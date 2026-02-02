@@ -1,27 +1,34 @@
 // nostr-utils.js
 const secp = require('@noble/secp256k1');
-const bech32 = require('bech32');
+const { nip19 } = require('nostr-tools');
 const crypto = require('crypto');
 
 function bech32Decode(bech) {
-  const { words } = bech32.decode(bech);
-  return Buffer.from(bech32.fromWords(words)).toString('hex');
+  const decoded = nip19.decode(bech);
+  return decoded.data;
 }
 
 function bech32Encode(prefix, hex) {
-  const words = bech32.toWords(Buffer.from(hex, 'hex'));
-  return bech32.encode(prefix, words);
+  if (prefix === 'npub') {
+    return nip19.npubEncode(hex);
+  } else if (prefix === 'nsec') {
+    return nip19.nsecEncode(hex);
+  }
+  throw new Error(`Unsupported prefix: ${prefix}`);
 }
 
 function privToPub(priv) {
   let hex = priv;
-  if (priv.startsWith('nsec')) hex = bech32Decode(priv);
-  const pub = secp.getPublicKey(hex).slice(1);
+  if (priv.startsWith('nsec')) {
+    const decoded = nip19.decode(priv);
+    hex = decoded.data;
+  }
+  const pub = secp.getPublicKey(hex, false).slice(1);
   return Buffer.from(pub).toString('hex');
 }
 
 function toNpub(pubhex) {
-  return bech32Encode('npub', pubhex);
+  return nip19.npubEncode(pubhex);
 }
 
 function canonicalEventSerialize(event) {
