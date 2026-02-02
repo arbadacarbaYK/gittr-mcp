@@ -1,6 +1,6 @@
 module.exports = {
-  // Bridge URL for HTTP API calls (git operations, bounties)
-  bridgeUrl: process.env.BRIDGE_URL || 'https://git.gittr.space',
+  // Main site URL for HTTP API calls (Next.js API routes)
+  bridgeUrl: process.env.BRIDGE_URL || 'https://gittr.space',
   
   // NIP-34 aware relays (git-specific, prioritize these)
   // Note: relay.noderunners.network has better NIP support than damus/nos.lol
