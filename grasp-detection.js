@@ -96,10 +96,22 @@ function detectGraspFromRepoEvent(tags) {
   };
 }
 
+/**
+ * Detect which relays from a list are GRASP servers
+ * @param {string[]} relays - Array of relay URLs
+ * @returns {Promise<string[]>} Array of GRASP server URLs
+ */
+async function detectGRASPServers(relays) {
+  // For now, just check against known domains
+  // In production, this would query each relay's capabilities
+  return relays.filter(isGraspServer);
+}
+
 module.exports = {
   KNOWN_GRASP_DOMAINS,
   isGraspServer,
   getGraspServers,
   getRegularRelays,
-  detectGraspFromRepoEvent
+  detectGraspFromRepoEvent,
+  detectGRASPServers
 };

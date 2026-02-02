@@ -1,6 +1,6 @@
 // gittr-nostr.js - Nostr operations for gittr (NIP-34 compliant)
 const fetch = require('node-fetch');
-const { SimplePool, nip19, getEventHash, getSignature } = require('nostr-tools');
+const { SimplePool, nip19, finalizeEvent, verifyEvent } = require('nostr-tools');
 const config = require('./config');
 const { detectGraspFromRepoEvent } = require('./grasp-detection');
 
@@ -27,12 +27,30 @@ function getPool() {
 }
 
 // Query repos by owner pubkey
-async function listRepos(pubkey, relays = config.relays) {
+async function listRepos(options = {}) {
+  const {
+    pubkey = null,
+    search = null,
+    limit = 100,
+    relays = config.relays
+  } = typeof options === 'string' ? { pubkey: options } : options;
+  
   const pool = getPool();
-  const events = await pool.querySync(relays, {
-    kinds: [KIND_REPOSITORY],
-    authors: [pubkey]
-  });
+  const filter = { kinds: [KIND_REPOSITORY] };
+  
+  // Add author filter if pubkey provided
+  if (pubkey) {
+    filter.authors = [pubkey];
+  }
+  
+  // Add search filter if provided
+  if (search) {
+    filter.search = search;
+  }
+  
+  filter.limit = limit;
+  
+  const events = await pool.querySync(relays, filter);
   
   return events.map(event => {
     const tags = Object.fromEntries(event.tags.filter(t => t.length >= 2));
@@ -42,6 +60,7 @@ async function listRepos(pubkey, relays = config.relays) {
       id: tags.d,
       name: tags.name,
       description: tags.description,
+      owner: event.pubkey,
       web: event.tags.filter(t => t[0] === 'web').map(t => t[1]),
       clone: cloneUrls,
       graspServers,
@@ -81,12 +100,28 @@ async function listIssues({ ownerPubkey, repoId, labels = [], relays = config.re
 }
 
 // Create and publish an issue
-async function createIssue({ ownerPubkey, repoId, subject, content, labels = [], privkey, relays = config.relays }) {
-  const pubkey = getPublicKey(privkey);
+async function createIssue(privkeyOrOptions, repoIdArg, ownerPubkeyArg, subjectArg, contentArg) {
+  // Support both object and positional parameters
+  let ownerPubkey, repoId, subject, content, labels, privkey, relays;
   
-  const event = {
+  if (typeof privkeyOrOptions === 'object' && privkeyOrOptions !== null && !Buffer.isBuffer(privkeyOrOptions)) {
+    // Object parameter style
+    ({ ownerPubkey, repoId, subject, content, labels = [], privkey, relays = config.relays } = privkeyOrOptions);
+  } else {
+    // Positional parameter style: createIssue(privkey, repoId, ownerPubkey, subject, content)
+    privkey = privkeyOrOptions;
+    repoId = repoIdArg;
+    ownerPubkey = ownerPubkeyArg;
+    subject = subjectArg;
+    content = contentArg;
+    labels = [];
+    relays = config.relays;
+  }
+  
+  const privkeyBuffer = typeof privkey === 'string' ? Buffer.from(privkey, 'hex') : privkey;
+  
+  const unsignedEvent = {
     kind: KIND_ISSUE,
-    pubkey,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
       ['a', `${KIND_REPOSITORY}:${ownerPubkey}:${repoId}`],
@@ -97,8 +132,7 @@ async function createIssue({ ownerPubkey, repoId, subject, content, labels = [],
     content
   };
   
-  event.id = getEventHash(event);
-  event.sig = getSignature(event, privkey);
+  const event = finalizeEvent(unsignedEvent, privkeyBuffer);
   
   const pool = getPool();
   await pool.publish(relays, event);
@@ -132,12 +166,31 @@ async function listPRs({ ownerPubkey, repoId, relays = config.relays }) {
 }
 
 // Create and publish a PR
-async function createPR({ ownerPubkey, repoId, subject, content, commitId, cloneUrls, branchName, labels = [], privkey, relays = config.relays }) {
-  const pubkey = getPublicKey(privkey);
+async function createPR(privkeyOrOptions, repoIdArg, ownerPubkeyArg, subjectArg, contentArg, baseBranchArg, headBranchArg, cloneUrlsArg) {
+  // Support both object and positional parameters
+  let ownerPubkey, repoId, subject, content, commitId, cloneUrls, branchName, labels, privkey, relays;
   
-  const event = {
+  if (typeof privkeyOrOptions === 'object' && privkeyOrOptions !== null && !Buffer.isBuffer(privkeyOrOptions)) {
+    // Object parameter style
+    ({ ownerPubkey, repoId, subject, content, commitId, cloneUrls, branchName, labels = [], privkey, relays = config.relays } = privkeyOrOptions);
+  } else {
+    // Positional parameter style: createPR(privkey, repoId, ownerPubkey, subject, content, baseBranch, headBranch, cloneUrls)
+    privkey = privkeyOrOptions;
+    repoId = repoIdArg;
+    ownerPubkey = ownerPubkeyArg;
+    subject = subjectArg;
+    content = contentArg;
+    branchName = headBranchArg;
+    commitId = 'HEAD'; // Default commit
+    cloneUrls = cloneUrlsArg || [];
+    labels = [];
+    relays = config.relays;
+  }
+  
+  const privkeyBuffer = typeof privkey === 'string' ? Buffer.from(privkey, 'hex') : privkey;
+  
+  const unsignedEvent = {
     kind: KIND_PULL_REQUEST,
-    pubkey,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
       ['a', `${KIND_REPOSITORY}:${ownerPubkey}:${repoId}`],
@@ -151,8 +204,7 @@ async function createPR({ ownerPubkey, repoId, subject, content, commitId, clone
     content
   };
   
-  event.id = getEventHash(event);
-  event.sig = getSignature(event, privkey);
+  const event = finalizeEvent(unsignedEvent, privkeyBuffer);
   
   const pool = getPool();
   await pool.publish(relays, event);
@@ -162,11 +214,10 @@ async function createPR({ ownerPubkey, repoId, subject, content, commitId, clone
 
 // Publish repository announcement (kind 30617)
 async function publishRepoAnnouncement({ repoId, name, description, web, clone, privkey, relays = config.relays }) {
-  const pubkey = getPublicKey(privkey);
+  const privkeyBuffer = typeof privkey === 'string' ? Buffer.from(privkey, 'hex') : privkey;
   
-  const event = {
+  const unsignedEvent = {
     kind: KIND_REPOSITORY,
-    pubkey,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
       ['d', repoId],
@@ -179,8 +230,7 @@ async function publishRepoAnnouncement({ repoId, name, description, web, clone, 
     content: ''
   };
   
-  event.id = getEventHash(event);
-  event.sig = getSignature(event, privkey);
+  const event = finalizeEvent(unsignedEvent, privkeyBuffer);
   
   const pool = getPool();
   await pool.publish(relays, event);
@@ -190,11 +240,10 @@ async function publishRepoAnnouncement({ repoId, name, description, web, clone, 
 
 // Publish repository state (kind 30618)
 async function publishRepoState({ repoId, refs, privkey, relays = config.relays }) {
-  const pubkey = getPublicKey(privkey);
+  const privkeyBuffer = typeof privkey === 'string' ? Buffer.from(privkey, 'hex') : privkey;
   
-  const event = {
+  const unsignedEvent = {
     kind: KIND_REPOSITORY_STATE,
-    pubkey,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
       ['d', repoId],
@@ -203,8 +252,7 @@ async function publishRepoState({ repoId, refs, privkey, relays = config.relays 
     content: ''
   };
   
-  event.id = getEventHash(event);
-  event.sig = getSignature(event, privkey);
+  const event = finalizeEvent(unsignedEvent, privkeyBuffer);
   
   const pool = getPool();
   await pool.publish(relays, event);
@@ -229,15 +277,47 @@ async function pushToBridge({ ownerPubkey, repo, branch, files, commitMessage })
   return response.json();
 }
 
+// Create bounty via bridge API (HTTP)
+async function createBounty(ownerPubkey, repoId, issueId, amount, description) {
+  const response = await fetch(`${config.bridgeUrl}/api/bounty/create`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ownerPubkey,
+      repoId,
+      issueId,
+      amount,
+      description
+    })
+  });
+  
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Bounty creation failed: ${error}`);
+  }
+  
+  return response.json();
+}
+
 // Helper: Get public key from private key
 function getPublicKey(privkey) {
+  if (!privkey) {
+    throw new Error('Private key is required');
+  }
+  
   let hex = privkey;
-  if (privkey.startsWith('nsec')) {
+  
+  // Handle nsec format
+  if (typeof privkey === 'string' && privkey.startsWith('nsec')) {
     const decoded = nip19.decode(privkey);
     hex = decoded.data;
   }
+  
+  // Convert hex string to Buffer if needed
+  const privateKeyBuffer = typeof hex === 'string' ? Buffer.from(hex, 'hex') : hex;
+  
   const { getPublicKey } = require('@noble/secp256k1');
-  return Buffer.from(getPublicKey(hex, false).slice(1)).toString('hex');
+  return Buffer.from(getPublicKey(privateKeyBuffer, false).slice(1)).toString('hex');
 }
 
 module.exports = {
@@ -247,8 +327,10 @@ module.exports = {
   listPRs,
   createPR,
   publishRepoAnnouncement,
+  publishRepo: publishRepoAnnouncement, // Alias for convenience
   publishRepoState,
   pushToBridge,
+  createBounty,
   KIND_REPOSITORY,
   KIND_ISSUE,
   KIND_PULL_REQUEST
