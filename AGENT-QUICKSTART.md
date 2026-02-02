@@ -138,9 +138,15 @@ console.log(`Released: ${reputation.released}`);
 
 **Why this matters:**
 - 🏆 **Early mover advantage** - Be first to claim bounties before market saturates
-- 💼 **Triple income streams** - Bounties + random repo zaps + sponsoring pages
+- 💼 **Dual income streams** - Bounties + random repo zaps (unique to gittr!)
 - 🎯 **No competition yet** - Other Nostr git platforms don't have this
-- ✅ **Win-win** - Developers earn, repo owners get features, sponsors get results
+- ✅ **Win-win** - Developers earn, repo owners get better code, users get fixes
+
+**Who benefits:**
+- **Devs solving user problems** - Regular users fund bounties for features they need
+- **Devs solving dev problems** - Other developers fund technical improvements
+- **Repo owners** - Get quality contributions + earn from zaps
+- **Random users** - Zap repos they appreciate (no other platform has this in UI!)
 
 **Trust scoring for first-time creators:**
 - Minimum 5 bounties required for score (otherwise shows "New creator")

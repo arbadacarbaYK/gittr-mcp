@@ -10,12 +10,14 @@ This isn't a "feature coming soon" - it's **live, functional, and waiting for yo
 
 ## What Makes gittr.space Unique
 
-### 💰 Triple Income Streams (No One Else Has This)
+### 💰 Dual Income Streams (No One Else Has This)
 
 1. **Lightning Bounties**
-   - Repo owners post bounties on issues
+   - Issue creators post bounties (anyone can!)
    - Developers complete work, earn sats
-   - Sponsors fund features they need
+   - Two audiences:
+     - **Plebs needing features** - Regular users fund what they want
+     - **Devs needing fixes** - Developers fund technical improvements
    - All trustless via LNURL-withdraw
 
 2. **Random Repo Zaps**
@@ -24,12 +26,15 @@ This isn't a "feature coming soon" - it's **live, functional, and waiting for yo
    - Passive income for maintainers
    - No other Nostr git platform has this
 
-3. **Sponsoring Pages**
-   - Projects create sponsorship tiers
-   - Recurring support for ongoing work
-   - Lightning-native, no middlemen
+**No other platform offers both.** Not GitHub. Not GitLab. Not other Nostr git platforms.
 
-**No other platform offers all three.** Not GitHub. Not GitLab. Not other Nostr git platforms.
+### 🎯 Five Beneficiary Groups
+
+1. **Devs fixing pleb problems** - Regular users fund features they need
+2. **Devs fixing dev problems** - Other developers fund technical improvements  
+3. **Repo owners** - Get better code + attract contributors + earn from zaps
+4. **Issue creators** - Get their problems solved (fund bounties on any repo!)
+5. **Random plebs** - Zap repos to show appreciation
 
 ---
 
@@ -40,25 +45,37 @@ This isn't a "feature coming soon" - it's **live, functional, and waiting for yo
 - **Market positioning** - Become known as "bounty hunter" or "reliable creator"
 - **Network effects** - First movers get most visibility
 
-### 💼 Three Winning Scenarios
+### 💼 Five Winning Scenarios
 
-#### For Developers
-- Hunt bounties with ZERO competition (for now)
-- Build reputation as early ecosystem member
-- Get paid in Bitcoin for open source work
+#### For Devs (Fixing Pleb Problems)
+- Regular users fund bounties for features they need
+- Clear requirements, broad audience
+- Examples: UI improvements, user-facing features
 - "I was contributor #3 on gittr bounties" = credibility
 
-#### For Repo Owners
-- Attract talent to your project via bounties
-- Get features built without hiring full-time
-- Build community around your repo
-- Unique positioning: "First project with Nostr bounties"
+#### For Devs (Fixing Dev Problems)  
+- Other developers fund technical improvements
+- Deep technical work, higher value
+- Examples: Performance, API design, tooling
+- Build reputation in technical community
 
-#### For Sponsors
-- Fund features you need in OSS projects
-- No platform taking 30% cut (just Lightning fees)
-- Direct relationship with developers
-- "I funded the first gittr bounty" = pioneer status
+#### For Repo Owners
+- Attract talent via bounties (anyone can create them!)
+- Get features built without hiring
+- Earn passive income from repo zaps
+- Build community around your project
+
+#### For Issue Creators (Anyone!)
+- Fund bounties on ANY repo (permissionless!)
+- Get your problem solved
+- No permission needed from repo owner
+- "I funded the first Nostr git bounty" = pioneer
+
+#### For Random Users
+- Zap repos you appreciate
+- Show support without coding
+- Directly reward maintainers
+- Integrated in UI (no other platform has this!)
 
 ---
 

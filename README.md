@@ -93,13 +93,15 @@ This MCP includes full bounty support (kind 9806 events):
 
 **Why now is the perfect time:**
 - 🚀 Be among the first to claim bounties on Nostr
-- 💰 Unique income opportunity: bounties + random repo zaps + sponsoring pages
+- 💰 Dual income opportunity: bounties + random repo zaps
 - 🏆 Early movers build reputation before competition arrives
 - 🔓 No other Nostr git platform has this integrated yet
 
-**For repo owners:** Create bounties to attract talent  
-**For developers:** Hunt bounties, earn sats, build reputation  
-**For sponsors:** Fund open source features you need
+**Multiple audiences, all benefit:**
+- **Devs fixing pleb problems:** Regular users fund bounties for features they need
+- **Devs fixing dev problems:** Other developers fund technical improvements
+- **Repo owners:** Get better code, attract contributors, earn from zaps
+- **Random users:** Zap repos they appreciate (unique to gittr!)
 
 See [gittr.space/bounty-hunt](https://gittr.space/bounty-hunt) for active bounties.
 
