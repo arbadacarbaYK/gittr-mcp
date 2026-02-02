@@ -46,7 +46,7 @@ const issue = await gittr.createIssue(
 );
 ```
 
-See [AGENT-QUICKSTART.md](AGENT-QUICKSTART.md) for detailed examples.
+See [docs/AGENT-QUICKSTART.md](docs/AGENT-QUICKSTART.md) for detailed examples.
 
 ## Configuration
 
@@ -65,9 +65,9 @@ module.exports = {
 
 ## Documentation
 
-- **[AGENT-QUICKSTART.md](AGENT-QUICKSTART.md)** - 5-minute agent guide with examples
-- **[NIP34-SCHEMAS.md](NIP34-SCHEMAS.md)** - Event schemas
-- **[TEST-VALIDATION.md](TEST-VALIDATION.md)** - Test results and validation
+- **[docs/AGENT-QUICKSTART.md](docs/AGENT-QUICKSTART.md)** - 5-minute agent guide with examples
+- **[docs/NIP34-SCHEMAS.md](docs/NIP34-SCHEMAS.md)** - Event schemas
+- **[docs/TEST-VALIDATION.md](docs/TEST-VALIDATION.md)** - Test results and validation
 
 ## Testing
 
@@ -81,7 +81,7 @@ node -e "const gittr = require('./gittr-nostr.js'); gittr.listRepos({ limit: 10 
 node -e "const gittr = require('./gittr-nostr.js'); gittr.listRepos({ search: 'bitcoin' }).then(r => console.log('Found', r.length, 'repos'));"
 ```
 
-See [TEST-VALIDATION.md](TEST-VALIDATION.md) for full test results.
+See [docs/TEST-VALIDATION.md](docs/TEST-VALIDATION.md) for full test results.
 
 ## Status
 
