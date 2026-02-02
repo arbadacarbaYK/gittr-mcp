@@ -66,16 +66,22 @@ module.exports = {
 ## Documentation
 
 - **[AGENT-QUICKSTART.md](AGENT-QUICKSTART.md)** - 5-minute agent guide with examples
-- **[ARCHITECTURE-DEEP-DIVE.md](ARCHITECTURE-DEEP-DIVE.md)** - System architecture
 - **[NIP34-SCHEMAS.md](NIP34-SCHEMAS.md)** - Event schemas
+- **[TEST-VALIDATION.md](TEST-VALIDATION.md)** - Test results and validation
 
 ## Testing
 
-Production test suite validates all functionality:
+Run basic validation:
 
 ```bash
-node test-gittr-mcp-production.js
+# Discover repos
+node -e "const gittr = require('./gittr-nostr.js'); gittr.listRepos({ limit: 10 }).then(r => console.log('Found', r.length, 'repos'));"
+
+# Search repos
+node -e "const gittr = require('./gittr-nostr.js'); gittr.listRepos({ search: 'bitcoin' }).then(r => console.log('Found', r.length, 'repos'));"
 ```
+
+See [TEST-VALIDATION.md](TEST-VALIDATION.md) for full test results.
 
 ## Status
 

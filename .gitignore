@@ -3,8 +3,9 @@ test-*.js
 *-test.js
 *.test.js
 
-# Test results (keep TEST-RESULTS.md in repo for users)
-# TEST-RESULTS.md is useful for agents to see it works
+# Dev test reports (keep TEST-VALIDATION.md only)
+TEST-REPORT.md
+TEST-RESULTS.md
 
 # Temp files
 *.tmp
