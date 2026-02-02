@@ -14,14 +14,20 @@
 ## Installation
 
 ```bash
+npm install gittr-mcp
+```
+
+**Or clone from source:**
+```bash
+git clone https://github.com/arbadacarbaYK/gittr-mcp.git
+cd gittr-mcp
 npm install
 ```
 
 ## Quick Start
 
 ```javascript
-const gittr = require('./gittr-nostr.js');
-const config = require('./config.js');
+const gittr = require('gittr-mcp');
 
 // Discover repositories
 const repos = await gittr.listRepos({ limit: 100 });
@@ -50,17 +56,20 @@ See [docs/AGENT-QUICKSTART.md](docs/AGENT-QUICKSTART.md) for detailed examples.
 
 ## Configuration
 
-Edit `config.js` to customize Nostr relays and bridge URL:
+The MCP uses default Nostr relays and gittr.space bridge. To customize, set environment variables:
+
+```bash
+export GITTR_BRIDGE_URL="https://git.gittr.space"
+export GITTR_RELAYS="wss://relay.ngit.dev,wss://git.shakespeare.diy"
+```
+
+Or pass config when calling functions:
 
 ```javascript
-module.exports = {
-  relays: [
-    'wss://relay.ngit.dev',  // Primary GRASP server
-    'wss://git.shakespeare.diy',
-    // ... more relays
-  ],
-  bridgeUrl: 'https://git.gittr.space'
-};
+const repos = await gittr.listRepos({ 
+  relays: ['wss://your-relay.com'],
+  limit: 100 
+});
 ```
 
 ## Documentation

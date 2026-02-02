@@ -49,3 +49,11 @@ SECURITY-AND-CORRECTIONS.md
 TRUST-SCORING.md
 PRODUCTION-READY.md
 FIRST-MOVER-ADVANTAGE.md
+GITHUB-METADATA.md
+
+# Unused server code (library-only package)
+server.js
+agent-reference.js
+gittr-shell.js
+nostr-utils.js
+tests/

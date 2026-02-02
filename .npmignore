@@ -1,0 +1,46 @@
+# Don't publish these to npm
+*.md
+!README.md
+!docs/AGENT-QUICKSTART.md
+!docs/NIP34-SCHEMAS.md
+!docs/TEST-VALIDATION.md
+
+# Test files
+test-*.js
+*-test.js
+*.test.js
+tests/
+
+# Dev files (exclude from npm package)
+server.js
+agent-reference.js
+gittr-shell.js
+nostr-utils.js
+gittr-nostr.js
+GITHUB-METADATA.md
+ARCHITECTURE-DEEP-DIVE.md
+ARCHITECTURE.md
+REALITY-CHECK.md
+SECURITY-AND-CORRECTIONS.md
+TRUST-SCORING.md
+PRODUCTION-READY.md
+FIRST-MOVER-ADVANTAGE.md
+
+# Git
+.git
+.gitignore
+.github
+
+# Editor
+.vscode
+.idea
+*.swp
+*~
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
