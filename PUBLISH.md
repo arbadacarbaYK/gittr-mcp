@@ -1,73 +1,144 @@
-# Publishing to npm
+# Publishing gittr-mcp to npm
 
 ## Prerequisites
 
-1. npm account (create at https://www.npmjs.com/signup)
-2. Login locally: `npm login`
-3. Verify: `npm whoami`
-
-## Pre-publish Checklist
-
-- [x] Clean package structure (library-only, no server)
-- [x] index.js as main entry point
-- [x] package.json updated (name, version, keywords, author)
-- [x] README.md shows npm install instructions
-- [x] .npmignore configured (excludes dev files)
-- [x] Dependencies minimal (nostr-tools, websocket-polyfill)
-- [x] Test dry-run: `npm pack --dry-run`
+✅ All done:
+- [x] Package tested end-to-end
+- [x] README.md complete with examples
+- [x] docs/AGENT-WORKFLOW.md guide created
+- [x] Code pushed to GitHub
+- [x] Version set to 1.0.0
+- [x] Lightning address for tips: arbadacarba@btip.nl
+- [x] All dependencies installed (nostr-tools, websocket-polyfill)
 
 ## Publish Steps
 
-```bash
-# 1. Test what will be published
-npm pack --dry-run
+### 1. Create npm Account (if needed)
 
-# 2. Create tarball (optional, for inspection)
-npm pack
+**Option A:** Use Yvette's npm account
+- Username: (to be determined)
+- Email: proper gittr.space branded email
 
-# 3. Publish to npm
-npm publish
+**Option B:** Create new account at https://npmjs.com/signup
+- Username: gittrspace or satopshq
+- Email: info@gittr.space or similar
+- Password: save to ~/.npm-credentials.txt
 
-# 4. Verify published
-npm view gittr-mcp
-```
-
-## Post-publish
-
-- [ ] Update MEMORY.md with npm package link
-- [ ] Post to Moltbook announcing npm release
-- [ ] Tweet about it (@arbadacarbaYK)
-- [ ] Add npm badge to README
-
-## Version Updates
+### 2. Login to npm
 
 ```bash
-# Patch (bug fixes): 1.0.0 → 1.0.1
-npm version patch
-
-# Minor (new features): 1.0.0 → 1.1.0
-npm version minor
-
-# Major (breaking changes): 1.0.0 → 2.0.0
-npm version major
-
-# Then publish
-npm publish
+npm login
 ```
 
-## npm Badges for README
+Enter credentials when prompted.
 
-```markdown
-[![npm version](https://badge.fury.io/js/gittr-mcp.svg)](https://www.npmjs.com/package/gittr-mcp)
-[![downloads](https://img.shields.io/npm/dm/gittr-mcp.svg)](https://www.npmjs.com/package/gittr-mcp)
-```
+### 3. Publish
 
----
-
-**First publish command:**
 ```bash
 cd gittr-mcp
 npm publish
 ```
 
-That's it! 🚀
+**Expected output:**
+```
++ gittr-mcp@1.0.0
+```
+
+### 4. Verify
+
+```bash
+npm info gittr-mcp
+```
+
+Should show version 1.0.0 published.
+
+### 5. Test Installation
+
+```bash
+cd /tmp
+mkdir test-install
+cd test-install
+npm install gittr-mcp
+node -e "const gittr = require('gittr-mcp'); console.log('✅ Installed:', Object.keys(gittr));"
+```
+
+## Announcement Plan
+
+### After npm publish succeeds:
+
+**1. X/Twitter** (see posts/twitter.txt)
+- Option 1: Short announcement (120 chars)
+- Option 2: Thread (4 tweets with details)
+
+**2. Nostr** (see posts/nostr.md)
+- Long-form article with full technical details
+- Post to all GRASP-aware relays
+
+**3. Moltbook** (when claimed)
+- Post announcement to /m/general
+- Cross-post to /m/bitcoin and /m/coding
+
+**4. Reddit**
+- r/nostr - "gittr-mcp: Enable AI agents to push code via Nostr"
+- r/Bitcoin - Lightning angle (bounties, payments)
+
+**5. ClawHub** (after adoption proven)
+- Wait for 10+ npm installs
+- Submit to skill marketplace
+- Tag: nostr, mcp, agent-tools, bitcoin, lightning
+
+**6. GitHub**
+- Update repo description
+- Add topics/tags (see GITHUB-METADATA.md)
+- Pin repository
+
+## Post-Launch
+
+### Monitor
+- npm downloads: https://npmjs.com/package/gittr-mcp
+- GitHub stars/issues
+- Moltbook mentions
+- Lightning tips received
+
+### Support
+- Respond to GitHub issues
+- Update docs based on feedback
+- Add examples as requested
+- Consider video tutorial
+
+### Marketing
+- Share success stories
+- Feature agents using gittr-mcp
+- Build integrations (OpenClaw, mcporter, etc.)
+- Write blog post on gittr.space
+
+## Success Metrics
+
+**Week 1:**
+- 50+ npm downloads
+- 10+ GitHub stars
+- 1+ Lightning tip received
+
+**Month 1:**
+- 200+ npm downloads
+- 50+ GitHub stars
+- 5+ agents actively using
+- 1+ PR to gittr-mcp from community
+
+**Month 3:**
+- Featured in agent toolkit lists
+- 1,000+ npm downloads
+- Integration with major agent frameworks
+- gittr.space as go-to platform for agent code placement
+
+## Next Steps
+
+1. ✅ Wait for proper gittr.space email setup
+2. ✅ npm signup with branded email
+3. ✅ npm publish
+4. ✅ Execute announcement wave
+5. ✅ Monitor & respond to feedback
+
+---
+
+**Ready to ship!** 🚀
