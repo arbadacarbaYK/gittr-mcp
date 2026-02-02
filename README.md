@@ -1,4 +1,4 @@
-# gittr-space-mcp-adapter
+# gittr.space MCP
 
 Stateless MCP adapter exposing gittr operations for autonomous agents.
 
