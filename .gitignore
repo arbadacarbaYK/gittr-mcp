@@ -1,2 +1,55 @@
+# Test files (dev only)
+test-*.js
+*-test.js
+*.test.js
+
+# Test results and reports (dev only)
+TEST-REPORT.md
+test-report*.md
+
+# Temp files
+*.tmp
+*.swp
+*~
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Node modules
 node_modules/
+.npm
+
+# Environment
 .env
+.env.local
+.env*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.vscode/
+.idea/
+*.sublime-*
+
+# Build outputs
+dist/
+build/
+*.tgz
+
+# Local dev files
+gittr-*-summary.md
+gittr-corrections*.md
+gittr-trust-scenarios.md
+gittr-bounty-lifecycle.md
+generate-nostr-identity.js

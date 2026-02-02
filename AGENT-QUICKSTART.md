@@ -108,14 +108,19 @@ console.log('PR created:', pr.event.id);
 - Use `pushToBridge()` with only the owner's PUBLIC key
 - No need to manage sensitive credentials
 
-### ✅ Built-in Bounty Discovery
-- Query repos by keyword
-- List open issues across all repos
-- Filter by labels, author, etc.
+### ✅ Issue & PR Management
+- Create issues on any repository
+- Submit pull requests with NIP-34 compliance
+- Query issues across all repos
 
 ### ✅ GRASP Server Detection
 - Automatically identifies dual-function servers
 - Clone repos from both HTTP and Nostr relays
+
+### ⏳ Coming Soon: Bounty System
+- Bounty discovery (`listBounties()`) - awaiting real bounties on platform
+- Creator reputation scoring - needs historical data
+- Expected value calculation - depends on bounty history
 
 ---
 
