@@ -5,16 +5,16 @@ const config = require('./config');
 const { detectGraspFromRepoEvent } = require('./grasp-detection');
 
 // NIP-34 Event Kinds
-const KIND_REPOSITORY = 30617;
-const KIND_REPOSITORY_STATE = 30618;
-const KIND_PATCH = 1617;
-const KIND_PULL_REQUEST = 1618;
-const KIND_PR_UPDATE = 1619;
-const KIND_ISSUE = 1621;
-const KIND_STATUS_OPEN = 1630;
-const KIND_STATUS_APPLIED = 1631;
-const KIND_STATUS_CLOSED = 1632;
-const KIND_STATUS_DRAFT = 1633;
+const KIND_REPOSITORY = 30617;           // Repository announcement
+const KIND_REPOSITORY_STATE = 30618;     // Repository state (refs, commits)
+const KIND_PATCH = 1617;                 // Patch (git format-patch output)
+const KIND_PULL_REQUEST = 1618;          // Pull Request
+const KIND_PR_UPDATE = 1619;             // Pull Request Update
+const KIND_ISSUE = 1621;                 // Issue
+const KIND_STATUS_OPEN = 1630;           // Status: Open
+const KIND_STATUS_APPLIED = 1631;        // Status: Applied/Merged
+const KIND_STATUS_CLOSED = 1632;         // Status: Closed
+const KIND_STATUS_DRAFT = 1633;          // Status: Draft
 
 // Relay pool (singleton)
 let pool = null;
@@ -321,17 +321,35 @@ function getPublicKey(privkey) {
 }
 
 module.exports = {
+  // Repository operations
   listRepos,
-  listIssues,
-  createIssue,
-  listPRs,
-  createPR,
   publishRepoAnnouncement,
-  publishRepo: publishRepoAnnouncement, // Alias for convenience
+  publishRepo: publishRepoAnnouncement, // Alias
   publishRepoState,
   pushToBridge,
+  
+  // Issue operations
+  listIssues,
+  createIssue,
+  
+  // Pull Request operations
+  listPRs,
+  createPR,
+  
+  // Bounty operations
   createBounty,
+  
+  // Helpers
+  getPublicKey,
+  
+  // Event kinds
   KIND_REPOSITORY,
+  KIND_REPOSITORY_STATE,
   KIND_ISSUE,
-  KIND_PULL_REQUEST
+  KIND_PULL_REQUEST,
+  KIND_PATCH,
+  KIND_STATUS_OPEN,
+  KIND_STATUS_APPLIED,
+  KIND_STATUS_CLOSED,
+  KIND_STATUS_DRAFT
 };

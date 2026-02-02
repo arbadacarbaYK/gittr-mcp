@@ -1,15 +1,6 @@
 # gittr-mcp
 
-**Model Context Protocol (MCP) for gittr.space** - Enables AI agents to interact with decentralized Git on Nostr.
-
-## Features
-
-- 🔍 **Discover repositories** from Nostr relays (NIP-34 compliant)
-- 🔎 **Search repos** by keyword, owner, or topic
-- 📝 **Create issues and PRs** with proper NIP-34 event structure
-- 📤 **Push code changes** using only owner's public key (no private key needed!)
-- ⚡ **Lightning bounties** (kind 9806 events on Nostr)
-- 🔐 **GRASP server detection** for dual-function git+relay servers
+**Model Context Protocol for gittr.space** - enables AI agents to interact with Git repositories on Nostr.
 
 ## Installation
 
@@ -17,137 +8,350 @@
 npm install gittr-mcp
 ```
 
-**Or clone from source:**
-```bash
-git clone https://github.com/arbadacarbaYK/gittr-mcp.git
-cd gittr-mcp
-npm install
-```
-
 ## Quick Start
 
 ```javascript
 const gittr = require('gittr-mcp');
 
-// Discover repositories
-const repos = await gittr.listRepos({ limit: 100 });
-console.log(`Found ${repos.length} repos`);
-
-// Search by keyword
-const bitcoinRepos = await gittr.listRepos({ 
-  search: 'bitcoin', 
-  limit: 20 
+// Push files to gittr (NO signing required)
+const pushResult = await gittr.pushToBridge({
+  ownerPubkey: 'your-64-char-hex-pubkey',
+  repo: 'my-repo',
+  branch: 'main',
+  files: [
+    { path: 'README.md', content: '# Hello World' },
+    { path: 'src/index.js', content: 'console.log("Hello!");' }
+  ]
 });
 
-// List issues
-const issues = await gittr.listIssues({ limit: 50 });
+// Publish to Nostr (REQUIRES signing with private key)
+await gittr.publishRepoAnnouncement({
+  repoId: 'my-repo',
+  name: 'my-repo',
+  description: 'My awesome project',
+  web: ['https://gittr.space/npub.../my-repo'],
+  clone: ['https://relay.ngit.dev/pubkey.../my-repo.git'],
+  privkey: 'your-private-key-hex',
+  relays: ['wss://relay.ngit.dev']
+});
 
-// Create issue (requires private key)
-const issue = await gittr.createIssue(
-  myPrivateKey,
-  'repo-name',
-  'owner-pubkey',
-  'Issue title',
-  'Issue description...'
-);
+await gittr.publishRepoState({
+  repoId: 'my-repo',
+  refs: pushResult.refs,
+  privkey: 'your-private-key-hex',
+  relays: ['wss://relay.ngit.dev']
+});
 ```
 
-See [docs/AGENT-QUICKSTART.md](docs/AGENT-QUICKSTART.md) for detailed examples.
+## Two-Step Workflow
 
-## Configuration
+### Step 1: Push Files (No Signing)
 
-The MCP uses default Nostr relays and gittr.space bridge. To customize, set environment variables:
-
-```bash
-export GITTR_BRIDGE_URL="https://git.gittr.space"
-export GITTR_RELAYS="wss://relay.ngit.dev,wss://git.shakespeare.diy"
-```
-
-Or pass config when calling functions:
+The bridge API accepts files without requiring Nostr signing:
 
 ```javascript
-const repos = await gittr.listRepos({ 
-  relays: ['wss://your-relay.com'],
-  limit: 100 
+const result = await gittr.pushToBridge({
+  ownerPubkey: '<64-char-hex-pubkey>',
+  repo: 'repo-name',
+  branch: 'main',
+  files: [
+    { path: 'file.txt', content: 'content' }
+  ]
+});
+
+console.log('Commit:', result.refs[0].commit);
+```
+
+**What happens:**
+- Files are pushed to git server (https://gittr.space)
+- Git commit is created with provided files
+- Returns commit SHA for Nostr state event
+
+**No signing required** - this is a standard HTTP API call.
+
+### Step 2: Publish to Nostr (Requires Signing)
+
+For files to appear on gittr.space, you must publish Nostr events:
+
+```javascript
+// Announce repository (kind 30617)
+const announceResult = await gittr.publishRepoAnnouncement({
+  repoId: 'repo-name',
+  name: 'My Repo',
+  description: 'Description',
+  web: ['https://gittr.space/npub.../repo-name'],
+  clone: ['https://relay.ngit.dev/<pubkey>/repo-name.git'],
+  privkey: '<your-private-key-hex>',
+  relays: ['wss://relay.ngit.dev'] // MUST match clone URL domain
+});
+
+// Publish state (kind 30618)
+const stateResult = await gittr.publishRepoState({
+  repoId: 'repo-name',
+  refs: result.refs, // From step 1
+  privkey: '<your-private-key-hex>',
+  relays: ['wss://relay.ngit.dev']
 });
 ```
 
-## Documentation
+**What happens:**
+- Creates Nostr events signed with your private key
+- Announces repository metadata to Nostr relays
+- Publishes current refs/commits
 
-- **[docs/AGENT-QUICKSTART.md](docs/AGENT-QUICKSTART.md)** - 5-minute agent guide with examples
-- **[docs/NIP34-SCHEMAS.md](docs/NIP34-SCHEMAS.md)** - Event schemas
-- **[docs/TEST-VALIDATION.md](docs/TEST-VALIDATION.md)** - Test results and validation
+**⚠️ Security:** Never commit your private key. Use environment variables.
 
-## Testing
+## API Reference
 
-Run basic validation:
+### Repository Operations
 
-```bash
-# Discover repos
-node -e "const gittr = require('./gittr-nostr.js'); gittr.listRepos({ limit: 10 }).then(r => console.log('Found', r.length, 'repos'));"
+#### `pushToBridge(options)`
 
-# Search repos
-node -e "const gittr = require('./gittr-nostr.js'); gittr.listRepos({ search: 'bitcoin' }).then(r => console.log('Found', r.length, 'repos'));"
+Push files to git server (NO signing required).
+
+**Parameters:**
+- `ownerPubkey` (string) - 64-char hex pubkey
+- `repo` (string) - Repository name
+- `branch` (string) - Branch name (default: 'main')
+- `files` (array) - Array of `{ path, content }` objects
+  - `path` (string) - File path (e.g., 'src/index.js')
+  - `content` (string) - File content (UTF-8)
+  - `isBinary` (boolean, optional) - If true, content is base64
+
+**Returns:**
+```javascript
+{
+  success: true,
+  pushedFiles: 2,
+  refs: [
+    { ref: 'refs/heads/main', commit: 'abc123...' }
+  ]
+}
 ```
 
-See [docs/TEST-VALIDATION.md](docs/TEST-VALIDATION.md) for full test results.
+#### `publishRepoAnnouncement(options)`
 
-## Status
+Publish repository to Nostr (kind 30617). **REQUIRES signing.**
 
-✅ **Production Ready** - All core functionality tested and working.
+**Parameters:**
+- `repoId` (string) - Repository identifier
+- `name` (string) - Human-readable name
+- `description` (string) - Repository description
+- `web` (array) - Web URLs (e.g., gittr.space links)
+- `clone` (array) - Git clone URLs (MUST match relay domains)
+- `privkey` (string) - 64-char hex private key
+- `relays` (array) - Relay URLs (MUST include GRASP server from clone URLs)
 
-### 🎯 Early Mover Opportunity: Bounty System
+**Returns:**
+```javascript
+{
+  success: true,
+  event: { id: '...', sig: '...', ... }
+}
+```
 
-**gittr.space is THE FIRST Nostr git platform to implement Lightning bounties!** 
+**⚠️ CRITICAL:** Clone URL domain MUST be in relays array:
+```javascript
+// ✅ CORRECT
+clone: ['https://relay.ngit.dev/<pubkey>/repo.git']
+relays: ['wss://relay.ngit.dev']
 
-This MCP includes full bounty support (kind 9806 events):
-- ✅ Bounty discovery from Nostr relays
-- ✅ Creator reputation tracking
-- ✅ Trust scoring for risk assessment
-- ✅ Expected value calculations
+// ❌ WRONG - domains don't match
+clone: ['https://git.gittr.space/<pubkey>/repo.git']
+relays: ['wss://relay.noderunners.network']
+```
 
-**Why now is the perfect time:**
-- 🚀 Be among the first to claim bounties on Nostr
-- 💰 Dual income opportunity: bounties + random repo zaps
-- 🏆 Early movers build reputation before competition arrives
-- 🔓 No other Nostr git platform has this integrated yet
+#### `publishRepoState(options)`
 
-**Multiple audiences, all benefit:**
-- **Devs fixing pleb problems:** Regular users fund bounties for features they need
-- **Devs fixing dev problems:** Other developers fund technical improvements
-- **Repo owners:** Get better code, attract contributors, earn from zaps
-- **Random users:** Zap repos they appreciate (unique to gittr!)
+Publish repository state to Nostr (kind 30618). **REQUIRES signing.**
 
-See [gittr.space/bounty-hunt](https://gittr.space/bounty-hunt) for active bounties.
+**Parameters:**
+- `repoId` (string) - Repository identifier
+- `refs` (array) - Array of `{ name, commit }` objects
+  - `name` (string) - Ref name (e.g., 'refs/heads/main')
+  - `commit` (string) - Commit SHA
+- `privkey` (string) - 64-char hex private key
+- `relays` (array) - Relay URLs
 
-### Known Limitations
-- Repo discovery limited by relay query limits (use batching for 1500+ repos)
-- Bridge repo sync takes time (repos appear on relays after git push)
+**Returns:**
+```javascript
+{
+  success: true,
+  event: { id: '...', sig: '...', ... }
+}
+```
 
-## NIP-34 Compliance
+#### `listRepos(options)`
 
-This MCP implements [NIP-34](https://nips.nostr.com/34) for git repositories on Nostr:
-- **Kind 30617**: Repository announcements
-- **Kind 1621**: Issues
-- **Kind 1618**: Pull requests
-- **Kind 1617**: Patches
-- **Kind 9806**: Bounties (custom)
+Discover repositories from Nostr relays.
 
-## Support This Project ⚡
+**Parameters:**
+- `pubkey` (string, optional) - Filter by owner pubkey
+- `search` (string, optional) - Search term
+- `limit` (number, optional) - Max results (default: 100)
+- `relays` (array, optional) - Custom relay list
 
-If this MCP helps you earn sats, consider zapping the builder:
+**Returns:**
+```javascript
+[
+  {
+    id: 'repo-name',
+    name: 'My Repo',
+    description: 'Description',
+    owner: 'pubkey...',
+    web: ['https://...'],
+    clone: ['https://...'],
+    graspServers: ['relay.ngit.dev'],
+    relays: ['wss://relay.ngit.dev'],
+    event: { ... }
+  }
+]
+```
 
-**Lightning:** `vivaciouscloud391379@getalby.com`
+### Issue Operations
 
----
+#### `listIssues(options)`
+
+List issues for a repository.
+
+**Parameters:**
+- `ownerPubkey` (string) - Repository owner pubkey
+- `repoId` (string) - Repository identifier
+- `labels` (array, optional) - Filter by labels
+- `relays` (array, optional) - Custom relay list
+
+#### `createIssue(options)`
+
+Create an issue. **REQUIRES signing.**
+
+**Parameters:**
+- `ownerPubkey` (string) - Repository owner pubkey
+- `repoId` (string) - Repository identifier
+- `subject` (string) - Issue title
+- `content` (string) - Issue description (markdown)
+- `labels` (array, optional) - Issue labels
+- `privkey` (string) - 64-char hex private key
+- `relays` (array, optional) - Relay URLs
+
+### Pull Request Operations
+
+#### `listPRs(options)`
+
+List pull requests for a repository.
+
+**Parameters:**
+- `ownerPubkey` (string) - Repository owner pubkey
+- `repoId` (string) - Repository identifier
+- `relays` (array, optional) - Custom relay list
+
+#### `createPR(options)`
+
+Create a pull request. **REQUIRES signing.**
+
+**Parameters:**
+- `ownerPubkey` (string) - Repository owner pubkey
+- `repoId` (string) - Repository identifier
+- `subject` (string) - PR title
+- `content` (string) - PR description (markdown)
+- `commitId` (string) - Tip commit SHA
+- `cloneUrls` (array) - Git clone URLs for PR branch
+- `branchName` (string) - PR branch name
+- `labels` (array, optional) - PR labels
+- `privkey` (string) - 64-char hex private key
+- `relays` (array, optional) - Relay URLs
+
+### Bounty Operations
+
+**⚠️ Note:** Bounty system exists in gittr code but no active bounties yet on platform.
+
+#### `createBounty(ownerPubkey, repoId, issueId, amount, description)`
+
+Create a Lightning bounty for an issue.
+
+**Parameters:**
+- `ownerPubkey` (string) - Repository owner pubkey
+- `repoId` (string) - Repository identifier
+- `issueId` (string) - Issue event ID
+- `amount` (number) - Bounty amount in sats
+- `description` (string) - Bounty description
+
+## Known GRASP Servers
+
+GRASP servers are both Nostr relays (wss://) AND git servers (https://):
+
+- `relay.ngit.dev` (recommended - accepts all repos)
+- `git.shakespeare.diy`
+- `ngit-relay.nostrver.se`
+- `git-01.uid.ovh`
+- `git-02.uid.ovh`
+- `ngit.danconwaydev.com`
+- `git.gittr.space` (gittr's server)
+
+**Usage:**
+```javascript
+const graspDomain = 'relay.ngit.dev';
+
+const announceResult = await gittr.publishRepoAnnouncement({
+  // ...
+  clone: [`https://${graspDomain}/<pubkey>/repo.git`],
+  relays: [`wss://${graspDomain}`] // MUST match clone domain
+});
+```
+
+## Common Issues
+
+### "Announcement must list service in both clone and relays tags"
+
+**Cause:** Clone URL domain doesn't match any relay.
+
+**Solution:** Extract domain from clone URL and add as `wss://<domain>` to relays.
+
+### Repo shows "0 files" on gittr.space
+
+**Cause:** Only pushed files (step 1), didn't publish to Nostr (step 2).
+
+**Solution:** Run both `publishRepoAnnouncement()` and `publishRepoState()`.
+
+### "duplicate url" error
+
+**Cause:** Publishing to same relay multiple times.
+
+**Solution:** Non-fatal - events published successfully. De-duplicate relays array.
+
+## Security
+
+- **Never commit private keys** - use environment variables
+- Only Nostr operations require signing (issues, PRs, announcements)
+- Bridge push (files) does NOT require signing
+- Store keys securely (e.g., `~/.nostr-identity.json` with 0600 permissions)
+
+## Complete Example
+
+See [docs/AGENT-WORKFLOW.md](docs/AGENT-WORKFLOW.md) for full end-to-end examples.
+
+## Support
+
+If you're earning sats with this MCP, consider zapping the builder!
+
+⚡ **Lightning:** arbadacarba@btip.nl
+
+**Fair deal:**
+- Used successfully? → 1,000-5,000 sats
+- Built bounty agent? → 10,000+ sats
+- Earned big? → 1-5% of your take
+
+Top supporters (10k+ sats) get:
+- Listed in SUPPORTERS.md
+- Priority feature requests
+- Direct support access
+
+## Links
+
+- **GitHub:** https://github.com/arbadacarbaYK/gittr-mcp
+- **gittr.space:** https://gittr.space
+- **NIP-34 Spec:** https://github.com/nostr-protocol/nips/blob/master/34.md
+- **Builder:** @arbadacarba (Telegram), @arbadacarbaYK (Twitter)
 
 ## License
 
 MIT
-
-## Links
-
-- **GitHub**: https://github.com/arbadacarbaYK/gittr-mcp
-- **gittr.space**: https://gittr.space (by [@arbadacarbaYK](https://github.com/arbadacarbaYK))
-- **MCP built by**: SatOpsHQ ⚡ `vivaciouscloud391379@getalby.com`
-- **Nostr relays**: See config.js for current list
