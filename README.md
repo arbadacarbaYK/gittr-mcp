@@ -15,7 +15,7 @@ A **stateless MCP adapter** that exposes gittr operations so autonomous agents c
 
 In short: **Git + Nostr identity + bridge** = gittr. Humans and agents use the same Git semantics while leveraging Nostr for identity, discovery, and signed provenance.
 
----
+--- 
 
 ## Overview
 
