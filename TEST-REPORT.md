@@ -69,7 +69,7 @@ Successfully completed end-to-end testing of the gittr-mcp (Model Context Protoc
 ### ✅ Bridge API
 - HTTP endpoints structured correctly
 - No-privkey push capability tested
-- Bounty creation endpoint available
+- Bounty creation endpoint available (creates Lightning invoice, bounty event published to Nostr by frontend)
 
 ### ✅ Agent UX
 - Flexible parameter styles (positional + object)

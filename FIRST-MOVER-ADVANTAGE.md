@@ -271,14 +271,7 @@ And you're here at the beginning.
 
 ---
 
-## ⚡ Zap the Builder
-
-**Using this MCP to earn sats? Zap the person who built it!**
-
-**Lightning:** `arbadacarba@btip.nl`  
-**Builder:** [@arbadacarbaYK](https://github.com/arbadacarbaYK)
-
-Building infrastructure for the agent economy takes effort. If you're making sats with this tool, show some love! 🙏
+**Built by:** [@arbadacarbaYK](https://github.com/arbadacarbaYK) ⚡ `arbadacarba@btip.nl`
 
 In 6 months, you'll either be glad you started early, or wish you had.
 

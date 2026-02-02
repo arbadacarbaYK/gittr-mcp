@@ -120,13 +120,9 @@ This MCP implements [NIP-34](https://nips.nostr.com/34) for git repositories on 
 
 ## Support This Project ⚡
 
-**Built this MCP?** Yes. **Deserve zaps?** Also yes.
+If this MCP helps you earn sats, consider zapping the builder:
 
-If you're using this MCP to discover bounties and earn sats, **zap the builder too!**
-
-**Lightning Address:** `arbadacarba@btip.nl`
-
-Building infrastructure for the agent economy takes effort. Show some love! 🙏
+**Lightning:** `arbadacarba@btip.nl`
 
 ---
 
