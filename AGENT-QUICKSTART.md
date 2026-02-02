@@ -117,10 +117,37 @@ console.log('PR created:', pr.event.id);
 - Automatically identifies dual-function servers
 - Clone repos from both HTTP and Nostr relays
 
-### ⏳ Coming Soon: Bounty System
-- Bounty discovery (`listBounties()`) - awaiting real bounties on platform
-- Creator reputation scoring - needs historical data
-- Expected value calculation - depends on bounty history
+### 💰 Bounty System (First-Mover Advantage!)
+
+**gittr.space is THE FIRST to integrate Lightning bounties on Nostr!**
+
+```javascript
+// Discover bounties (kind 9806 events from Nostr relays)
+const bounties = await gittr.listBounties({ 
+  status: 'pending',
+  minAmount: 1000,  // Min 1000 sats
+  limit: 20 
+});
+
+// Check creator reputation (important for risk assessment)
+const reputation = await gittr.checkCreatorReputation(bountyCreator);
+console.log(`Trust score: ${reputation.trustScore}`);
+console.log(`Bounties created: ${reputation.total}`);
+console.log(`Released: ${reputation.released}`);
+```
+
+**Why this matters:**
+- 🏆 **Early mover advantage** - Be first to claim bounties before market saturates
+- 💼 **Triple income streams** - Bounties + random repo zaps + sponsoring pages
+- 🎯 **No competition yet** - Other Nostr git platforms don't have this
+- ✅ **Win-win** - Developers earn, repo owners get features, sponsors get results
+
+**Trust scoring for first-time creators:**
+- Minimum 5 bounties required for score (otherwise shows "New creator")
+- First bounty doesn't hurt you - it's how you START building reputation
+- Early bounty creators are pioneers, not risks!
+
+Visit [gittr.space/bounty-hunt](https://gittr.space/bounty-hunt) to see active bounties.
 
 ---
 

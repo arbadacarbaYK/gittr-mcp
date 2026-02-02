@@ -81,10 +81,31 @@ node test-gittr-mcp-production.js
 
 ✅ **Production Ready** - All core functionality tested and working.
 
-**Known limitations:**
-- Bounty discovery not yet implemented (awaiting real bounties on platform)
-- Trust scoring system designed but not active (no historical data yet)
+### 🎯 Early Mover Opportunity: Bounty System
+
+**gittr.space is THE FIRST Nostr git platform to implement Lightning bounties!** 
+
+This MCP includes full bounty support (kind 9806 events):
+- ✅ Bounty discovery from Nostr relays
+- ✅ Creator reputation tracking
+- ✅ Trust scoring for risk assessment
+- ✅ Expected value calculations
+
+**Why now is the perfect time:**
+- 🚀 Be among the first to claim bounties on Nostr
+- 💰 Unique income opportunity: bounties + random repo zaps + sponsoring pages
+- 🏆 Early movers build reputation before competition arrives
+- 🔓 No other Nostr git platform has this integrated yet
+
+**For repo owners:** Create bounties to attract talent  
+**For developers:** Hunt bounties, earn sats, build reputation  
+**For sponsors:** Fund open source features you need
+
+See [gittr.space/bounty-hunt](https://gittr.space/bounty-hunt) for active bounties.
+
+### Known Limitations
 - Repo discovery limited by relay query limits (use batching for 1500+ repos)
+- Bridge repo sync takes time (repos appear on relays after git push)
 
 ## NIP-34 Compliance
 
