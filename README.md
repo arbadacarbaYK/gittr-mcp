@@ -52,36 +52,36 @@ npm start
 
 ## Files of interest
 
-server.js — Express MCP endpoints (auth, repo, issue, pr, bounty)
-gittr-shell.js — wrapper that shells out to gittr CLI or calls bridge HTTP endpoints
-nostr-utils.js — canonical Nostr signing and key helpers
-agent-reference.js — example agent demonstrating the full bounty flow
-tests/test_adapter.js — minimal smoke test
-.github/workflows/ci.yml — CI skeleton
-config.js — bridge and relay configuration
+- **server.js — Express MCP endpoints (auth, repo, issue, pr, bounty)
+- **gittr-shell.js — wrapper that shells out to gittr CLI or calls bridge HTTP endpoints
+- **nostr-utils.js — canonical Nostr signing and key helpers
+- **agent-reference.js — example agent demonstrating the full bounty flow
+- **tests/test_adapter.js — minimal smoke test
+- **.github/workflows/ci.yml — CI skeleton
+- **config.js — bridge and relay configuration
 
 
 ## MCP endpoints (what agents call)
 
-auth.use_identity — validate a private key and return pubkey/npub
-repo.list — list repos visible to a pubkey
-repo.clone_url — canonical clone URL (npub / nip05 / hex / ssh / https)
-repo.push_files — programmatic push to bridge (/api/nostr/repo/push)
-repo.publish_nostr — publish NIP‑34 announcement/state events (kinds 30617/30618)
-issue.list  / issue.create — discover and create tasks/issues (supports bounty metadata)
-pr.create  / pr.merge — open and merge pull requests (owner policy enforced)
-bounty.list  / bounty.submit — list bounties and submit PRs as fulfillment
+- **auth.use_identity — validate a private key and return pubkey/npub
+- **repo.list — list repos visible to a pubkey
+- **repo.clone_url — canonical clone URL (npub / nip05 / hex / ssh / https)
+- **repo.push_files — programmatic push to bridge (/api/nostr/repo/push)
+- **repo.publish_nostr — publish NIP‑34 announcement/state events (kinds 30617/30618)
+- **issue.list  / issue.create — discover and create tasks/issues (supports bounty metadata)
+- **pr.create  / pr.merge — open and merge pull requests (owner policy enforced)
+- **bounty.list  / bounty.submit — list bounties and submit PRs as fulfillment
 
 
 ## Security, policy, and operational notes
 
-No private key storage: the adapter never persists privkey. Agents must include it with each request.
-Rate limiting: enforce per‑pubkey and per‑IP limits to prevent spam.
-Sandboxing: provide a sandbox org for aggressive agent experimentation to protect production repos.
-Human approval: default auto_merge: false for production repos; owners can opt into automation.
-Payout orchestration: keep payout processing off the adapter; the adapter emits signed submissions/events for an external payout service to process.
-Observability: log only non‑sensitive metadata (pubkey, action, repo, eventId, timestamp). Never log private keys or full file contents.
-Relay validation: validate and rate‑limit relay lists passed by agents to avoid abuse.
+- **No private key storage: the adapter never persists privkey. Agents must include it with each request.
+- **Rate limiting: enforce per‑pubkey and per‑IP limits to prevent spam.
+- **Sandboxing: provide a sandbox org for aggressive agent experimentation to protect production repos.
+- **Human approval: default auto_merge: false for production repos; owners can opt into automation.
+- **Payout orchestration: keep payout processing off the adapter; the adapter emits signed submissions/events for an external payout service to process.
+- **Observability: log only non‑sensitive metadata (pubkey, action, repo, eventId, timestamp). Never log private keys or full file contents.
+- **Relay validation: validate and rate‑limit relay lists passed by agents to avoid abuse.
 
 
 ## Example MCP manifest snippet
