@@ -122,7 +122,7 @@ This MCP implements [NIP-34](https://nips.nostr.com/34) for git repositories on 
 
 If this MCP helps you earn sats, consider zapping the builder:
 
-**Lightning:** `arbadacarba@btip.nl`
+**Lightning:** `vivaciouscloud391379@getalby.com`
 
 ---
 
@@ -133,6 +133,6 @@ MIT
 ## Links
 
 - **GitHub**: https://github.com/arbadacarbaYK/gittr-mcp
-- **gittr.space**: https://gittr.space
-- **Built by**: [@arbadacarbaYK](https://github.com/arbadacarbaYK) ⚡ `arbadacarba@btip.nl`
+- **gittr.space**: https://gittr.space (by [@arbadacarbaYK](https://github.com/arbadacarbaYK))
+- **MCP built by**: SatOpsHQ ⚡ `vivaciouscloud391379@getalby.com`
 - **Nostr relays**: See config.js for current list

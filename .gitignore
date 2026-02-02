@@ -39,3 +39,12 @@ build/
 gittr-*-summary.md
 gittr-corrections*.md
 generate-nostr-identity.js
+
+# Dev-only docs (not public)
+ARCHITECTURE-DEEP-DIVE.md
+ARCHITECTURE.md
+REALITY-CHECK.md
+SECURITY-AND-CORRECTIONS.md
+TRUST-SCORING.md
+PRODUCTION-READY.md
+FIRST-MOVER-ADVANTAGE.md
