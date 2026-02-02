@@ -2,6 +2,7 @@
 const fetch = require('node-fetch');
 const { SimplePool, nip19, getEventHash, getSignature } = require('nostr-tools');
 const config = require('./config');
+const { detectGraspFromRepoEvent } = require('./grasp-detection');
 
 // NIP-34 Event Kinds
 const KIND_REPOSITORY = 30617;
@@ -34,13 +35,17 @@ async function listRepos(pubkey, relays = config.relays) {
   });
   
   return events.map(event => {
-    const tags = Object.fromEntries(event.tags);
+    const tags = Object.fromEntries(event.tags.filter(t => t.length >= 2));
+    const { graspServers, regularRelays, cloneUrls } = detectGraspFromRepoEvent(event.tags);
+    
     return {
       id: tags.d,
       name: tags.name,
       description: tags.description,
       web: event.tags.filter(t => t[0] === 'web').map(t => t[1]),
-      clone: event.tags.filter(t => t[0] === 'clone').map(t => t[1]),
+      clone: cloneUrls,
+      graspServers,
+      relays: regularRelays,
       event: event
     };
   });
