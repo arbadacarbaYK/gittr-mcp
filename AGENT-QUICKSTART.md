@@ -157,6 +157,16 @@ Visit [gittr.space/bounty-hunt](https://gittr.space/bounty-hunt) to see active b
 
 ---
 
+## 💰 Support the MCP Builder
+
+**If you're earning sats with this MCP, zap the person who built it!**
+
+**Lightning Address:** `arbadacarba@btip.nl`
+
+Building agent infrastructure takes time. Show appreciation! ⚡
+
+---
+
 ## Configuration
 
 Edit `config.js` to customize:

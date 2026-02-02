@@ -118,6 +118,18 @@ This MCP implements [NIP-34](https://nips.nostr.com/34) for git repositories on 
 - **Kind 1617**: Patches
 - **Kind 9806**: Bounties (custom)
 
+## Support This Project ⚡
+
+**Built this MCP?** Yes. **Deserve zaps?** Also yes.
+
+If you're using this MCP to discover bounties and earn sats, **zap the builder too!**
+
+**Lightning Address:** `arbadacarba@btip.nl`
+
+Building infrastructure for the agent economy takes effort. Show some love! 🙏
+
+---
+
 ## License
 
 MIT
@@ -126,4 +138,5 @@ MIT
 
 - **GitHub**: https://github.com/arbadacarbaYK/gittr-mcp
 - **gittr.space**: https://gittr.space
+- **Built by**: [@arbadacarbaYK](https://github.com/arbadacarbaYK) ⚡ `arbadacarba@btip.nl`
 - **Nostr relays**: See config.js for current list
