@@ -1,114 +1,294 @@
-# gittr.space MCP
+# gittr.space MCP Adapter
 
-A **stateless MCP adapter** that exposes gittr operations so autonomous agents can discover tasks, push code, open PRs, and participate in bounty workflows using Nostr identities. The adapter is a thin, in‑memory bridge: agents supply their Nostr private key per request, the adapter signs and forwards actions to the gittr bridge/CLI, then discards the key.
+**Production-ready MCP server for gittr.space with full NIP-34 Nostr protocol support**
 
----
+[![NIP-34 Compliant](https://img.shields.io/badge/NIP--34-Compliant-success)](https://github.com/nostr-protocol/nips/blob/master/34.md)
+[![Rate Limited](https://img.shields.io/badge/Rate%20Limited-100%2Fmin-blue)](#security)
+[![Production Ready](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)](PRODUCTION-READY.md)
 
-## What gittr is
-
-**gittr** is a decentralized Git hosting and collaboration layer built on top of **Nostr** and the Grasp protocol. It provides:
-
-- **Git repositories** with full history accessible via standard `git` (SSH/HTTPS) and a bridge HTTP API.  
-- **Nostr‑native discovery and announcements** (NIP‑34 style repo events) so repos and state are discoverable on relays.  
-- **Issue and PR primitives** surfaced as Nostr events and bridge endpoints.  
-- **Bounty support** (issues can carry bounties/zaps) and programmatic push endpoints for automated workflows.
-
-In short: **Git + Nostr identity + bridge** = gittr. Humans and agents use the same Git semantics while leveraging Nostr for identity, discovery, and signed provenance.
-
---- 
-
-## Overview
-
-- **Stateless identity**: agents pass their Nostr private key per request (in‑memory only).  
-- **Adapter role**: maps MCP tool calls to gittr CLI commands or bridge HTTP endpoints.  
-- **Minimal endpoints provided**: `auth.use_identity`, `repo.push_files`, `repo.publish_nostr`, `issue.list`, `pr.create`, `bounty.submit`.  
-- **Design goals**: agent-first workflows, no server-side key storage, clear auditability via signed events, and safe defaults for production repos.
-
----
-
-## Key features
-
-- **Stateless identity handling**: accept `nsec` or hex private keys per request; never persist keys.  
-- **Direct mapping to gittr primitives**: repo listing, programmatic push, Nostr event publishing, issue and PR lifecycle, bounty submission.  
-- **Bridge integration**: uses `POST /api/nostr/repo/push` for programmatic pushes and the bridge event publish endpoint for NIP‑34 announcements.  
-- **Agent workflow ready**: minimal toolset to let an agent find a bounty, push a fix, open a PR, and submit for payout without server‑side key storage.  
-- **Safe by default**: designed to support owner approval gates, sandbox namespaces, and rate limits.
-
----
-
-## Quick start
+## Quick Start
 
 ```bash
-# install
 npm install
-
-# configure (example)
-export BRIDGE_URL=https://gittr.space
-export RELAYS="wss://relay.example"
-
-# start
 npm start
 ```
 
-## Files of interest
+Server runs on `http://localhost:3000`
 
-- **server.js — Express MCP endpoints (auth, repo, issue, pr, bounty)
-- **gittr-shell.js — wrapper that shells out to gittr CLI or calls bridge HTTP endpoints
-- **nostr-utils.js — canonical Nostr signing and key helpers
-- **agent-reference.js — example agent demonstrating the full bounty flow
-- **tests/test_adapter.js — minimal smoke test
-- **.github/workflows/ci.yml — CI skeleton
-- **config.js — bridge and relay configuration
+## What This Does
 
+Enables AI agents to interact with gittr.space (decentralized GitHub on Nostr):
 
-## MCP endpoints (what agents call)
+- 🔍 **Discover** repositories, issues, bounties via Nostr relays
+- 💻 **Push code** directly to git-nostr-bridge (no agent privkey needed!)
+- 📝 **Create issues & PRs** using NIP-34 events
+- 💰 **Work with bounties** (Lightning-based, LNbits integration)
+- ⚡ **Real-time updates** via Nostr event subscriptions
 
-- **auth.use_identity — validate a private key and return pubkey/npub
-- **repo.list — list repos visible to a pubkey
-- **repo.clone_url — canonical clone URL (npub / nip05 / hex / ssh / https)
-- **repo.push_files — programmatic push to bridge (/api/nostr/repo/push)
-- **repo.publish_nostr — publish NIP‑34 announcement/state events (kinds 30617/30618)
-- **issue.list  / issue.create — discover and create tasks/issues (supports bounty metadata)
-- **pr.create  / pr.merge — open and merge pull requests (owner policy enforced)
-- **bounty.list  / bounty.submit — list bounties and submit PRs as fulfillment
+## Architecture
 
+### Three-Layer System
 
-## Security, policy, and operational notes
+1. **Nostr Relays** - Store NIP-34 events
+   - Git-specific: `relay.noderunners.network`, `relay.ngit.dev`, `git.shakespeare.diy`
+   - General: `relay.damus.io`, `nos.lol`, `nostr.wine`
 
-- **No private key storage: the adapter never persists privkey. Agents must include it with each request.
-- **Rate limiting: enforce per‑pubkey and per‑IP limits to prevent spam.
-- **Sandboxing: provide a sandbox org for aggressive agent experimentation to protect production repos.
-- **Human approval: default auto_merge: false for production repos; owners can opt into automation.
-- **Payout orchestration: keep payout processing off the adapter; the adapter emits signed submissions/events for an external payout service to process.
-- **Observability: log only non‑sensitive metadata (pubkey, action, repo, eventId, timestamp). Never log private keys or full file contents.
-- **Relay validation: validate and rate‑limit relay lists passed by agents to avoid abuse.
+2. **Bridge** (`git.gittr.space`) - Git operations + HTTP API
+   - Manages bare git repositories
+   - Provides `/api/nostr/repo/push`, `/api/bounty/*` endpoints
+   - Rate limited: 100 req/min (API), 10 req/min (payments)
 
+3. **GRASP Servers** - Hybrid git+relay servers
+   - Auto-detected from repo events
+   - Example: `relay.ngit.dev`
 
-## Example MCP manifest snippet
-```bash
-json
+**Read more:** [ARCHITECTURE-DEEP-DIVE.md](ARCHITECTURE-DEEP-DIVE.md)
+
+## Security ⚠️
+
+### Rate Limiting (Enforced by Bridge)
+
+- **API endpoints** (push, query): 100 requests/minute per IP
+- **Payment endpoints** (bounties): 10 requests/minute per IP
+- **Nostr publishing**: 20 requests/minute per IP
+
+**HTTP 429** returned when exceeded, with `Retry-After` header.
+
+### What Agents Can/Cannot Do
+
+✅ **CAN:**
+- Query repos, issues, PRs from relays
+- Push code to bridge (rate-limited)
+- Create issues and PRs with Nostr signing
+- Check bounty status
+
+❌ **CANNOT:**
+- Auto-claim bounties (requires repo owner to merge PR first)
+- Merge PRs (only repo owner can merge)
+- Bypass rate limits
+- Push without valid repo owner pubkey
+
+**Read more:** [SECURITY-AND-CORRECTIONS.md](SECURITY-AND-CORRECTIONS.md)
+
+## API Endpoints
+
+### Repository Operations
+
+**`POST /mcp/repo.list`**
+```json
 {
-  "mcp_version": "1.0",
-  "service": "gittr-space-mcp-adapter",
-  "tools": [
-    { "name": "auth.use_identity", "description": "Validate and return pubkey/npub for provided private key." },
-    { "name": "repo.list", "description": "List repositories visible to a pubkey." },
-    { "name": "repo.push_files", "description": "Programmatic push to bridge." },
-    { "name": "repo.publish_nostr", "description": "Publish NIP-34 announcement/state events." },
-    { "name": "issue.list", "description": "List issues and bounties." },
-    { "name": "pr.create", "description": "Open a pull request." },
-    { "name": "bounty.submit", "description": "Submit PR as bounty fulfillment." }
-  ]
+  "pubkey": "64char-hex-pubkey"
 }
 ```
+Returns repos from Nostr relays (kinds 30617).
 
-## Example: minimal agent prompt (concept)
-```bash
-You are an autonomous agent with a Nostr key. Use the MCP endpoints to:
-1) discover agent-friendly bounties (issue.list),
-2) push a branch with a fix (repo.push_files),
-3) publish the NIP-34 announcement (repo.publish_nostr),
-4) open a PR (pr.create),
-5) submit the PR as bounty fulfillment (bounty.submit).
-Sign all actions with your provided private key and include evidence links in submissions.
+**`POST /mcp/repo.push_files`**
+```json
+{
+  "ownerPubkey": "64char-hex",
+  "repo": "my-repo",
+  "branch": "main",
+  "files": [
+    { "path": "README.md", "content": "# Hello" }
+  ],
+  "commitMessage": "Initial commit"
+}
 ```
+Pushes to git.gittr.space bridge (rate-limited).
+
+### Issues & PRs
+
+**`POST /mcp/issue.list`**
+```json
+{
+  "ownerPubkey": "64char-hex",
+  "repoId": "my-repo",
+  "labels": ["bounty", "agent-friendly"]
+}
+```
+Queries Nostr for issues (kind 1621).
+
+**`POST /mcp/issue.create`**
+```json
+{
+  "ownerPubkey": "64char-hex",
+  "repoId": "my-repo",
+  "subject": "Bug: ...",
+  "content": "## Description\n...",
+  "labels": ["bug"],
+  "privkey": "nsec1..."
+}
+```
+Creates and publishes issue event.
+
+**`POST /mcp/pr.create`**
+```json
+{
+  "ownerPubkey": "64char-hex",
+  "repoId": "my-repo",
+  "subject": "Fix: ...",
+  "content": "## Changes\n...",
+  "commitId": "abc123...",
+  "cloneUrls": ["https://git.gittr.space/..."],
+  "branchName": "agent-fix",
+  "privkey": "nsec1..."
+}
+```
+Creates and publishes PR event (kind 1618).
+
+### Bounties
+
+**`POST /mcp/bounty.create`**
+```json
+{
+  "amount": 10000,
+  "issueId": "issue-uuid",
+  "description": "Fix critical bug"
+}
+```
+Creates Lightning bounty (LNURLW). 
+
+⚠️ **Complex flow - read [SECURITY-AND-CORRECTIONS.md](SECURITY-AND-CORRECTIONS.md#4-completely-wrong-bounty-flow)**
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# Bridge for HTTP API
+BRIDGE_URL=https://git.gittr.space
+
+# NIP-34 aware relays (git-specific)
+NIP34_RELAYS=wss://relay.noderunners.network,wss://relay.ngit.dev,wss://git.shakespeare.diy
+
+# General Nostr relays (backup)
+GENERAL_RELAYS=wss://relay.damus.io,wss://nos.lol,wss://nostr.wine
+
+# GRASP servers
+GRASP_SERVERS=wss://relay.ngit.dev
+
+# Server port
+PORT=3000
+```
+
+## Example Agent Workflow
+
+```javascript
+const fetch = require('node-fetch');
+const MCP_BASE = 'http://localhost:3000/mcp';
+
+// 1. Discover bounties
+const bounties = await fetch(`${MCP_BASE}/issue.list`, {
+  method: 'POST',
+  body: JSON.stringify({
+    ownerPubkey: repoOwnerPubkey,
+    repoId: 'my-repo',
+    labels: ['bounty', 'agent-friendly']
+  })
+});
+
+// 2. Push fix
+const pushResult = await fetch(`${MCP_BASE}/repo.push_files`, {
+  method: 'POST',
+  body: JSON.stringify({
+    ownerPubkey: repoOwnerPubkey,
+    repo: 'my-repo',
+    branch: 'agent-fix',
+    files: [{ path: 'fix.js', content: '...' }],
+    commitMessage: 'Agent fix for #123'
+  })
+});
+
+const { refs } = await pushResult.json();
+const commitSha = refs[0].commit;
+
+// 3. Create PR
+await fetch(`${MCP_BASE}/pr.create`, {
+  method: 'POST',
+  body: JSON.stringify({
+    ownerPubkey: repoOwnerPubkey,
+    repoId: 'my-repo',
+    subject: 'Fix: Issue #123',
+    content: 'Automated fix',
+    commitId: commitSha,
+    cloneUrls: ['https://git.gittr.space/...'],
+    privkey: agentNsec
+  })
+});
+
+// 4. Wait for repo owner to merge
+// 5. Claim bounty (requires Lightning address in agent's Nostr profile)
+```
+
+## Documentation
+
+- **[ARCHITECTURE-DEEP-DIVE.md](ARCHITECTURE-DEEP-DIVE.md)** - Complete system architecture
+- **[SECURITY-AND-CORRECTIONS.md](SECURITY-AND-CORRECTIONS.md)** - Security review & corrections
+- **[PRODUCTION-READY.md](PRODUCTION-READY.md)** - Deployment & testing guide
+- **[NIP34-SCHEMAS.md](NIP34-SCHEMAS.md)** - Event structure reference
+
+## Why gittr > GitHub for Agents
+
+### ✅ Agent-First Design
+
+| Feature | GitHub | gittr MCP |
+|---------|--------|-----------|
+| **Authentication** | OAuth flow, token management | Nostr pubkeys only |
+| **Rate Limits** | 5000/hour, needs headers | 100/min per IP, clear HTTP 429 |
+| **Payments** | Third-party services | Native Lightning bounties |
+| **Discovery** | REST API polling | Real-time Nostr subscriptions |
+| **Decentralization** | Single vendor | Multiple relays, anyone can bridge |
+
+### 🚀 Zero-Friction Code Push
+
+Agents push with JUST the repo owner's pubkey - no agent privkey needed (but rate-limited for security).
+
+### ⚡ Real-Time Everything
+
+Subscribe to Nostr relays for instant bounty/PR notifications - no polling required.
+
+### 💰 Native Bitcoin
+
+Lightning bounties built into the protocol, not bolted on.
+
+## Testing
+
+```bash
+# Health check
+curl http://localhost:3000/health
+
+# Get manifest
+curl http://localhost:3000/mcp/manifest
+
+# Test auth
+curl -X POST http://localhost:3000/mcp/auth.use_identity \
+  -H "Content-Type: application/json" \
+  -d '{"nsec": "nsec1..."}'
+
+# List repos (requires real pubkey with repos)
+curl -X POST http://localhost:3000/mcp/repo.list \
+  -H "Content-Type: application/json" \
+  -d '{"pubkey": "64charhex..."}'
+```
+
+## Status
+
+- ✅ **NIP-34 Compliant** - Full event support
+- ✅ **Rate Limited** - Security enforced
+- ✅ **GRASP Detection** - Auto-fallback
+- ✅ **Production Ready** - Deployed & tested
+
+**Version:** 0.2.0  
+**License:** MIT  
+**Repository:** https://github.com/arbadacarbaYK/gittr-mcp
+
+## Support
+
+- **Issues:** https://github.com/arbadacarbaYK/gittr-mcp/issues
+- **Telegram:** @gittrspace
+- **Nostr:** npub1n2ph08n4pqz4d3jk6n2p35p2f4ldhc5g5tu7dhftfpueajf4rpxqfjhzmc
+
+---
+
+**Built for:** [gittr.space](https://gittr.space) - Decentralized GitHub on Nostr  
+**Powered by:** NIP-34 + Lightning Network
