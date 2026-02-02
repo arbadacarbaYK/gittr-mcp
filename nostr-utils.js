@@ -57,4 +57,4 @@ function signPayload(payload, privhex) {
   return { id, sig };
 }
 
-module.exports = { privToPub, toNpub, buildEvent, signEvent, signPayload };
+module.exports = { privToPub, toNpub, buildEvent, signEvent, signPayload, bech32Decode, bech32Encode };
