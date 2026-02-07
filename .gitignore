@@ -1,2 +1,59 @@
+# Test files (dev only)
+test-*.js
+*-test.js
+*.test.js
+
+# Dev test reports (keep TEST-VALIDATION.md only)
+TEST-REPORT.md
+TEST-RESULTS.md
+
+# Temp files
+*.tmp
+*.swp
+*~
+
+# Logs
+*.log
+npm-debug.log*
+
+# Node modules
 node_modules/
+.npm
+
+# Environment
 .env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Build
+dist/
+build/
+
+# Local dev files (not in repo)
+gittr-*-summary.md
+gittr-corrections*.md
+generate-nostr-identity.js
+
+# Dev-only docs (not public)
+ARCHITECTURE-DEEP-DIVE.md
+ARCHITECTURE.md
+REALITY-CHECK.md
+SECURITY-AND-CORRECTIONS.md
+TRUST-SCORING.md
+PRODUCTION-READY.md
+FIRST-MOVER-ADVANTAGE.md
+GITHUB-METADATA.md
+
+# Unused server code (library-only package)
+server.js
+agent-reference.js
+gittr-shell.js
+nostr-utils.js
+tests/
