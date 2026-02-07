@@ -27,7 +27,7 @@
   "license": "MIT",
   "dependencies": {
     "nostr-tools": "^2.23.0",
-    "websocket-polyfill": "^0.0.3"
+    "websocket-polyfill": "^1.0.0"
   },
   "engines": {
     "node": ">=14.0.0"
