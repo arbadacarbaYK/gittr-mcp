@@ -1,0 +1,3 @@
+# Skills installed via `npx clawhub install <slug>` (from workspace or state dir) go here.
+# The gateway loads this folder via openclaw.json → skills.load.extraDirs.
+# Restart the gateway after adding skills so they show at http://127.0.0.1:18790/skills

@@ -1,0 +1,8 @@
+# Secrets — never commit
+.env
+credentials.local
+.nostr-keys.json
+.npm-credentials.txt
+
+# Optional: uncomment if you keep other creds here
+# *.secret
