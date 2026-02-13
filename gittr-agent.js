@@ -153,7 +153,7 @@ async function getRepo(options) {
   // Find the matching repo
   const match = repos.find(r => 
     r.id === repoId || 
-    r.name.toLowerCase() === repoId.toLowerCase()
+    (r.name && r.name.toLowerCase() === repoId.toLowerCase())
   );
   
   if (!match) {
