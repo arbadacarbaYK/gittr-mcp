@@ -38,6 +38,20 @@ module.exports = {
   mirrorRepo: gittrAgent.mirrorRepo,
   loadCredentials: gittrAgent.loadCredentials,
   
+  // NEW: gittr.space feature parity
+  submitBounty: gittrAgent.submitBounty,
+  starRepo: gittrAgent.starRepo,
+  unstarRepo: gittrAgent.unstarRepo,
+  listStars: gittrAgent.listStars,
+  watchRepo: gittrAgent.watchRepo,
+  getTrendingRepos: gittrAgent.getTrendingRepos,
+  getRepoContributors: gittrAgent.getRepoContributors,
+  getBranches: gittrAgent.getBranches,
+  getCommitHistory: gittrAgent.getCommitHistory,
+  createRelease: gittrAgent.createRelease,
+  listReleases: gittrAgent.listReleases,
+  exploreRepos: gittrAgent.exploreRepos,
+  
   // Event kinds (for reference)
   KIND_REPOSITORY: gittrNostr.KIND_REPOSITORY,
   KIND_REPOSITORY_STATE: gittrNostr.KIND_REPOSITORY_STATE,

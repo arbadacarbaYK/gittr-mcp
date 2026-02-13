@@ -318,6 +318,171 @@ const tools = [
       properties: {},
     },
   },
+  // NEW: gittr.space feature parity
+  {
+    name: 'submitBounty',
+    description: 'Submit work on a bounty (claim it with PR/evidence)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueId: { type: 'string', description: 'Issue ID to claim' },
+        prUrl: { type: 'string', description: 'URL to the PR with the work' },
+        evidence: { type: 'string', description: 'Evidence/work description' },
+        privkey: { type: 'string', description: 'Private key (auto-loaded)' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['issueId', 'prUrl', 'evidence'],
+    },
+  },
+  {
+    name: 'starRepo',
+    description: 'Star a repository (show appreciation)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ownerPubkey: { type: 'string', description: 'Repository owner pubkey' },
+        repoId: { type: 'string', description: 'Repository ID' },
+        privkey: { type: 'string', description: 'Private key (auto-loaded)' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['ownerPubkey', 'repoId'],
+    },
+  },
+  {
+    name: 'unstarRepo',
+    description: 'Remove a star from a repository',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ownerPubkey: { type: 'string', description: 'Repository owner pubkey' },
+        repoId: { type: 'string', description: 'Repository ID' },
+        privkey: { type: 'string', description: 'Private key (auto-loaded)' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['ownerPubkey', 'repoId'],
+    },
+  },
+  {
+    name: 'listStars',
+    description: 'Get repositories a user has starred',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pubkey: { type: 'string', description: 'User pubkey (auto-detected from credentials)' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+    },
+  },
+  {
+    name: 'watchRepo',
+    description: 'Watch a repository for updates (notifications)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ownerPubkey: { type: 'string', description: 'Repository owner pubkey' },
+        repoId: { type: 'string', description: 'Repository ID' },
+        privkey: { type: 'string', description: 'Private key (auto-loaded)' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['ownerPubkey', 'repoId'],
+    },
+  },
+  {
+    name: 'getTrendingRepos',
+    description: 'Get trending/popular repositories',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Max results (default 20)' },
+        timeRange: { type: 'string', description: 'Time range: day, week, month' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+    },
+  },
+  {
+    name: 'getRepoContributors',
+    description: 'Get contributors to a repository',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ownerPubkey: { type: 'string', description: 'Repository owner pubkey' },
+        repoId: { type: 'string', description: 'Repository ID' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['ownerPubkey', 'repoId'],
+    },
+  },
+  {
+    name: 'getBranches',
+    description: 'Get branches for a repository',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ownerPubkey: { type: 'string', description: 'Repository owner pubkey' },
+        repoId: { type: 'string', description: 'Repository ID' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['ownerPubkey', 'repoId'],
+    },
+  },
+  {
+    name: 'getCommitHistory',
+    description: 'Get commit history for a repository',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ownerPubkey: { type: 'string', description: 'Repository owner pubkey' },
+        repoId: { type: 'string', description: 'Repository ID' },
+        branch: { type: 'string', description: 'Branch name (default: main)' },
+        limit: { type: 'number', description: 'Max commits (default 50)' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['ownerPubkey', 'repoId'],
+    },
+  },
+  {
+    name: 'createRelease',
+    description: 'Create a release (tag a version)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ownerPubkey: { type: 'string', description: 'Repository owner pubkey' },
+        repoId: { type: 'string', description: 'Repository ID' },
+        version: { type: 'string', description: 'Version (e.g., v1.0.0)' },
+        targetCommit: { type: 'string', description: 'Commit SHA to tag' },
+        releaseNotes: { type: 'string', description: 'Markdown release notes' },
+        privkey: { type: 'string', description: 'Private key (auto-loaded)' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['ownerPubkey', 'repoId', 'version'],
+    },
+  },
+  {
+    name: 'listReleases',
+    description: 'List releases for a repository',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ownerPubkey: { type: 'string', description: 'Repository owner pubkey' },
+        repoId: { type: 'string', description: 'Repository ID' },
+        limit: { type: 'number', description: 'Max results (default 20)' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['ownerPubkey', 'repoId'],
+    },
+  },
+  {
+    name: 'exploreRepos',
+    description: 'Explore repositories by category/topic',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        category: { type: 'string', description: 'Category: bitcoin, lightning, nostr, defi, ai, tools, cli, mobile' },
+        limit: { type: 'number', description: 'Max results (default 20)' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+    },
+  },
 ];
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -391,6 +556,43 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (result && result.nsec) {
           result = { ...result, nsec: result.nsec?.substring(0, 8) + '...', secretKey: '[MASKED]' };
         }
+        break;
+      // NEW: gittr.space feature parity
+      case 'submitBounty':
+        result = await gittr.submitBounty(args);
+        break;
+      case 'starRepo':
+        result = await gittr.starRepo(args);
+        break;
+      case 'unstarRepo':
+        result = await gittr.unstarRepo(args);
+        break;
+      case 'listStars':
+        result = await gittr.listStars(args);
+        break;
+      case 'watchRepo':
+        result = await gittr.watchRepo(args);
+        break;
+      case 'getTrendingRepos':
+        result = await gittr.getTrendingRepos(args);
+        break;
+      case 'getRepoContributors':
+        result = await gittr.getRepoContributors(args);
+        break;
+      case 'getBranches':
+        result = await gittr.getBranches(args);
+        break;
+      case 'getCommitHistory':
+        result = await gittr.getCommitHistory(args);
+        break;
+      case 'createRelease':
+        result = await gittr.createRelease(args);
+        break;
+      case 'listReleases':
+        result = await gittr.listReleases(args);
+        break;
+      case 'exploreRepos':
+        result = await gittr.exploreRepos(args);
         break;
       default:
         return { content: [{ type: 'text', text: `Unknown tool: ${name}` }], isError: true };

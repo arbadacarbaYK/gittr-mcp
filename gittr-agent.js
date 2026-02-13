@@ -177,25 +177,31 @@ async function searchRepos(query, options = {}) {
  * Note: This is a best-effort search - actual bounty discovery may vary
  */
 async function listBounties(options = {}) {
+  const config = require('./config');
   const { 
     minAmount = 0,      // Minimum bounty in sats
     limit = 50, 
-    relays = gittrNostr.config.relays 
+    relays = config.relays || []
   } = options;
   
+  if (!relays || relays.length === 0) {
+    return [];
+  }
+  
   const pool = new (require('nostr-tools')).SimplePool();
+  let events = [];
   
   try {
-    const events = await pool.querySync(relays, {
+    events = await pool.querySync(relays, {
       kinds: [1621], // Issue kind
       '#t': ['bounty', 'bounties', 'sats', 'lightning', 'paid'],
       limit: limit * 2 // Get more, filter later
     });
   } finally {
-    pool.close?.();
+    try { pool.close(relays); } catch (_) { /* nostr-tools close may throw if relay state is odd */ }
   }
   
-  const bounties = events.map(event => {
+  const bounties = (events || []).map(event => {
     const tags = Object.fromEntries(event.tags.filter(t => t.length >= 2));
     return {
       id: event.id,
@@ -317,8 +323,11 @@ async function addCollaborator(options) {
   
   const event = finalizeEvent(unsignedEvent, Buffer.from(privkey, 'hex'));
   const pool = new (require('nostr-tools')).SimplePool();
-  await pool.publish(relays, event);
-  pool.close?.();
+  try {
+    await pool.publish(relays, event);
+  } finally {
+    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+  }
   
   return { success: true, event, collaborator: collaboratorPubkey };
 }
@@ -421,6 +430,557 @@ async function mirrorRepo(options) {
   };
 }
 
+/**
+ * Submit work on a bounty (claim it with PR/evidence)
+ * This is how developers claim and complete bounties
+ */
+async function submitBounty(options) {
+  const {
+    issueId,      // Issue ID to claim
+    prUrl,        // URL to the PR with the work
+    evidence,     // Evidence/work description
+    privkey,
+    relays = gittrNostr.config.relays
+  } = options;
+  
+  // Auto-load credentials
+  if (!privkey) {
+    const creds = loadCredentials();
+    if (creds && creds.nsec) {
+      privkey = creds.nsec;
+    }
+  }
+  
+  if (!privkey) {
+    throw new Error('Private key required for submitting bounty work');
+  }
+  
+  const { finalizeEvent } = require('nostr-tools');
+  
+  // Submit bounty work as a Patch event (kind 1617)
+  const unsignedEvent = {
+    kind: 1617, // Patch
+    created_at: Math.floor(Date.now() / 1000),
+    tags: [
+      ['a', issueId],  // Reference to the issue
+      ['r', prUrl],    // PR/branch URL
+      ['status', 'open']
+    ],
+    content: evidence
+  };
+  
+  const event = finalizeEvent(unsignedEvent, Buffer.from(privkey, 'hex'));
+  const pool = new (require('nostr-tools')).SimplePool();
+  try {
+    await pool.publish(relays, event);
+  } finally {
+    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+  }
+  
+  return { success: true, event, issueId, prUrl };
+}
+
+/**
+ * Star a repository (show appreciation)
+ */
+async function starRepo(options) {
+  const {
+    ownerPubkey,
+    repoId,
+    privkey,
+    relays = gittrNostr.config.relays
+  } = options;
+  
+  if (!privkey) {
+    const creds = loadCredentials();
+    if (creds && creds.nsec) privkey = creds.nsec;
+  }
+  
+  if (!privkey) {
+    throw new Error('Private key required');
+  }
+  
+  const { finalizeEvent } = require('nostr-tools');
+  const pubkey = gittrNostr.getPublicKey(privkey);
+  
+  // Publish a like/reaction event
+  const unsignedEvent = {
+    kind: 7, // Kind 7 = reaction
+    created_at: Math.floor(Date.now() / 1000),
+    tags: [
+      ['p', ownerPubkey],
+      ['a', `30617:${ownerPubkey}:${repoId}`]
+    ],
+    content: '⭐'
+  };
+  
+  const event = finalizeEvent(unsignedEvent, Buffer.from(privkey, 'hex'));
+  const pool = new (require('nostr-tools')).SimplePool();
+  try {
+    await pool.publish(relays, event);
+  } finally {
+    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+  }
+  
+  return { success: true, event, action: 'starred', repo: `${ownerPubkey}/${repoId}` };
+}
+
+/**
+ * Unstar a repository
+ */
+async function unstarRepo(options) {
+  const {
+    ownerPubkey,
+    repoId,
+    privkey,
+    relays = gittrNostr.config.relays
+  } = options;
+  
+  if (!privkey) {
+    const creds = loadCredentials();
+    if (creds && creds.nsec) privkey = creds.nsec;
+  }
+  
+  if (!privkey) {
+    throw new Error('Private key required');
+  }
+  
+  const { finalizeEvent } = require('nostr-tools');
+  const pubkey = gittrNostr.getPublicKey(privkey);
+  
+  // Publish removal of reaction (kind 7 with content empty or '-' to remove)
+  const unsignedEvent = {
+    kind: 7,
+    created_at: Math.floor(Date.now() / 1000),
+    tags: [
+      ['p', ownerPubkey],
+      ['a', `30617:${ownerPubkey}:${repoId}`]
+    ],
+    content: ''  // Empty removes the reaction
+  };
+  
+  const event = finalizeEvent(unsignedEvent, Buffer.from(privkey, 'hex'));
+  const pool = new (require('nostr-tools')).SimplePool();
+  try {
+    await pool.publish(relays, event);
+  } finally {
+    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+  }
+  
+  return { success: true, event, action: 'unstarred', repo: `${ownerPubkey}/${repoId}` };
+}
+
+/**
+ * Get repositories a user has starred
+ */
+async function listStars(options = {}) {
+  const { pubkey, relays = gittrNostr.config.relays } = options;
+  
+  let targetPubkey = pubkey;
+  if (!targetPubkey) {
+    const creds = loadCredentials();
+    targetPubkey = creds?.npub;
+  }
+  
+  if (!targetPubkey) {
+    return { error: 'No pubkey provided and no credentials found' };
+  }
+  
+  // Query kind 7 events (reactions) that reference repo events
+  const pool = new (require('nostr-tools')).SimplePool();
+  let events = [];
+  
+  try {
+    events = await pool.querySync(relays, {
+      kinds: [7],
+      authors: [targetPubkey],
+      '#a': ['30617*'],  // Any repo reference
+      limit: 100
+    });
+  } finally {
+    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+  }
+  
+  // Extract repo refs from the events
+  const starredRepos = events
+    .filter(e => e.content === '⭐')
+    .map(e => {
+      const repoTag = e.tags.find(t => t[0] === 'a' && t[1]?.startsWith('30617:'));
+      const parts = repoTag?.[1]?.split(':') || [];
+      return {
+        ownerPubkey: parts[1],
+        repoId: parts[2],
+        starredAt: e.created_at
+      };
+    })
+    .filter(r => r.ownerPubkey && r.repoId);
+  
+  return starredRepos;
+}
+
+/**
+ * Watch a repository for updates (notifications)
+ */
+async function watchRepo(options) {
+  const {
+    ownerPubkey,
+    repoId,
+    privkey,
+    relays = gittrNostr.config.relays
+  } = options;
+  
+  if (!privkey) {
+    const creds = loadCredentials();
+    if (creds && creds.nsec) privkey = creds.nsec;
+  }
+  
+  if (!privkey) {
+    throw new Error('Private key required');
+  }
+  
+  const { finalizeEvent } = require('nostr-tools');
+  
+  // Use kind 10001 for follows (or create custom)
+  // For now, we'll use a generic follow kind
+  const unsignedEvent = {
+    kind: 10001, // Kind 10001 = relay list metadata (used for follows here)
+    created_at: Math.floor(Date.now() / 1000),
+    tags: [
+      ['a', `30617:${ownerPubkey}:${repoId}`]
+    ],
+    content: `Watching ${repoId}`
+  };
+  
+  const event = finalizeEvent(unsignedEvent, Buffer.from(privkey, 'hex'));
+  const pool = new (require('nostr-tools')).SimplePool();
+  try {
+    await pool.publish(relays, event);
+  } finally {
+    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+  }
+  
+  return { success: true, event, action: 'watching', repo: `${ownerPubkey}/${repoId}` };
+}
+
+/**
+ * Get trending/popular repositories
+ */
+async function getTrendingRepos(options = {}) {
+  const { limit = 20, timeRange = 'week', relays = gittrNostr.config.relays } = options;
+  
+  // Get recent repos and sort by engagement
+  // This is a simplified version - full implementation would track stars/PRs
+  const pool = new (require('nostr-tools')).SimplePool();
+  let events = [];
+  
+  const since = Math.floor(Date.now() / 1000);
+  const period = timeRange === 'day' ? 86400 : timeRange === 'week' ? 604800 : 2592000;
+  
+  try {
+    events = await pool.querySync(relays, {
+      kinds: [30617],
+      since: since - period,
+      limit: limit * 3  // Get more to filter
+    });
+  } finally {
+    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+  }
+  
+  // For now, return recently created repos as "trending"
+  // A full implementation would count stars/PRs
+  const repos = events.slice(0, limit).map(event => {
+    const tags = Object.fromEntries(event.tags.filter(t => t.length >= 2));
+    return {
+      id: tags.d,
+      name: tags.name,
+      description: tags.description,
+      owner: event.pubkey,
+      created_at: event.created_at,
+      event
+    };
+  });
+  
+  return repos;
+}
+
+/**
+ * Get contributors to a repository
+ */
+async function getRepoContributors(options) {
+  const { ownerPubkey, repoId, relays = gittrNostr.config.relays } = options;
+  
+  if (!ownerPubkey || !repoId) {
+    throw new Error('ownerPubkey and repoId required');
+  }
+  
+  // Query for PRs and Issues to find contributors
+  const pool = new (require('nostr-tools')).SimplePool();
+  let prEvents = [];
+  let issueEvents = [];
+  
+  try {
+    // Get PR authors
+    prEvents = await pool.querySync(relays, {
+      kinds: [1618], // PR kind
+      '#a': [`30617:${ownerPubkey}:${repoId}`],
+      limit: 100
+    });
+    
+    // Get issue authors  
+    issueEvents = await pool.querySync(relays, {
+      kinds: [1621], // Issue kind
+      '#a': [`30617:${ownerPubkey}:${repoId}`],
+      limit: 100
+    });
+  } finally {
+    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+  }
+  
+  // Count contributions per pubkey
+  const contributors = {};
+  
+  for (const e of prEvents) {
+    contributors[e.pubkey] = contributors[e.pubkey] || { pubkey: e.pubkey, prs: 0, issues: 0 };
+    contributors[e.pubkey].prs++;
+  }
+  
+  for (const e of issueEvents) {
+    contributors[e.pubkey] = contributors[e.pubkey] || { pubkey: e.pubkey, prs: 0, issues: 0 };
+    contributors[e.pubkey].issues++;
+  }
+  
+  // Add owner explicitly
+  if (!contributors[ownerPubkey]) {
+    contributors[ownerPubkey] = { pubkey: ownerPubkey, prs: 0, issues: 0, isOwner: true };
+  } else {
+    contributors[ownerPubkey].isOwner = true;
+  }
+  
+  return Object.values(contributors).sort((a, b) => (b.prs + b.issues) - (a.prs + a.issues));
+}
+
+/**
+ * Get branches for a repository
+ */
+async function getBranches(options) {
+  const { ownerPubkey, repoId, relays = gittrNostr.config.relays } = options;
+  
+  if (!ownerPubkey || !repoId) {
+    throw new Error('ownerPubkey and repoId required');
+  }
+  
+  // Get repo state events (kind 30618) to find branches
+  const pool = new (require('nostr-tools')).SimplePool();
+  let events = [];
+  
+  try {
+    events = await pool.querySync(relays, {
+      kinds: [30618],
+      '#d': [repoId],
+      authors: [ownerPubkey],
+      limit: 20
+    });
+  } finally {
+    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+  }
+  
+  // Extract refs/branches from state events
+  const branches = new Set(['main', 'master']);
+  
+  for (const event of events) {
+    for (const tag of event.tags) {
+      if (tag[0].startsWith('refs/heads/')) {
+        branches.add(tag[0].replace('refs/heads/', ''));
+      } else if (tag[0] === 'ref') {
+        branches.add(tag[1]);
+      }
+    }
+  }
+  
+  return Array.from(branches).map(name => ({ name }));
+}
+
+/**
+ * Get commit history for a repository
+ */
+async function getCommitHistory(options) {
+  const { ownerPubkey, repoId, branch = 'main', limit = 50, relays = gittrNostr.config.relays } = options;
+  
+  // Get state events to find commits
+  const pool = new (require('nostr-tools')).SimplePool();
+  let events = [];
+  
+  try {
+    events = await pool.querySync(relays, {
+      kinds: [30618],
+      '#d': [repoId],
+      authors: [ownerPubkey],
+      limit: limit
+    });
+  } finally {
+    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+  }
+  
+  const commits = [];
+  
+  for (const event of events) {
+    for (const tag of event.tags) {
+      if (tag[0].startsWith('refs/heads/') && tag[0].includes(branch)) {
+        commits.push({
+          sha: tag[1],
+          ref: tag[0],
+          timestamp: event.created_at,
+          eventId: event.id
+        });
+      }
+    }
+  }
+  
+  return commits.slice(0, limit);
+}
+
+/**
+ * Create a release (tag a version)
+ */
+async function createRelease(options) {
+  const {
+    ownerPubkey,
+    repoId,
+    version,        // e.g., "v1.0.0"
+    tagName,        // e.g., "v1.0.0"
+    targetCommit,   // Commit SHA to tag
+    releaseNotes,   // Markdown release notes
+    privkey,
+    relays = gittrNostr.config.relays
+  } = options;
+  
+  if (!privkey) {
+    const creds = loadCredentials();
+    if (creds && creds.nsec) privkey = creds.nsec;
+  }
+  
+  if (!privkey) {
+    throw new Error('Private key required');
+  }
+  
+  const { finalizeEvent } = require('nostr-tools');
+  
+  // Use kind 30617 with special tags for release
+  const unsignedEvent = {
+    kind: 30617,
+    created_at: Math.floor(Date.now() / 1000),
+    tags: [
+      ['d', repoId],
+      ['version', version || tagName],
+      ['t', tagName || version],
+      ...(targetCommit ? [['commit', targetCommit]] : [])
+    ],
+    content: releaseNotes || `Release ${version || tagName}`
+  };
+  
+  const event = finalizeEvent(unsignedEvent, Buffer.from(privkey, 'hex'));
+  const pool = new (require('nostr-tools')).SimplePool();
+  try {
+    await pool.publish(relays, event);
+  } finally {
+    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+  }
+  
+  return { success: true, event, version: version || tagName };
+}
+
+/**
+ * List releases for a repository
+ */
+async function listReleases(options) {
+  const { ownerPubkey, repoId, limit = 20, relays = gittrNostr.config.relays } = options;
+  
+  if (!ownerPubkey || !repoId) {
+    throw new Error('ownerPubkey and repoId required');
+  }
+  
+  const pool = new (require('nostr-tools')).SimplePool();
+  let events = [];
+  
+  try {
+    events = await pool.querySync(relays, {
+      kinds: [30617],
+      '#d': [repoId],
+      authors: [ownerPubkey],
+      '#t': ['*'],  // Tags with versions
+      limit: limit
+    });
+  } finally {
+    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+  }
+  
+  const releases = events.map(event => {
+    const versionTag = event.tags.find(t => t[0] === 't');
+    const commitTag = event.tags.find(t => t[0] === 'commit');
+    return {
+      version: versionTag?.[1],
+      releaseNotes: event.content,
+      commit: commitTag?.[1],
+      created_at: event.created_at,
+      eventId: event.id
+    };
+  }).filter(r => r.version);
+  
+  return releases;
+}
+
+/**
+ * Explore repos by category/topic
+ */
+async function exploreRepos(options = {}) {
+  const { 
+    category,    // 'bitcoin', 'lightning', 'nostr', 'defi', etc.
+    limit = 20, 
+    relays = gittrNostr.config.relays 
+  } = options;
+  
+  if (!category) {
+    // Return popular categories if none specified
+    return [
+      { name: 'bitcoin', description: 'Bitcoin-related projects' },
+      { name: 'lightning', description: 'Lightning Network projects' },
+      { name: 'nostr', description: 'Nostr clients and tools' },
+      { name: 'defi', description: 'Decentralized finance' },
+      { name: 'ai', description: 'AI and machine learning' },
+      { name: 'tools', description: 'Developer tools' },
+      { name: 'cli', description: 'Command line tools' },
+      { name: 'mobile', description: 'Mobile applications' }
+    ];
+  }
+  
+  // Search repos by topic
+  const pool = new (require('nostr-tools')).SimplePool();
+  let events = [];
+  
+  try {
+    events = await pool.querySync(relays, {
+      kinds: [30617],
+      search: category,
+      limit: limit
+    });
+  } finally {
+    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+  }
+  
+  return events.map(event => {
+    const tags = Object.fromEntries(event.tags.filter(t => t.length >= 2));
+    return {
+      id: tags.d,
+      name: tags.name,
+      description: tags.description,
+      owner: event.pubkey,
+      web: event.tags.filter(t => t[0] === 'web').map(t => t[1]),
+      clone: event.tags.filter(t => t[0] === 'clone').map(t => t[1]),
+      created_at: event.created_at
+    };
+  });
+}
+
 module.exports = {
   loadCredentials,
   createRepo,
@@ -431,5 +991,18 @@ module.exports = {
   myRepos,
   addCollaborator,
   getFile,
-  mirrorRepo
+  mirrorRepo,
+  // New features from gittr-shell and gittr.space
+  submitBounty,
+  starRepo,
+  unstarRepo,
+  listStars,
+  watchRepo,
+  getTrendingRepos,
+  getRepoContributors,
+  getBranches,
+  getCommitHistory,
+  createRelease,
+  listReleases,
+  exploreRepos
 };
