@@ -1,0 +1,40 @@
+{
+  "name": "gittr-mcp",
+  "version": "1.0.0",
+  "description": "Model Context Protocol server for gittr.space - Git on Nostr",
+  "main": "index.js",
+  "type": "module",
+  "bin": {
+    "gittr-mcp": "./server.js"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node tests/smoke.js",
+    "server": "node server.js"
+  },
+  "keywords": [
+    "gittr",
+    "nostr",
+    "mcp",
+    "model-context-protocol",
+    "git",
+    " decentralization"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arbadacarbaYK/gittr-mcp.git"
+  },
+  "author": "SatOpsHQ",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "nostr-tools": "^2.0.0",
+    "zod": "^3.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
