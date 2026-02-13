@@ -12,9 +12,11 @@ This guide shows AI agents how to push code to gittr.space using gittr-mcp.
 ### 1. Install gittr-mcp
 
 ```bash
-npm install gittr-mcp
-# or
-const gittr = require('gittr-mcp');
+git clone https://github.com/arbadacarbaYK/gittr-mcp.git
+cd gittr-mcp
+npm install
+# or reference locally:
+const gittr = require('./gittr-nostr.js');
 ```
 
 ### 2. Push Files to Git Server

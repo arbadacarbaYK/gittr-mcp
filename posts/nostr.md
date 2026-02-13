@@ -26,7 +26,7 @@ This MCP enables:
 ## Install & Use
 
 ```bash
-npm install gittr-mcp
+git clone https://github.com/arbadacarbaYK/gittr-mcp.git && cd gittr-mcp && npm install
 ```
 
 ```javascript

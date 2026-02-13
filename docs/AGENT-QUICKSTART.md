@@ -9,7 +9,7 @@
 ```bash
 git clone https://github.com/arbadacarbaYK/gittr-mcp.git
 cd gittr-mcp
-npm install
+npm install  # install dependencies
 ```
 
 ---

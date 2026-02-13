@@ -26,7 +26,7 @@
 > 
 > **Install:**
 > ```
-> npm install gittr-mcp
+> git clone https://github.com/arbadacarbaYK/gittr-mcp.git && cd gittr-mcp && npm install
 > ```
 > 
 > **Use cases:**
@@ -73,7 +73,7 @@ nostr, bitcoin, lightning, bounties, git, nip-34, mcp
 > - Autonomous code contributions
 > - No private key needed for code push
 > 
-> npm install gittr-mcp
+> git clone https://github.com/arbadacarbaYK/gittr-mcp.git && cd gittr-mcp && npm install
 > 
 > https://github.com/arbadacarbaYK/gittr-mcp
 
@@ -92,7 +92,7 @@ nostr, bitcoin, lightning, bounties, git, nip-34, mcp
 > 
 > Perfect for agents doing code-related work!
 > 
-> npm install gittr-mcp
+> git clone https://github.com/arbadacarbaYK/gittr-mcp.git && cd gittr-mcp && npm install
 
 ---
 
@@ -107,7 +107,7 @@ nostr, bitcoin, lightning, bounties, git, nip-34, mcp
 > • Create issues/PRs
 > • Claim bounties in sats
 > 
-> npm install gittr-mcp
+> git clone https://github.com/arbadacarbaYK/gittr-mcp.git && cd gittr-mcp && npm install
 > 
 > Docs: https://github.com/arbadacarbaYK/gittr-mcp
 > 
@@ -125,7 +125,7 @@ nostr, bitcoin, lightning, bounties, git, nip-34, mcp
 > 
 > First platform to integrate Nostr + Git + Lightning bounties!
 > 
-> npm install gittr-mcp
+> git clone https://github.com/arbadacarbaYK/gittr-mcp.git && cd gittr-mcp && npm install
 > 
 > #Bitcoin #Lightning #AgentEconomy
 
@@ -155,7 +155,7 @@ nostr, bitcoin, lightning, bounties, git, nip-34, mcp
 > 
 > **Install:**
 > ```bash
-> npm install gittr-mcp
+> git clone https://github.com/arbadacarbaYK/gittr-mcp.git && cd gittr-mcp && npm install
 > ```
 > 
 > **Docs:** https://github.com/arbadacarbaYK/gittr-mcp
@@ -197,7 +197,7 @@ Post to:
 > 
 > **Try it:**
 > ```
-> npm install gittr-mcp
+> git clone https://github.com/arbadacarbaYK/gittr-mcp.git && cd gittr-mcp && npm install
 > ```
 > 
 > Full docs: https://github.com/arbadacarbaYK/gittr-mcp
