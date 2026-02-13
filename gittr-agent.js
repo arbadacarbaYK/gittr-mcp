@@ -80,14 +80,15 @@ async function createRepo(options) {
     pubkey = gittrNostr.getPublicKey(privkey);
   }
   
-  // Step 1: Push files to bridge (no signing needed)
+  // Step 1: Push files to bridge (requires authentication)
   let pushResult = null;
   if (files.length > 0) {
     pushResult = await gittrNostr.pushToBridge({
       ownerPubkey: pubkey,
       repo: name,
       branch,
-      files
+      files,
+      privkey  // Pass privkey for authenticated push
     });
   }
   

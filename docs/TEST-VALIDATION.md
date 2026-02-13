@@ -63,6 +63,7 @@ Run validation yourself:
 ```bash
 # Install dependencies
 npm install
+cd gittr-mcp
 
 # Basic discovery test
 node -e "

@@ -260,11 +260,72 @@ async function publishRepoState({ repoId, refs, privkey, relays = config.relays 
   return { event, success: true };
 }
 
-// Push files to bridge (HTTP API - no privkey needed!)
-async function pushToBridge({ ownerPubkey, repo, branch, files, commitMessage }) {
+// Push files to bridge with Nostr authentication (REQUIRED)
+// Agent must sign a challenge to authenticate
+async function getBridgeChallenge(bridgeUrl) {
+  const response = await fetch(`${bridgeUrl}/api/nostr/repo/push-challenge`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' }
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to get challenge: ${response.status}`);
+  }
+  
+  return response.json();
+}
+
+// Sign the challenge with Nostr private key
+async function signChallenge(challenge, privkey) {
+  const { finalizeEvent } = require('nostr-tools');
+  
+  const privkeyBuffer = typeof privkey === 'string' ? Buffer.from(privkey, 'hex') : privkey;
+  
+  const unsignedEvent = {
+    kind: 24242, // Generic auth kind
+    created_at: Math.floor(Date.now() / 1000),
+    tags: [['challenge', challenge]],
+    content: 'gittr bridge auth'
+  };
+  
+  const signedEvent = finalizeEvent(unsignedEvent, privkeyBuffer);
+  
+  return {
+    pubkey: Buffer.from(signedEvent.pubkey).toString('hex'),
+    sig: signedEvent.sig,
+    created_at: signedEvent.created_at
+  };
+}
+
+// Push files to bridge - REQUIRES privkey for authentication
+async function pushToBridge({ ownerPubkey, repo, branch, files, commitMessage, privkey }) {
+  // Authentication is now REQUIRED
+  if (!privkey) {
+    throw new Error('Authentication required: privkey must be provided. The bridge now requires Nostr authentication.');
+  }
+  
+  // Get a challenge from the bridge
+  const challengeData = await getBridgeChallenge(config.bridgeUrl);
+  const challenge = challengeData.challenge;
+  
+  // Sign the challenge
+  const auth = await signChallenge(challenge, privkey);
+  
+  // Encode auth header (NIP-98 style)
+  const authPayload = JSON.stringify({
+    pubkey: auth.pubkey,
+    sig: auth.sig,
+    created_at: auth.created_at
+  });
+  const authHeader = Buffer.from(authPayload).toString('base64');
+  
+  // Make authenticated request
   const response = await fetch(`${config.bridgeUrl}/api/nostr/repo/push`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Nostr ${authHeader}`
+    },
     body: JSON.stringify({
       ownerPubkey,
       repo,
@@ -274,7 +335,13 @@ async function pushToBridge({ ownerPubkey, repo, branch, files, commitMessage })
     })
   });
   
-  return response.json();
+  const result = await response.json();
+  
+  if (!response.ok) {
+    throw new Error(result.error || result.details || 'Bridge push failed');
+  }
+  
+  return result;
 }
 
 // Create bounty via bridge API (HTTP)

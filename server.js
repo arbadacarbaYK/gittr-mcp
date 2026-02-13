@@ -76,7 +76,7 @@ const tools = [
   },
   {
     name: 'pushToBridge',
-    description: 'Push files to git server (NO signing required). Bridge API accepts files without Nostr signing.',
+    description: 'Push files to git server (REQUIRES signing with privkey for authenticated push). Bridge API now requires Nostr authentication.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -95,6 +95,8 @@ const tools = [
           },
           description: 'Array of { path, content } objects',
         },
+        commitMessage: { type: 'string', description: 'Commit message' },
+        privkey: { type: 'string', description: 'Private key for authentication (auto-loaded from .nostr-keys.json if not provided)' },
       },
       required: ['ownerPubkey', 'repo', 'files'],
     },
