@@ -2,9 +2,10 @@
 // Enables AI agents to interact with Git repositories on Nostr
 
 const gittrNostr = require('./gittr-nostr.js');
+const gittrAgent = require('./gittr-agent.js');
 
 module.exports = {
-  // Repository operations
+  // Core repository operations
   listRepos: gittrNostr.listRepos,
   publishRepoAnnouncement: gittrNostr.publishRepoAnnouncement,
   publishRepo: gittrNostr.publishRepoAnnouncement, // Alias
@@ -24,6 +25,18 @@ module.exports = {
   
   // Helpers
   getPublicKey: gittrNostr.getPublicKey,
+  
+  // Agent-friendly convenience functions
+  createRepo: gittrAgent.createRepo,
+  getRepo: gittrAgent.getRepo,
+  searchRepos: gittrAgent.searchRepos,
+  listBounties: gittrAgent.listBounties,
+  forkRepo: gittrAgent.forkRepo,
+  myRepos: gittrAgent.myRepos,
+  addCollaborator: gittrAgent.addCollaborator,
+  getFile: gittrAgent.getFile,
+  mirrorRepo: gittrAgent.mirrorRepo,
+  loadCredentials: gittrAgent.loadCredentials,
   
   // Event kinds (for reference)
   KIND_REPOSITORY: gittrNostr.KIND_REPOSITORY,

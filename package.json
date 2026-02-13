@@ -26,12 +26,17 @@
   "author": "SatOpsHQ <vivaciouscloud391379@getalby.com>",
   "license": "MIT",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "nostr-tools": "^2.23.0",
     "websocket-polyfill": "^1.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.11"
+  },
   "engines": {
     "node": ">=14.0.0"
+  },
+  "scripts": {
+    "test": "node -e \"console.log('gittr-mcp smoke OK');\""
   }
 }

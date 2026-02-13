@@ -1,5 +1,5 @@
 // gittr-nostr.js - Nostr operations for gittr (NIP-34 compliant)
-const fetch = require('node-fetch');
+// Use native fetch (Node 22+)
 const { SimplePool, nip19, finalizeEvent, verifyEvent } = require('nostr-tools');
 const config = require('./config');
 const { detectGraspFromRepoEvent } = require('./grasp-detection');
@@ -351,5 +351,8 @@ module.exports = {
   KIND_STATUS_OPEN,
   KIND_STATUS_APPLIED,
   KIND_STATUS_CLOSED,
-  KIND_STATUS_DRAFT
+  KIND_STATUS_DRAFT,
+  
+  // Export config for agent functions
+  config
 };
