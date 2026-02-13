@@ -47,7 +47,35 @@ await gittr.publishRepoState({
 
 ## Two-Step Workflow
 
-### Step 1: Push Files (No Signing)
+**Note:** For most use cases, use `createRepo()` which handles both steps automatically.
+
+### createRepo() — Recommended
+
+```javascript
+const result = await gittr.createRepo({
+  name: 'my-repo',
+  description: 'My project',
+  files: [
+    { path: 'README.md', content: '# Hello' },
+    { path: 'src/index.js', content: 'console.log("Hi");' }
+  ],
+  privkey: 'your-hex-privkey'
+});
+// Returns: { success, repoId, cloneUrl, webUrl, announced, statePublished }
+```
+
+This function:
+1. Pushes files to the bridge
+2. Publishes NIP-34 announcement (kind 30617)
+3. Publishes NIP-34 state (kind 30618)
+
+Always use `createRepo()` to avoid stray files on the bridge.
+
+### Manual Steps (Advanced)
+
+If you need fine-grained control:
+
+#### Step 1: Push Files (No Signing)
 
 The bridge API accepts files without requiring Nostr signing:
 
@@ -357,3 +385,13 @@ Top supporters (10k+ sats) get:
 ## License
 
 MIT
+
+## Limitations
+
+### getFile() — Requires Nostr Sync
+
+`getFile()` fetches file content via GRASP servers. This works **only after** the repo has been published to Nostr. 
+
+Files that exist on the bridge but haven't been published yet (NIP-34 events) cannot be read via this function. 
+
+**Workaround:** Always use `createRepo()` or ensure your changes are published to Nostr before attempting to read files.
