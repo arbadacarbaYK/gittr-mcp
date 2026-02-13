@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Model Context Protocol server for gittr.space - Git on Nostr",
   "main": "index.js",
-  "type": "module",
   "bin": {
     "gittr-mcp": "./server.js"
   },
