@@ -395,3 +395,45 @@ MIT
 Files that exist on the bridge but haven't been published yet (NIP-34 events) cannot be read via this function. 
 
 **Workaround:** Always use `createRepo()` or ensure your changes are published to Nostr before attempting to read files.
+
+### createPR() — Bridge Git Accessibility Required
+
+**Status:** PR creation via MCP has limitations with gittr bridge-based repositories.
+
+**The Issue:**
+- NIP-34 requires that PR commits be accessible via git clone before the PR event can be accepted by relays
+- The gittr bridge stores files but does NOT make them accessible via git (clone URLs return "repository not found")
+- Relays validate that the commit exists in the git repo before accepting PR events
+- This causes PR events to be rejected with: "PR event must reference an accepted repository or accepted event"
+
+**What Works:**
+- ✅ Issues (kind 1621) - no git validation required
+- ✅ Repositories - announcement and state events work
+- ✅ Bridge push - files are stored correctly
+- ❌ PRs (kind 1618) - rejected by relays due to bridge limitation
+
+**Root Cause:**
+```
+# Bridge push succeeds:
+curl -X POST bridge.ngit.dev/api/nostr/repo/push → success
+
+# But git clone fails:
+git clone https://relay.ngit.dev/.../repo.git → "repository not found"
+
+# Relays reject PR because they can't verify the commit exists
+```
+
+**Workarounds:**
+1. **Use gittr CLI** - it handles the full flow including making git accessible
+2. **Use external clone URLs** - create repos with GitHub/GitLab URLs where git is always accessible
+3. **Use Patches (kind 1617)** instead of PRs - patches don't require git validation (coming soon to MCP)
+4. **Wait for bridge fix** - the bridge needs to expose git endpoints properly
+
+**Testing Results (2026-02-14):**
+- Bridge push: ✅ Works
+- Repo announcement (30617): ✅ Works  
+- Repo state (30618): ⚠️ Published but goes to "purgatory"
+- Commit events (30620): ⚠️ Published but goes to "purgatory"
+- PR events (1618): ❌ Rejected - git not accessible
+
+**The MCP code is correct** - this is a gittr bridge limitation, not an MCP bug.

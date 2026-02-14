@@ -433,8 +433,75 @@ async function pushToBridge({ ownerPubkey, repo, branch, files, commitMessage, p
   if (!response.ok) {
     throw new Error(result.error || result.details || 'Bridge push failed');
   }
+
+  // After successful bridge push, publish commit and state events to Nostr
+  // This is REQUIRED for PRs to work - relays need to see these events
+  const relays = config.relays;
+  if (result.refs && result.refs.length > 0 && privkey) {
+    try {
+      await publishCommitAndState({
+        ownerPubkey,
+        repo,
+        commit: result.refs[0].commit,
+        branch: result.refs[0].ref.replace('refs/heads/', ''),
+        commitMessage,
+        privkey,
+        relays
+      });
+    } catch (e) {
+      console.error('Failed to publish Nostr events:', e.message);
+      // Don't fail the push if Nostr publish fails
+    }
+  }
   
   return result;
+}
+
+// Publish commit (30620) and state (30618) events after bridge push
+async function publishCommitAndState({ ownerPubkey, repo, commit, branch, commitMessage, privkey, relays }) {
+  const privkeyBuffer = typeof privkey === 'string' ? Buffer.from(privkey, 'hex') : privkey;
+  const now = Math.floor(Date.now() / 1000);
+  
+  // Build r tag for repo reference
+  const rTag = `30617:${ownerPubkey}:${repo}`;
+  
+  // 1. Publish commit event (kind 30620)
+  const commitEvent = {
+    kind: 30620,
+    created_at: now,
+    tags: [
+      ['d', repo],
+      ['r', rTag],
+      ['c', commit],  // commit hash
+      ['b', branch],  // branch name
+      ['m', 'commit']  // operation type
+    ],
+    content: commitMessage || `Commit to ${branch}`
+  };
+  const signedCommitEvent = finalizeEvent(commitEvent, privkeyBuffer);
+  
+  const pool = getPool();
+  await pool.publish(relays, signedCommitEvent);
+  console.log('Published commit event:', signedCommitEvent.id);
+  
+  // 2. Publish state event (kind 30618)
+  const stateEvent = {
+    kind: 30618,
+    created_at: now,
+    tags: [
+      ['d', repo],
+      ['r', rTag],
+      ['c', commit],  // head commit
+      ['b', branch]   // current branch
+    ],
+    content: `State: ${branch} at ${commit.slice(0, 8)}`
+  };
+  const signedStateEvent = finalizeEvent(stateEvent, privkeyBuffer);
+  
+  await pool.publish(relays, signedStateEvent);
+  console.log('Published state event:', signedStateEvent.id);
+  
+  return { commitEvent: signedCommitEvent, stateEvent: signedStateEvent };
 }
 
 // Create bounty via bridge API (HTTP)
