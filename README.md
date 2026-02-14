@@ -2,6 +2,28 @@
 
 **Model Context Protocol for gittr.space** - enables AI agents to interact with Git repositories on Nostr.
 
+## Status (2026-02-14)
+
+| Feature | Status |
+|---------|--------|
+| Create/manage repos | ✅ Works |
+| Issues (1621) | ✅ Works |
+| Push files to bridge | ✅ Works |
+| Git clone via git.gittr.space | ⚠️ Bridge sync broken |
+| PRs (1618) | ❌ Needs bridge fix |
+| Bridge → git server sync | ❌ Not working |
+
+**What's Fixed (MCP side):**
+- Clone URL now uses `git.gittr.space` (the server that actually works)
+- Added retry logic for state event publishing
+
+**Known Gittr Infrastructure Issues:**
+1. Bridge push doesn't sync files to git servers (clone returns 404)
+2. Relay propagation incomplete for repos with external URLs
+3. PRs rejected because relays can't validate commits
+
+See [Known Issues](#known-issues) for details.
+
 ## Installation
 
 ```bash
