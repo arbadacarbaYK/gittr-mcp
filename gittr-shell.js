@@ -1,6 +1,7 @@
 // gittr-shell.js
 const { execFile } = require('child_process');
-const fetch = require('node-fetch');
+const fetchModule = require('node-fetch');
+const fetch = fetchModule.default || fetchModule;
 const config = require('./config');
 
 function execGittr(args) {
