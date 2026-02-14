@@ -12,16 +12,13 @@ function execGittr(args) {
   });
 }
 
-// Full PR creation via gittr CLI (includes git push + refs/nostr/ push)
+// Full PR creation - NOTE: Requires gittr CLI (not available in this environment)
+// Use gittr.space web UI to push branch, then createPR via Nostr
 async function createPRViaGittrCLI({ repo, head, base, title, body, privkey }) {
-  const args = ['pr', 'create', '--repo', repo];
-  if (head) args.push('--head', head);
-  if (base) args.push('--base', base);
-  if (title) args.push('--title', title);
-  if (body) args.push('--body', body);
-  if (privkey) args.push('--sign', privkey);
-  
-  return execGittr(args);
+  return { 
+    note: 'gittr CLI not installed. Workflow: 1) Push branch via gittr.space web UI 2) Use createPR with commit hash',
+    webUI: 'https://gittr.space'
+  };
 }
 
 async function listRepos(pubkey, includePrivate) {

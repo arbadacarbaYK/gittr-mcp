@@ -1,3 +1,4 @@
-gittr-ssh-key
-gittr-ssh-key.pub
-.ssh-key-for-deploy
+node_modules/
+.env
+*.log
+.DS_Store
