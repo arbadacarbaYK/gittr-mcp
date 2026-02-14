@@ -361,23 +361,25 @@ async function getBridgeChallenge(bridgeUrl) {
   return response.json();
 }
 
-// Sign the challenge with Nostr private key
+// Sign the challenge with Nostr private key (NIP-98 style for gittr bridge)
 async function signChallenge(challenge, privkey) {
   const { finalizeEvent } = require('nostr-tools');
   
   const privkeyBuffer = typeof privkey === 'string' ? Buffer.from(privkey, 'hex') : privkey;
-  
+  const pubkeyHex = getPublicKey(privkey);
+
   const unsignedEvent = {
-    kind: 24242, // Generic auth kind
+    pubkey: pubkeyHex,
+    kind: 24242,
     created_at: Math.floor(Date.now() / 1000),
     tags: [['challenge', challenge]],
     content: 'gittr bridge auth'
   };
-  
+
   const signedEvent = finalizeEvent(unsignedEvent, privkeyBuffer);
-  
+
   return {
-    pubkey: Buffer.from(signedEvent.pubkey).toString('hex'),
+    pubkey: typeof signedEvent.pubkey === 'string' ? signedEvent.pubkey : Buffer.from(signedEvent.pubkey).toString('hex'),
     sig: signedEvent.sig,
     created_at: signedEvent.created_at
   };
