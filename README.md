@@ -37,7 +37,7 @@ npm install
 ```javascript
 const gittr = require('gittr-mcp');
 
-// Push files to gittr (NO signing required)
+// Push files to gittr (Nostr auth required — privkey signs challenge)
 const pushResult = await gittr.pushToBridge({
   ownerPubkey: 'your-64-char-hex-pubkey',
   repo: 'my-repo',
@@ -45,7 +45,8 @@ const pushResult = await gittr.pushToBridge({
   files: [
     { path: 'README.md', content: '# Hello World' },
     { path: 'src/index.js', content: 'console.log("Hello!");' }
-  ]
+  ],
+  privkey: 'your-hex-privkey'
 });
 
 // Publish to Nostr (REQUIRES signing with private key)
@@ -97,9 +98,9 @@ Always use `createRepo()` to avoid stray files on the bridge.
 
 If you need fine-grained control:
 
-#### Step 1: Push Files (No Signing)
+#### Step 1: Push Files (Auth Required)
 
-The bridge API accepts files without requiring Nostr signing:
+The bridge requires NIP-98 auth (sign challenge with your Nostr key). MCP caches the signed challenge briefly to avoid hammering the challenge endpoint.
 
 ```javascript
 const result = await gittr.pushToBridge({
@@ -108,18 +109,18 @@ const result = await gittr.pushToBridge({
   branch: 'main',
   files: [
     { path: 'file.txt', content: 'content' }
-  ]
+  ],
+  privkey: '<your-hex-privkey>'  // required for NIP-98 bridge auth
 });
 
 console.log('Commit:', result.refs[0].commit);
 ```
 
 **What happens:**
-- Files are pushed to git server (https://gittr.space)
-- Git commit is created with provided files
-- Returns commit SHA for Nostr state event
-
-**No signing required** - this is a standard HTTP API call.
+- MCP gets a challenge from the bridge, signs it with your key (NIP-98), and sends the push
+- Signed challenge is cached ~45s so multiple pushes reuse one challenge
+- On 429 (rate limit), MCP waits `retry_after` seconds and retries once
+- Files are pushed to the bridge (https://gittr.space); commit SHA is returned for Nostr state
 
 ### Step 2: Publish to Nostr (Requires Signing)
 
@@ -159,13 +160,14 @@ const stateResult = await gittr.publishRepoState({
 
 #### `pushToBridge(options)`
 
-Push files to git server (NO signing required).
+Push files to the gittr bridge. **Requires `privkey`** for NIP-98 auth (challenge is fetched and signed automatically; result is cached briefly).
 
 **Parameters:**
 - `ownerPubkey` (string) - 64-char hex pubkey
 - `repo` (string) - Repository name
 - `branch` (string) - Branch name (default: 'main')
 - `files` (array) - Array of `{ path, content }` objects
+- `privkey` (string) - **Required.** Hex private key to sign the bridge challenge (NIP-98)
   - `path` (string) - File path (e.g., 'src/index.js')
   - `content` (string) - File content (UTF-8)
   - `isBinary` (boolean, optional) - If true, content is base64
@@ -259,6 +261,17 @@ Discover repositories from Nostr relays.
   }
 ]
 ```
+
+#### `resolveRepoByNostrId(ownerNpubOrHex, repoId, options?)`
+
+Resolve a repo by Nostr identity (npub or hex) and repo name. Returns `cloneUrl` (prefers git.gittr.space), `cloneUrls`, and `relays` so agents can be location-agnostic.
+
+**Parameters:**
+- `ownerNpubOrHex` (string) - Owner as npub (NIP-19) or 64-char hex
+- `repoId` (string) - Repository name/id
+- `options.relays` (array, optional) - Relay list for discovery
+
+**Returns:** Same as `getRepo` plus `cloneUrl` (single preferred URL) and `cloneUrls` (all clone URLs from the event).
 
 ### Issue Operations
 
@@ -370,11 +383,14 @@ const announceResult = await gittr.publishRepoAnnouncement({
 
 **Solution:** Non-fatal - events published successfully. De-duplicate relays array.
 
+### Rate limits (gittr.space bridge)
+
+The bridge applies: **push** 10/min per IP and 5/min per Nostr identity; **push-challenge** 30/min per IP. On `429`, the JSON body includes `retry_after` (seconds). MCP caches the signed challenge ~45s and on 429 waits `retry_after` then retries once. Avoid tight loops (e.g. many `createRepo` calls in a row without delay).
+
 ## Security
 
 - **Never commit private keys** - use environment variables
-- Only Nostr operations require signing (issues, PRs, announcements)
-- Bridge push (files) does NOT require signing
+- Bridge push requires NIP-98 (sign challenge with privkey); Nostr publish (announcements, issues, PRs) also requires signing
 - Store keys securely (e.g., `~/.nostr-identity.json` with 0600 permissions)
 
 ## Complete Example

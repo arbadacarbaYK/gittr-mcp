@@ -188,6 +188,38 @@ async function getRepo(options) {
 }
 
 /**
+ * Resolve repo by Nostr identity (npub or hex) + repo name.
+ * Returns cloneUrl (prefer git.gittr.space), cloneUrls, relays for location-agnostic agents.
+ */
+async function resolveRepoByNostrId(ownerNpubOrHex, repoId, options = {}) {
+  const { relays = gittrNostr.config.relays } = options;
+  let ownerPubkey = ownerNpubOrHex;
+  if (ownerNpubOrHex.startsWith('npub')) {
+    try {
+      const { nip19 } = require('nostr-tools');
+      const decoded = nip19.decode(ownerNpubOrHex);
+      if (decoded.type === 'npub' && decoded.data) {
+        ownerPubkey = typeof decoded.data === 'string' ? decoded.data : Buffer.from(decoded.data).toString('hex');
+      }
+    } catch (e) {
+      return { error: `Invalid npub: ${e.message}`, ownerNpubOrHex, repoId };
+    }
+  } else if (!/^[0-9a-f]{64}$/i.test(ownerNpubOrHex)) {
+    return { error: 'ownerNpubOrHex must be npub (NIP-19) or 64-char hex', ownerNpubOrHex, repoId };
+  }
+  const repo = await getRepo({ ownerPubkey, repoId, relays });
+  if (repo.error) return repo;
+  const cloneUrls = repo.clone && repo.clone.length ? repo.clone : [];
+  const cloneUrl = cloneUrls.find(u => u.includes('git.gittr.space')) || cloneUrls[0] || null;
+  return {
+    ...repo,
+    cloneUrl,
+    cloneUrls,
+    relays: repo.relays || relays
+  };
+}
+
+/**
  * Search repositories with full-text search
  */
 async function searchRepos(query, options = {}) {
@@ -1029,6 +1061,7 @@ module.exports = {
   loadCredentials,
   createRepo,
   getRepo,
+  resolveRepoByNostrId,
   searchRepos,
   listBounties,
   forkRepo,

@@ -52,6 +52,19 @@ const tools = [
     },
   },
   {
+    name: 'resolveRepoByNostrId',
+    description: 'Resolve repo by Nostr identity (npub or hex) and repo name. Returns cloneUrl (prefer git.gittr.space), cloneUrls, relays for location-agnostic use.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ownerNpubOrHex: { type: 'string', description: 'Owner as npub (NIP-19) or 64-char hex' },
+        repoId: { type: 'string', description: 'Repository name' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['ownerNpubOrHex', 'repoId'],
+    },
+  },
+  {
     name: 'searchRepos',
     description: 'Full-text search across repository names and descriptions',
     inputSchema: {
@@ -519,6 +532,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case 'getRepo':
         result = await gittr.getRepo(args);
+        break;
+      case 'resolveRepoByNostrId':
+        result = await gittr.resolveRepoByNostrId(args.ownerNpubOrHex, args.repoId, args);
         break;
       case 'searchRepos':
         result = await gittr.searchRepos(args.query, args);

@@ -346,18 +346,37 @@ async function publishRepoState({ repoId, refs, privkey, relays = config.relays 
   return { event, success: true };
 }
 
-// Push files to bridge with Nostr authentication (REQUIRED)
-// Agent must sign a challenge to authenticate
+// In-memory cache: reuse one signed challenge per (bridgeUrl, pubkey) for a short window
+// Reduces load on push-challenge when MCP does several pushes in a row
+const challengeCache = new Map();
+const CHALLENGE_CACHE_TTL_MS = 45 * 1000;
+
+function getCachedAuth(bridgeUrl, pubkey) {
+  const key = `${bridgeUrl}:${pubkey}`;
+  const entry = challengeCache.get(key);
+  if (entry && entry.expiresAt > Date.now()) return entry.authHeader;
+  challengeCache.delete(key);
+  return null;
+}
+
+function setCachedAuth(bridgeUrl, pubkey, authHeader) {
+  const key = `${bridgeUrl}:${pubkey}`;
+  challengeCache.set(key, { authHeader, expiresAt: Date.now() + CHALLENGE_CACHE_TTL_MS });
+}
+
 async function getBridgeChallenge(bridgeUrl) {
   const response = await fetch(`${bridgeUrl}/api/nostr/repo/push-challenge`, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' }
   });
-  
+  if (response.status === 429) {
+    const body = await response.json().catch(() => ({}));
+    const retryAfter = body.retry_after ?? body.retryAfter ?? 60;
+    throw new Error(`Rate limited; retry after ${retryAfter}s`);
+  }
   if (!response.ok) {
     throw new Error(`Failed to get challenge: ${response.status}`);
   }
-  
   return response.json();
 }
 
@@ -387,38 +406,39 @@ async function signChallenge(challenge, privkey) {
 
 // Push files to bridge - REQUIRES privkey for authentication
 async function pushToBridge({ ownerPubkey, repo, branch, files, commitMessage, privkey }) {
-  // Authentication is now REQUIRED
   if (!privkey) {
     throw new Error('Authentication required: privkey must be provided. The bridge now requires Nostr authentication.');
   }
-  
-  // Try challenge-based auth first, fall back to direct push if challenge returns 404
-  let challengeData;
-  let useAuth = true;
-  try {
-    challengeData = await getBridgeChallenge(config.bridgeUrl);
-  } catch (e) {
-    useAuth = false;
+
+  const pubkeyHex = getPublicKey(privkey);
+  let authHeader = getCachedAuth(config.bridgeUrl, pubkeyHex);
+
+  if (!authHeader) {
+    let challengeData;
+    let useAuth = true;
+    try {
+      challengeData = await getBridgeChallenge(config.bridgeUrl);
+    } catch (e) {
+      useAuth = false;
+    }
+    if (useAuth && challengeData?.challenge) {
+      const auth = await signChallenge(challengeData.challenge, privkey);
+      const authPayload = JSON.stringify({
+        pubkey: auth.pubkey,
+        sig: auth.sig,
+        created_at: auth.created_at
+      });
+      authHeader = Buffer.from(authPayload).toString('base64');
+      setCachedAuth(config.bridgeUrl, pubkeyHex, authHeader);
+    }
   }
-  
-  let authHeader = '';
-  if (useAuth && challengeData?.challenge) {
-    const challenge = challengeData.challenge;
-    const auth = await signChallenge(challenge, privkey);
-    const authPayload = JSON.stringify({
-      pubkey: auth.pubkey,
-      sig: auth.sig,
-      created_at: auth.created_at
-    });
-    authHeader = Buffer.from(authPayload).toString('base64');
-  }
-  
+
   const headers = { 'Content-Type': 'application/json' };
   if (authHeader) {
     headers['Authorization'] = `Nostr ${authHeader}`;
   }
-  
-  const response = await fetch(`${config.bridgeUrl}/api/nostr/repo/push`, {
+
+  const doPush = () => fetch(`${config.bridgeUrl}/api/nostr/repo/push`, {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -429,9 +449,18 @@ async function pushToBridge({ ownerPubkey, repo, branch, files, commitMessage, p
       commitMessage
     })
   });
-  
-  const result = await response.json();
-  
+
+  let response = await doPush();
+  let result = await response.json().catch(() => ({}));
+
+  // On 429, back off and retry once
+  if (response.status === 429) {
+    const retryAfter = Math.min(120, Math.max(30, result.retry_after ?? result.retryAfter ?? 60));
+    await new Promise(r => setTimeout(r, retryAfter * 1000));
+    response = await doPush();
+    result = await response.json().catch(() => ({}));
+  }
+
   if (!response.ok) {
     throw new Error(result.error || result.details || 'Bridge push failed');
   }
