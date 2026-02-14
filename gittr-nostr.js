@@ -304,28 +304,35 @@ async function pushToBridge({ ownerPubkey, repo, branch, files, commitMessage, p
     throw new Error('Authentication required: privkey must be provided. The bridge now requires Nostr authentication.');
   }
   
-  // Get a challenge from the bridge
-  const challengeData = await getBridgeChallenge(config.bridgeUrl);
-  const challenge = challengeData.challenge;
+  // Try challenge-based auth first, fall back to direct push if challenge returns 404
+  let challengeData;
+  let useAuth = true;
+  try {
+    challengeData = await getBridgeChallenge(config.bridgeUrl);
+  } catch (e) {
+    useAuth = false;
+  }
   
-  // Sign the challenge
-  const auth = await signChallenge(challenge, privkey);
+  let authHeader = '';
+  if (useAuth && challengeData?.challenge) {
+    const challenge = challengeData.challenge;
+    const auth = await signChallenge(challenge, privkey);
+    const authPayload = JSON.stringify({
+      pubkey: auth.pubkey,
+      sig: auth.sig,
+      created_at: auth.created_at
+    });
+    authHeader = Buffer.from(authPayload).toString('base64');
+  }
   
-  // Encode auth header (NIP-98 style)
-  const authPayload = JSON.stringify({
-    pubkey: auth.pubkey,
-    sig: auth.sig,
-    created_at: auth.created_at
-  });
-  const authHeader = Buffer.from(authPayload).toString('base64');
+  const headers = { 'Content-Type': 'application/json' };
+  if (authHeader) {
+    headers['Authorization'] = `Nostr ${authHeader}`;
+  }
   
-  // Make authenticated request
   const response = await fetch(`${config.bridgeUrl}/api/nostr/repo/push`, {
     method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Nostr ${authHeader}`
-    },
+    headers,
     body: JSON.stringify({
       ownerPubkey,
       repo,
