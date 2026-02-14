@@ -436,4 +436,9 @@ git clone https://relay.ngit.dev/.../repo.git → "repository not found"
 - Commit events (30620): ⚠️ Published but goes to "purgatory"
 - PR events (1618): ❌ Rejected - git not accessible
 
+**Tested Clone URLs (all return 404):**
+- `https://relay.ngit.dev/.../repo.git` → "repository not found"
+- `https://gittr.space/.../repo.git` → "page not found"  
+- `nostr://` protocol → needs git-remote-nostr helper
+
 **The MCP code is correct** - this is a gittr bridge limitation, not an MCP bug.
