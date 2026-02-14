@@ -3,6 +3,7 @@
 
 const gittrNostr = require('./gittr-nostr.js');
 const gittrAgent = require('./gittr-agent.js');
+const gittrShell = require('./gittr-shell.js');
 
 module.exports = {
   // Core repository operations
@@ -19,6 +20,8 @@ module.exports = {
   // Pull Request operations  
   listPRs: gittrNostr.listPRs,
   createPR: gittrNostr.createPR,
+  // Full PR flow via gittr CLI (includes git push + refs/nostr/ push - REQUIRED for NIP-34)
+  createPRViaGittrCLI: gittrShell.createPRViaGittrCLI,
   
   // Bounty operations (not yet active on platform)
   createBounty: gittrNostr.createBounty,

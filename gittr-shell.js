@@ -12,6 +12,18 @@ function execGittr(args) {
   });
 }
 
+// Full PR creation via gittr CLI (includes git push + refs/nostr/ push)
+async function createPRViaGittrCLI({ repo, head, base, title, body, privkey }) {
+  const args = ['pr', 'create', '--repo', repo];
+  if (head) args.push('--head', head);
+  if (base) args.push('--base', base);
+  if (title) args.push('--title', title);
+  if (body) args.push('--body', body);
+  if (privkey) args.push('--sign', privkey);
+  
+  return execGittr(args);
+}
+
 async function listRepos(pubkey, includePrivate) {
   try {
     return await execGittr(['repo', 'list', '--pubkey', pubkey, includePrivate ? '--private' : '--public']);
@@ -51,4 +63,12 @@ async function submitBounty({ issueId, prUrl, evidence, privkey }) {
   return execGittr(['bounty', 'submit', '--issue', issueId, '--pr', prUrl, '--evidence', evidence, '--sign', privkey]);
 }
 
-module.exports = { listRepos, pushToBridge, publishEvent, listIssues, createPR, submitBounty };
+module.exports = { 
+  listRepos, 
+  pushToBridge, 
+  publishEvent, 
+  listIssues, 
+  createPR, 
+  submitBounty,
+  createPRViaGittrCLI 
+};

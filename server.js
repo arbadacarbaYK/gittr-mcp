@@ -300,6 +300,22 @@ const tools = [
       required: ['ownerPubkey', 'repoId', 'subject', 'commitId', 'branchName', 'privkey', 'relays'],
     },
   },
+  {
+    name: 'createPRViaGittrCLI',
+    description: 'Create PR via gittr CLI - full flow including git push (RECOMMENDED for PRs)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        repo: { type: 'string', description: 'Repository (e.g., "npub.../my-repo")' },
+        head: { type: 'string', description: 'Head branch' },
+        base: { type: 'string', description: 'Base branch (default: main)' },
+        title: { type: 'string', description: 'PR title' },
+        body: { type: 'string', description: 'PR body' },
+        privkey: { type: 'string', description: 'Private key for signing' },
+      },
+      required: ['repo', 'title', 'privkey'],
+    },
+  },
   // Utility
   {
     name: 'getPublicKey',
@@ -530,6 +546,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case 'createPR':
         result = await gittr.createPR(args);
+        break;
+      case 'createPRViaGittrCLI':
+        result = await gittr.createPRViaGittrCLI(args);
         break;
       case 'createRepo':
         result = await gittr.createRepo(args);
