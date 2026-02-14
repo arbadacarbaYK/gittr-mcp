@@ -168,11 +168,22 @@ async function listPRs({ ownerPubkey, repoId, relays = config.relays }) {
 // Create and publish a PR
 async function createPR(privkeyOrOptions, repoIdArg, ownerPubkeyArg, subjectArg, contentArg, baseBranchArg, headBranchArg, cloneUrlsArg) {
   // Support both object and positional parameters
-  let ownerPubkey, repoId, subject, content, commitId, cloneUrls, branchName, labels, privkey, relays;
+  // NOTE: Default values must be in the variable declarations, not in destructuring
+  let ownerPubkey, repoId, subject, content, commitId = 'HEAD', cloneUrls = [], branchName = 'main', labels = [], privkey, relays;
   
   if (typeof privkeyOrOptions === 'object' && privkeyOrOptions !== null && !Buffer.isBuffer(privkeyOrOptions)) {
-    // Object parameter style
-    ({ ownerPubkey, repoId, subject, content, commitId, cloneUrls, branchName, labels = [], privkey, relays = config.relays } = privkeyOrOptions);
+    // Object parameter style - override defaults only if values are provided
+    const opts = privkeyOrOptions;
+    ownerPubkey = opts.ownerPubkey;
+    repoId = opts.repoId;
+    subject = opts.subject;
+    content = opts.content;
+    commitId = opts.commitId || 'HEAD';
+    cloneUrls = opts.cloneUrls || [];
+    branchName = opts.branchName || 'main';
+    labels = opts.labels || [];
+    privkey = opts.privkey;
+    relays = opts.relays || config.relays;
   } else {
     // Positional parameter style: createPR(privkey, repoId, ownerPubkey, subject, content, baseBranch, headBranch, cloneUrls)
     privkey = privkeyOrOptions;
@@ -180,7 +191,7 @@ async function createPR(privkeyOrOptions, repoIdArg, ownerPubkeyArg, subjectArg,
     ownerPubkey = ownerPubkeyArg;
     subject = subjectArg;
     content = contentArg;
-    branchName = headBranchArg;
+    branchName = headBranchArg || 'main';
     commitId = 'HEAD'; // Default commit
     cloneUrls = cloneUrlsArg || [];
     labels = [];
@@ -189,18 +200,27 @@ async function createPR(privkeyOrOptions, repoIdArg, ownerPubkeyArg, subjectArg,
   
   const privkeyBuffer = typeof privkey === 'string' ? Buffer.from(privkey, 'hex') : privkey;
   
+  // Build tags array, filtering out undefined values
+  const tags = [
+    ['a', `${KIND_REPOSITORY}:${ownerPubkey}:${repoId}`],
+    ['p', ownerPubkey],
+    ['subject', subject],
+    ['c', commitId],
+    ['branch-name', branchName]
+  ];
+  
+  // Add optional tags only if they have values
+  if (cloneUrls && cloneUrls.length > 0) {
+    tags.push(...cloneUrls.map(url => ['clone', url]));
+  }
+  if (labels && labels.length > 0) {
+    tags.push(...labels.map(label => ['t', label]));
+  }
+  
   const unsignedEvent = {
     kind: KIND_PULL_REQUEST,
     created_at: Math.floor(Date.now() / 1000),
-    tags: [
-      ['a', `${KIND_REPOSITORY}:${ownerPubkey}:${repoId}`],
-      ['p', ownerPubkey],
-      ['subject', subject],
-      ['c', commitId],
-      ...cloneUrls.map(url => ['clone', url]),
-      ['branch-name', branchName],
-      ...labels.map(label => ['t', label])
-    ],
+    tags,
     content
   };
   

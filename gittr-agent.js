@@ -65,9 +65,10 @@ async function createRepo(options) {
   // Auto-load credentials if not provided
   if (!privkey) {
     const creds = loadCredentials();
-    if (creds && creds.nsec) {
-      privkey = creds.nsec;
-      pubkey = creds.npub;
+    if (creds) {
+      // Support both nsec format and secretKey hex format
+      privkey = creds.nsec || creds.secretKey || creds.private_key;
+      pubkey = pubkey || creds.npub || creds.publicKey || creds.pubkey;
     }
   }
   
@@ -239,8 +240,8 @@ async function forkRepo(options) {
   // Auto-load credentials
   if (!privkey) {
     const creds = loadCredentials();
-    if (creds && creds.nsec) {
-      privkey = creds.nsec;
+    if (creds) {
+      privkey = creds.nsec || creds.secretKey || creds.private_key;
     }
   }
   
@@ -299,8 +300,8 @@ async function addCollaborator(options) {
   // Auto-load credentials
   if (!privkey) {
     const creds = loadCredentials();
-    if (creds && creds.nsec) {
-      privkey = creds.nsec;
+    if (creds) {
+      privkey = creds.nsec || creds.secretKey || creds.private_key;
     }
   }
   
@@ -399,8 +400,8 @@ async function mirrorRepo(options) {
   // Auto-load credentials
   if (!privkey) {
     const creds = loadCredentials();
-    if (creds && creds.nsec) {
-      privkey = creds.nsec;
+    if (creds) {
+      privkey = creds.nsec || creds.secretKey || creds.private_key;
     }
   }
   
@@ -467,8 +468,8 @@ async function submitBounty(options) {
   // Auto-load credentials
   if (!privkey) {
     const creds = loadCredentials();
-    if (creds && creds.nsec) {
-      privkey = creds.nsec;
+    if (creds) {
+      privkey = creds.nsec || creds.secretKey || creds.private_key;
     }
   }
   
@@ -514,7 +515,7 @@ async function starRepo(options) {
   
   if (!privkey) {
     const creds = loadCredentials();
-    if (creds && creds.nsec) privkey = creds.nsec;
+    if (creds && creds.nsec) privkey = creds.nsec || creds.secretKey || creds.private_key;
   }
   
   if (!privkey) {
@@ -559,7 +560,7 @@ async function unstarRepo(options) {
   
   if (!privkey) {
     const creds = loadCredentials();
-    if (creds && creds.nsec) privkey = creds.nsec;
+    if (creds && creds.nsec) privkey = creds.nsec || creds.secretKey || creds.private_key;
   }
   
   if (!privkey) {
@@ -652,7 +653,7 @@ async function watchRepo(options) {
   
   if (!privkey) {
     const creds = loadCredentials();
-    if (creds && creds.nsec) privkey = creds.nsec;
+    if (creds && creds.nsec) privkey = creds.nsec || creds.secretKey || creds.private_key;
   }
   
   if (!privkey) {
@@ -877,7 +878,7 @@ async function createRelease(options) {
   
   if (!privkey) {
     const creds = loadCredentials();
-    if (creds && creds.nsec) privkey = creds.nsec;
+    if (creds && creds.nsec) privkey = creds.nsec || creds.secretKey || creds.private_key;
   }
   
   if (!privkey) {
