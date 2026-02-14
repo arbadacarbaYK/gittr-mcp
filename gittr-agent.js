@@ -120,15 +120,29 @@ async function createRepo(options) {
     relays: validRelays.length > 0 ? validRelays : ['wss://relay.ngit.dev']
   });
   
-  // Step 4: Publish state (if we pushed files)
+  // Step 4: Publish state (if we pushed files) - wait for announcement to be accepted first
   let stateResult = null;
   if (pushResult && pushResult.refs) {
-    stateResult = await gittrNostr.publishRepoState({
-      repoId: name,
-      refs: pushResult.refs,
-      privkey,
-      relays
-    });
+    // Wait for relay to accept the announcement before publishing state
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Retry state publish up to 3 times if it fails
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        stateResult = await gittrNostr.publishRepoState({
+          repoId: name,
+          refs: pushResult.refs,
+          privkey,
+          relays
+        });
+        break; // Success
+      } catch (e) {
+        console.log(`State publish attempt ${attempt} failed:`, e.message);
+        if (attempt < 3) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+    }
   }
   
   return {
