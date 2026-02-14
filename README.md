@@ -424,10 +424,16 @@ git clone https://relay.ngit.dev/.../repo.git → "repository not found"
 ```
 
 **Workarounds:**
-1. **Use gittr CLI** - it handles the full flow including making git accessible
+1. **Use gittr CLI** - it handles the full flow (uses nostr:// protocol internally)
 2. **Use external clone URLs** - create repos with GitHub/GitLab URLs where git is always accessible
-3. **Use Patches (kind 1617)** instead of PRs - patches don't require git validation (coming soon to MCP)
-4. **Wait for bridge fix** - the bridge needs to expose git endpoints properly
+3. **Use Patches (kind 1617)** instead of PRs - patches don't require git validation
+4. **Install git-remote-nostr** - helper to use nostr:// URLs with git (needs build from source)
+
+**The Key Insight:**
+- GRASP servers = git servers that ALSO act as relays (same URL serves both git and Nostr)
+- The `nostr://` protocol abstracts away the exact server - finds it automatically via Nostr
+- Bridge URLs (relay.ngit.dev) don't work because git isn't synced there
+- The nostr:// URL is what actually works - gittr CLI uses this internally
 
 **Testing Results (2026-02-14):**
 - Bridge push: ✅ Works
