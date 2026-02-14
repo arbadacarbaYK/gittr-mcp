@@ -236,17 +236,28 @@ async function createPR(privkeyOrOptions, repoIdArg, ownerPubkeyArg, subjectArg,
 async function publishRepoAnnouncement({ repoId, name, description, web, clone, privkey, relays = config.relays }) {
   const privkeyBuffer = typeof privkey === 'string' ? Buffer.from(privkey, 'hex') : privkey;
   
+  // Build tags - clone takes multiple URLs in a SINGLE tag per NIP-34
+  const tags = [
+    ['d', repoId],
+    ['name', name],
+    ['description', description],
+    ...web.map(url => ['web', url])
+  ];
+  
+  // Clone: single tag with all URLs as values
+  if (clone && clone.length > 0) {
+    tags.push(['clone', ...clone]);
+  }
+  
+  // Relays: single tag with all relay URLs
+  if (relays && relays.length > 0) {
+    tags.push(['relays', ...relays]);
+  }
+  
   const unsignedEvent = {
     kind: KIND_REPOSITORY,
     created_at: Math.floor(Date.now() / 1000),
-    tags: [
-      ['d', repoId],
-      ['name', name],
-      ['description', description],
-      ...web.map(url => ['web', url]),
-      ...clone.map(url => ['clone', url]),
-      ...relays.map(relay => ['relays', relay])
-    ],
+    tags,
     content: ''
   };
   
@@ -410,8 +421,10 @@ function getPublicKey(privkey) {
   // Convert hex string to Buffer if needed
   const privateKeyBuffer = typeof hex === 'string' ? Buffer.from(hex, 'hex') : hex;
   
-  const { getPublicKey } = require('@noble/secp256k1');
-  return Buffer.from(getPublicKey(privateKeyBuffer, false).slice(1)).toString('hex');
+  const { getPublicKey: nobleGetPublicKey } = require('@noble/secp256k1');
+  // Use true for compressed (33 bytes with 0x02/0x03 prefix), then slice to get 32 raw bytes
+  const pubKeyBytes = nobleGetPublicKey(privateKeyBuffer, true);
+  return Buffer.from(pubKeyBytes.slice(1)).toString('hex');
 }
 
 module.exports = {

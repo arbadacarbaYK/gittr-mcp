@@ -51,16 +51,15 @@ function loadCredentials() {
  * This is the main agent-friendly function for creating repos
  */
 async function createRepo(options) {
-  const {
-    name,           // Repository name (required)
-    description = '',
-    files = [],     // Array of { path, content } (required for initial push)
-    branch = 'main',
-    privkey,        // Your private key (hex)
-    pubkey,         // Your public key (hex) - auto-derived if privkey provided
-    relays = gittrNostr.config.relays,
-    graspServer = 'relay.ngit.dev'
-  } = options;
+  // Destructure without const to allow reassignment
+  const name = options.name;
+  const description = options.description || '';
+  const files = options.files || [];
+  const branch = options.branch || 'main';
+  let privkey = options.privkey;
+  let pubkey = options.pubkey;
+  const relays = options.relays || gittrNostr.config.relays;
+  const graspServer = options.graspServer || 'relay.ngit.dev';
   
   // Auto-load credentials if not provided
   if (!privkey) {
@@ -93,13 +92,24 @@ async function createRepo(options) {
     });
   }
   
-  // Step 2: Build clone URLs
+  // Step 2: Build clone URLs - include BOTH bridge and relay URLs
+  // The relay requires both clone and relays tags to accept the announcement
   const cloneUrls = [
-    `https://${graspServer}/${pubkey}/${name}.git`
+    `https://${graspServer}/${pubkey}/${name}.git`,  // relay.ngit.dev
+    `https://gittr.space/${pubkey}/${name}.git`       // gittr.space fallback
   ];
+  
+  // Include relay URLs in the announcement - this is REQUIRED for relays to accept
   const webUrls = [
     `https://gittr.space/${pubkey}/${name}`
   ];
+  
+  // Make sure relays match clone URLs or use whitelisted relays
+  const validRelays = relays.filter(r => 
+    r.includes('relay.ngit.dev') || 
+    r.includes('gittr.space') ||
+    r.includes('nostr.wine')
+  );
   
   // Step 3: Publish announcement
   const announceResult = await gittrNostr.publishRepoAnnouncement({
@@ -109,7 +119,7 @@ async function createRepo(options) {
     web: webUrls,
     clone: cloneUrls,
     privkey,
-    relays
+    relays: validRelays.length > 0 ? validRelays : relays  // Fallback to all if none match
   });
   
   // Step 4: Publish state (if we pushed files)
