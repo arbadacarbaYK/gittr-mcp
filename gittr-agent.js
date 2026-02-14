@@ -92,11 +92,9 @@ async function createRepo(options) {
     });
   }
   
-  // Step 2: Build clone URLs - include BOTH bridge and relay URLs
-  // The relay requires both clone and relays tags to accept the announcement
+  // Step 2: Build clone URLs - single URL for NIP-34 compliance
   const cloneUrls = [
-    `https://${graspServer}/${pubkey}/${name}.git`,  // relay.ngit.dev
-    `https://gittr.space/${pubkey}/${name}.git`       // gittr.space fallback
+    `https://${graspServer}/${pubkey}/${name}.git`
   ];
   
   // Include relay URLs in the announcement - this is REQUIRED for relays to accept
@@ -104,11 +102,9 @@ async function createRepo(options) {
     `https://gittr.space/${pubkey}/${name}`
   ];
   
-  // Make sure relays match clone URLs or use whitelisted relays
+  // Filter to open relays only (no auth required)
   const validRelays = relays.filter(r => 
-    r.includes('relay.ngit.dev') || 
-    r.includes('gittr.space') ||
-    r.includes('nostr.wine')
+    r.includes('relay.ngit.dev') || !r.includes('noderunners')
   );
   
   // Step 3: Publish announcement
@@ -119,7 +115,7 @@ async function createRepo(options) {
     web: webUrls,
     clone: cloneUrls,
     privkey,
-    relays: validRelays.length > 0 ? validRelays : relays  // Fallback to all if none match
+    relays: validRelays.length > 0 ? validRelays : ['wss://relay.ngit.dev']
   });
   
   // Step 4: Publish state (if we pushed files)
