@@ -344,7 +344,27 @@ async function getFile(options) {
     branch = 'main'
   } = options;
   
-  // Try each grasp server
+  // First try bridge API (for files that are on bridge but not yet synced to Nostr)
+  const bridgeUrl = 'https://gittr.space';
+  const bridgeAttempts = [
+    `${bridgeUrl}/api/nostr/repo/raw/${ownerPubkey}/${repoId}/${branch}/${filePath}`,
+    `${bridgeUrl}/api/raw/${ownerPubkey}/${repoId}/${branch}/${filePath}`,
+    `${bridgeUrl}/raw/${ownerPubkey}/${repoId}/${branch}/${filePath}`
+  ];
+  
+  for (const url of bridgeAttempts) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        const content = await response.text();
+        return { content, path: filePath, repo: repoId, branch, source: 'bridge', url };
+      }
+    } catch (e) {
+      // Try next URL
+    }
+  }
+  
+  // If bridge fails, try GRASP servers (for files synced to Nostr)
   const servers = ['relay.ngit.dev', 'git.gittr.space', 'git.shakespeare.diy'];
   
   for (const server of servers) {
@@ -353,7 +373,7 @@ async function getFile(options) {
       const response = await fetch(url);
       if (response.ok) {
         const content = await response.text();
-        return { content, path: filePath, repo: repoId, branch, server };
+        return { content, path: filePath, repo: repoId, branch, server, source: 'grasp' };
       }
     } catch (e) {
       // Try next server
