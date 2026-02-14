@@ -198,18 +198,24 @@ async function createPR(privkeyOrOptions, repoIdArg, ownerPubkeyArg, subjectArg,
     relays = config.relays;
   }
   
-  // If no relays specified, fetch the repo to get its relays
+  // If no relays specified, fetch the repo to get its clone/relay info
+  let repo = null;
   if (!relays || relays.length === 0) {
     try {
       const repos = await listRepos({ pubkey: ownerPubkey, search: repoId });
-      const repo = repos.find(r => r.id === repoId);
-      if (repo && repo.relays) {
+      repo = repos.find(r => r.id === repoId);
+      if (repo && repo.relays && repo.relays.length > 0) {
         relays = repo.relays;
+      } else if (repo && repo.clone && repo.clone.length > 0) {
+        // Fallback: extract relay from clone URL
+        const cloneUrl = repo.clone[0];
+        let relayUrl = cloneUrl.replace(/^https?:\/\//, 'wss://').replace(/\/.*$/, '');
+        relays = [relayUrl];
       } else {
         relays = config.relays;
       }
     } catch (e) {
-      console.error('Failed to fetch repo relays:', e.message);
+      console.error('Failed to fetch repo:', e.message);
       relays = config.relays;
     }
   }
@@ -236,8 +242,14 @@ async function createPR(privkeyOrOptions, repoIdArg, ownerPubkeyArg, subjectArg,
   }
   
   // Build tags array, filtering out undefined values
+  // NIP-34: 'a' tag should include relay URLs for validation
+  const repoRef = `${KIND_REPOSITORY}:${ownerPubkey}:${repoId}`;
+  const aTagValue = relays && relays.length > 0 
+    ? `${repoRef}, ${relays.join(', ')}` 
+    : repoRef;
+  
   const tags = [
-    ['a', `${KIND_REPOSITORY}:${ownerPubkey}:${repoId}`],
+    ['a', aTagValue],
     ['p', ownerPubkey],
     ['subject', subject],
     ['c', commitId],
@@ -252,6 +264,9 @@ async function createPR(privkeyOrOptions, repoIdArg, ownerPubkeyArg, subjectArg,
   // Add optional tags only if they have values
   if (cloneUrls && cloneUrls.length > 0) {
     tags.push(...cloneUrls.map(url => ['clone', url]));
+  } else if (repo && repo.clone && repo.clone.length > 0) {
+    // Fallback: use clone URL from repo
+    tags.push(['clone', repo.clone[0]]);
   }
   if (labels && labels.length > 0) {
     tags.push(...labels.map(label => ['t', label]));
