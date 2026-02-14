@@ -92,9 +92,11 @@ async function createRepo(options) {
     });
   }
   
-  // Step 2: Build clone URLs - single URL for NIP-34 compliance
+  // Step 2: Build clone URLs - include BOTH git.gittr.space (works!) and relay.ngit.dev
+  // git.gittr.space is the ONLY server that actually exposes git access!
   const cloneUrls = [
-    `https://${graspServer}/${pubkey}/${name}.git`
+    `https://git.gittr.space/${pubkey}/${name}.git`,
+    `https://relay.ngit.dev/${pubkey}/${name}.git`
   ];
   
   // Include relay URLs in the announcement - this is REQUIRED for relays to accept
@@ -240,7 +242,7 @@ async function forkRepo(options) {
     newRepoDescription = '',
     privkey,
     relays = gittrNostr.config.relays,
-    graspServer = 'relay.ngit.dev'
+    graspServer = 'git.gittr.space'  // Use the server that actually works!
   } = options;
   
   // Auto-load credentials
@@ -400,7 +402,7 @@ async function mirrorRepo(options) {
     description = '',
     privkey,
     relays = gittrNostr.config.relays,
-    graspServer = 'relay.ngit.dev'
+    graspServer = 'git.gittr.space'  // Use the server that actually works!
   } = options;
   
   // Auto-load credentials
