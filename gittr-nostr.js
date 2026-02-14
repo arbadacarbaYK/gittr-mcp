@@ -198,7 +198,42 @@ async function createPR(privkeyOrOptions, repoIdArg, ownerPubkeyArg, subjectArg,
     relays = config.relays;
   }
   
+  // If no relays specified, fetch the repo to get its relays
+  if (!relays || relays.length === 0) {
+    try {
+      const repos = await listRepos({ pubkey: ownerPubkey, search: repoId });
+      const repo = repos.find(r => r.id === repoId);
+      if (repo && repo.relays) {
+        relays = repo.relays;
+      } else {
+        relays = config.relays;
+      }
+    } catch (e) {
+      console.error('Failed to fetch repo relays:', e.message);
+      relays = config.relays;
+    }
+  }
+  
   const privkeyBuffer = typeof privkey === 'string' ? Buffer.from(privkey, 'hex') : privkey;
+  
+  // Get repo EUC (earliest unique commit) if available - some relays require this
+  let euc = null;
+  try {
+    const pool = getPool();
+    const repoEvents = await pool.querySync(relays, {
+      kinds: [KIND_REPOSITORY],
+      authors: [ownerPubkey],
+      '#d': [repoId]
+    });
+    if (repoEvents.length > 0) {
+      const rTag = repoEvents[0].tags.find(t => t[0] === 'r' && t[2] === 'euc');
+      if (rTag) {
+        euc = rTag[1];
+      }
+    }
+  } catch (e) {
+    console.error('Failed to get repo EUC:', e.message);
+  }
   
   // Build tags array, filtering out undefined values
   const tags = [
@@ -208,6 +243,11 @@ async function createPR(privkeyOrOptions, repoIdArg, ownerPubkeyArg, subjectArg,
     ['c', commitId],
     ['branch-name', branchName]
   ];
+  
+  // Add EUC if available (required by some relays for validation)
+  if (euc) {
+    tags.push(['r', euc, 'euc']);
+  }
   
   // Add optional tags only if they have values
   if (cloneUrls && cloneUrls.length > 0) {
