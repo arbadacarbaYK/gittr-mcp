@@ -29,7 +29,7 @@
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@noble/secp256k1": "^3.0.0",
     "node-fetch": "^3.3.2",
-    "nostr-tools": "^2.23.1",
+    "nostr-tools": "^2.23.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {
