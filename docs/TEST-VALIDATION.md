@@ -1,8 +1,8 @@
 # Test Validation Report
 
 **MCP Version:** 1.0.0  
-**Test Date:** February 2026  
-**Status:** ✅ PRODUCTION READY
+**Test Date:** May 2026  
+**Status:** ✅ Core flows validated, relay behavior still variable
 
 ---
 
@@ -84,11 +84,18 @@ gittr.listRepos({ search: 'bitcoin', limit: 5 })
 
 ## Conclusion
 
-**The gittr-mcp is production-ready and fully functional.**
+Core MCP flows are validated across repeated live runs:
 
-All core operations validated. Documentation verified. Agent workflows tested end-to-end.
+- repo creation/push + bridge reads are stable
+- status events (`1631`/`1632`) can be published and remain on relays
+- paywall and bounty invoice endpoints return expected responses
 
-**Agent Readiness: 100%**
+Known variability remains relay-side:
+
+- newly published announcements/issues/PRs can be temporarily unqueryable
+- live test suite treats these as warnings and retries/fallbacks where possible
+
+**Agent Readiness:** High for bridge-backed automation; relay propagation is eventually consistent.
 
 ---
 

@@ -1,6 +1,12 @@
 # gittr-mcp
 
-**Model Context Protocol for gittr.space** - enables AI agents to interact with Git repositories on Nostr.
+**Ship through agents, not through copy-paste.** This MCP is the missing control plane: your Cursor / Claude / OpenClaw stack gets **first-class tools** for **Gittr**—create repos, push over the bridge, wire **NIP-34** issues and PRs, merge with real git state, and handle **Lightning** paywalls and bounties—**with the same keys and relays you already use**, not a vendor’s sandbox account.
+
+**Why it matters strategically:** teams that bet on AI-only workflows will bottleneck on **“the agent can’t touch the repo.”** Gittr is git on Nostr; this server is how agents **stop asking humans to click the UI** for every branch, issue, and invoice. Competitors optimize for *their* cloud; this optimizes for **your** identity and **your** infrastructure—then stays honest when relays rate-limit or disagree (structured `nextSteps` / `reason` on failures).
+
+*Model Context Protocol (stdio) for [gittr.space](https://gittr.space) — agent-native Git on Nostr.*
+
+---
 
 ## Status (2026-02-14)
 
@@ -24,6 +30,49 @@
 
 See [Known Issues](#known-issues) for details.
 
+## AI agent toolkit (MCP)
+
+The MCP server (`server.js`, package bin `gittr-mcp`) exposes tools for **Cursor, Claude Desktop, OpenClaw, Hermes**, etc. There is **no HTTP login session**: identity is a **Nostr private key** (hex or `nsec`, usually via `.nostr-keys.json` or per-tool `privkey`). **LNbits / Blink** values mirror the gittr web **Settings → Account** and **repo Settings** flows: the browser stores wallet config in `localStorage`; agents should pass the **same** URLs/keys via tool arguments or environment variables (`GITTR_LNBITS_URL`, `GITTR_LNBITS_ADMIN_KEY`, optional invoice key). Never commit secrets.
+
+**Agent-oriented responses:** many tools (and all MCP errors) return JSON with `agentSummary`, `whatHappensNext`, `nextSteps`, and on failure `reason` + `error`, so automations know what to retry or which prerequisite to run next (`gittr-agent-outcomes.js` + enriched handlers in `gittr-agent.js`).
+
+| Area | Tools / pattern |
+|------|-----------------|
+| **Who am I?** | `describeAgentAuth`, `getPublicKey`, `loadCredentials` (masked) |
+| **Repos** | `createRepo` (scratch + optional `pushCostSats` + bridge policy sync), `importRemoteToBridge` / `bridgeRepoExists`, `listRepos`, `getRepo`, `pushToBridge`, `publishRepoAnnouncement`, `publishRepoState`, `mirrorRepo` |
+| **Refetch / read tree** | `bridgeListFiles`, `bridgeListRefs`, `bridgeListCommits`, `bridgeGetFileContent`, `getFile` |
+| **Pay-to-push** | `getPushPaywallStatus`, `createPushPaywallIntent`, `syncRepoPushPolicy` (after publishing `push_cost_sats` on kind **30617**); bridge enforces via SQLite policy |
+| **Issues** | `listIssues`, `createIssue`, `getIssueById`, `publishStatusForRoot` (e.g. **1632** close) |
+| **PRs** | `listPRs`, `createPR`, `getPullRequestById`, `updatePullRequest` (**1619**), `mergePullRequest` (git merge + bridge push + **30618** + **1631**), `markPullRequestMerged` / `publishStatusForRoot` (**1631** Nostr-only) |
+| **Bounties** | `createBountyInvoice`, `publishBountyToNostr` (**9806**), `listBountiesForIssue`, `bountyRelease`, `bountyCreateWithdraw`, `bountyClaimWithdraw` |
+| **Relays** | Pass `relays` on Nostr-mutating tools; default list in `config.js` |
+
+**NIP-05 / npub:** `resolveRepoOwnerHex`, `listRepos`, `listIssues`, and bridge helpers accept **hex** or **npub** where the upstream API supports it.
+
+**Full NIP-34 repo metadata** (maintainers, zap splits, milestones, etc.) is still largely edited in the **web UI** and published as kind **30617** events; this MCP focuses on **automation-friendly** subsets (announcement + `push_cost_sats`, push, import, payments, issues/PRs/bounties).
+
+## Testing
+
+```bash
+npm test                 # smoke (exports) + happy-path dry-run (bridge ping + auth summary)
+npm run test:smoke       # exports only
+npm run test:happy-path  # dry-run only
+```
+
+Live integration (creates a real repo + issue on relays; optional LNbits bounty invoice):
+
+```bash
+# See .env.example — use GITTR_TEST_NSEC or .nostr-keys.json
+HAPPY_PATH_LIVE=1 GITTR_TEST_NSEC=nsec1... npm run test:happy-path:live
+GITTR_TEST_NSEC=nsec1... npm run test:live:matrix
+```
+
+Live matrix reliability knobs:
+
+- `GITTR_TEST_RELAYS` defaults to `wss://relay.ngit.dev,wss://ngit-relay.nostrver.se,wss://git.shakespeare.diy`
+- `GITTR_TEST_FALLBACK_REPO` defaults to `verify-1778578052940` and is used for issue/PR lifecycle checks when a fresh repo announcement is bridge-visible but still not relay-discoverable.
+- Warnings about issue/PR visibility (`publish acknowledged but not queryable yet`) reflect relay propagation lag/rate limiting and are expected occasionally on live runs.
+
 ## Installation
 
 ```bash
@@ -31,6 +80,182 @@ git clone https://github.com/arbadacarbaYK/gittr-mcp.git
 cd gittr-mcp
 npm install
 ```
+
+Optional global CLI (same binary the agents use):
+
+```bash
+npm link   # from the repo root — adds `gittr-mcp` on your PATH
+```
+
+**Requirements:** Node **18+** (see `package.json` `engines`). For `mergePullRequest`, **`git`** must be on `PATH`.
+
+---
+
+## MCP setup (common AI agents)
+
+The MCP server is **`server.js`** and speaks **stdio** (Cursor starts it with `node …/server.js`). It does **not** read `.env` by itself—set environment variables in your host app’s MCP config (or export them in the shell that launches the server).
+
+**Reality check:** every app stores MCP config in a different place and JSON field names can differ between versions. The patterns below match **Cursor** (`~/.cursor/mcp.json`) and **Claude Desktop** (`claude_desktop_config.json`). Other tools follow the same *idea* (add a stdio server that runs `node …/server.js`), but use that product’s own MCP docs if something does not match.
+
+### 1. Identity and bridge (all hosts)
+
+1. **Nostr key** — the server loads signing material from (first match wins):
+   - `./.nostr-keys.json` in the **current working directory** when the process starts, or  
+   - `~/.nostr-identity.json`, or  
+   - `~/.config/gittr/keys.json`  
+
+   Minimal file shape:
+
+   ```json
+   { "nsec": "nsec1…" }
+   ```
+
+   Hex `secretKey` / `private_key` is also supported. **Never commit** this file; add it to `.gitignore` if you keep it in the repo folder.
+
+2. **Bridge URL** — default is `https://gittr.space` from `config.js`. Override with:
+
+   ```bash
+   export BRIDGE_URL=https://gittr.space
+   ```
+
+3. **Optional env** — see [`.env.example`](.env.example) for `GITTR_LNBITS_*`, test relays, etc. Copy to `.env` for your own notes; MCP clients usually need the same keys in their `env` block.
+
+4. **Quick self-check** (terminal, from repo root):
+
+   ```bash
+   npm run test:happy-path
+   ```
+
+   Or call tool **`describeAgentAuth`** from your agent once MCP is connected.
+
+---
+
+### 2. Cursor (`~/.cursor/mcp.json`)
+
+When you use **MCP → Add new** (or “Open MCP config”), Cursor opens **`~/.cursor/mcp.json`**. That file has **one** top-level object `mcpServers`. **Each key inside `mcpServers` is a separate MCP server** running in parallel. You do **not** replace your existing server—you **add another entry** next to it.
+
+- Your existing **`streamable-mcp-server`** uses **`type` + `url`** (HTTP MCP). Leave it as-is.
+- **gittr-mcp** uses **`command` + `args`** (stdio MCP). No `type` or `url` for this one—Cursor treats `command` as “run this process and talk MCP over stdin/stdout”.
+
+**Valid JSON:** put a **comma** after the closing `}` of the previous server, then paste the `gittr` block. The file must stay valid JSON (no trailing comma after the last server).
+
+Example: **your current file + gittr** (replace the path with your real clone path):
+
+```json
+{
+  "mcpServers": {
+    "streamable-mcp-server": {
+      "type": "streamable-http",
+      "url": "http://127.0.0.1:12306/mcp"
+    },
+    "gittr": {
+      "command": "node",
+      "args": ["/home/homie/Downloads/gittr-mcp/server.js"],
+      "env": {
+        "BRIDGE_URL": "https://gittr.space"
+      }
+    }
+  }
+}
+```
+
+- **`args`**: must be an **array** with one element: the absolute path to `server.js` inside your clone.  
+- **`env`**: optional if defaults are fine; add `GITTR_LNBITS_URL` / `GITTR_LNBITS_ADMIN_KEY` here if you use bounties from the agent.
+
+**Keys file:** put `.nostr-keys.json` in your home directory **or** pass nothing extra if you already use `~/.nostr-identity.json`. If the file only lives next to the repo, either copy it to `~/.nostr-identity.json` or add a **`cwd`** field on the `gittr` entry pointing at the repo folder **if your Cursor build supports `cwd` for MCP** (feature availability varies).
+
+Save the file, then **reload MCP** or restart Cursor. You should see two servers (e.g. `streamable-mcp-server` and `gittr`) and gittr’s tools under the gittr server.
+
+**Same idea on other apps:** wherever the product stores MCP config, it is almost always a **list or map of several servers**. People run into the same mistake—pasting only the gittr block and **wiping** existing entries (HTTP bridges, other stdio servers). Always **merge additively**; keep commas / array items valid for that format.
+
+---
+
+### 3. Claude Desktop (Anthropic)
+
+1. **Quit** Claude Desktop (it reads config at startup).  
+2. Open the config file (create it if missing):
+   - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`  
+   - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`  
+   - **Linux (when used):** often `~/.config/Claude/claude_desktop_config.json` — if missing, use your build’s docs.
+
+3. The file uses the same overall shape as Cursor: a top-level **`mcpServers`** object. **Add** a `gittr` key **next to** whatever you already have (filesystem, memory, other HTTP MCPs, etc.). Do **not** delete other keys unless you intend to remove those servers.
+
+Example (existing server + gittr — adjust paths and names):
+
+```json
+{
+  "mcpServers": {
+    "some-other-server": {
+      "command": "npx",
+      "args": ["-y", "some-package"]
+    },
+    "gittr": {
+      "command": "node",
+      "args": ["/ABSOLUTE/PATH/TO/gittr-mcp/server.js"],
+      "env": {
+        "BRIDGE_URL": "https://gittr.space"
+      }
+    }
+  }
+}
+```
+
+4. Save, start Claude Desktop again, confirm gittr appears as its own MCP server.
+
+If your Claude build documents **`servers`** instead of **`mcpServers`**, follow that file’s schema—the rule is still: **add** gittr, do not replace the whole registry.
+
+---
+
+### 4. VS Code (GitHub Copilot / MCP)
+
+VS Code’s MCP UI and JSON shape **vary by version** (sometimes user `settings.json`, sometimes a dedicated MCP JSON file). What trips people up is the same: **you already have one or more MCP definitions** and the editor shows a snippet for *only* the new server.
+
+- Use **Command Palette → “MCP”** (or your version’s **Settings → Features → MCP**) to see how servers are listed.  
+- When editing JSON, **append** the gittr stdio definition **alongside** existing servers; keep the file valid (commas between entries, correct nesting).  
+- **Stdio** = `command` + `args` (array with absolute path to `server.js`), optional `env`, same as Cursor.
+
+If the UI offers **“Add server”** and generates JSON for you, prefer that—then you are less likely to overwrite unrelated entries.
+
+---
+
+### 5. Windsurf / Codeium
+
+Windsurf also keeps **multiple MCP connections** in one place (wording varies: Cascade / MCP settings / “Open MCP config”). Same rules:
+
+- Do **not** replace the whole config with only gittr.  
+- Add a **new** stdio server: `command`: `node`, `args`: `[absolute path to server.js]`, optional `env`.  
+- **HTTP** and **stdio** servers can coexist; they are different entries.
+
+Use the in-app **open config file** action when available so you see the full JSON and can merge safely.
+
+---
+
+### 6. OpenClaw (mcporter)
+
+With **mcporter**, `config add` usually **registers another named server** without removing the others—similar mental model to adding a key in `mcpServers`.
+
+```bash
+mcporter config add gittr-mcp --command "node /ABSOLUTE/PATH/TO/gittr-mcp/server.js"
+```
+
+If you **hand-edit** mcporter’s JSON (or a merged config file), apply the same rule: **append** gittr’s entry, do not delete existing server blocks. More detail: **[OPENCLAW-INTEGRATION.md](OPENCLAW-INTEGRATION.md)**.
+
+(`server.js` speaks MCP over stdio; `index.js` is the library API only.)
+
+---
+
+### 7. Any other MCP host (Hermes, CLI, Docker, etc.)
+
+Orchestrators and CLIs differ, but the confusion is the same:
+
+- **Registries are additive:** one process or config file often lists **many** MCP endpoints.  
+- Adding gittr should **not** remove your existing bridge unless you choose to.
+
+**Stdio contract:** run `node /absolute/path/to/gittr-mcp/server.js` with optional env (`BRIDGE_URL`, keys in `env` or pre-exported). Pass env the way your runner documents (`Environment=` in systemd, `env:` in compose, etc.).
+
+Tool results are JSON text with **`nextSteps`** / **`agentSummary`** on many flows—parse the tool result string as JSON.
+
+---
 
 ## Quick Start
 
@@ -364,6 +589,12 @@ const announceResult = await gittr.publishRepoAnnouncement({
 ```
 
 ## Common Issues
+
+### "Invalid announcement: multiple clone tags found"
+
+**Cause:** Some relays reject repeated `clone` tags in kind `30617`.
+
+**Solution:** Publish a single `clone` tag with multiple values, and a single `relays` tag with multiple values.
 
 ### "Announcement must list service in both clone and relays tags"
 

@@ -2,3 +2,8 @@ node_modules/
 .env
 *.log
 .DS_Store
+
+# Never commit signing material or local identity
+.nostr-keys.json
+.nostr-identity.json
+**/.nostr-keys.json

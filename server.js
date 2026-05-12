@@ -9,6 +9,7 @@ const {
 } = require('@modelcontextprotocol/sdk/types.js');
 
 const gittr = require('./index.js');
+const { suggestNextStepsForTool } = require('./gittr-agent-outcomes.js');
 
 const server = new Server(
   {
@@ -125,7 +126,8 @@ const tools = [
         description: { type: 'string' },
         web: { type: 'array', items: { type: 'string' } },
         clone: { type: 'array', items: { type: 'string' } },
-        privkey: { type: 'string', description: '64-char hex private key' },
+        pushCostSats: { type: 'number', description: 'Optional pay-to-push; then call syncRepoPushPolicy with returned event' },
+        privkey: { type: 'string', description: '64-char hex or nsec' },
         relays: { type: 'array', items: { type: 'string' } },
       },
       required: ['repoId', 'name', 'privkey', 'relays'],
@@ -170,9 +172,15 @@ const tools = [
         pubkey: { type: 'string', description: 'Public key (auto-derived from privkey)' },
         relays: { type: 'array', items: { type: 'string' } },
         graspServer: { type: 'string', description: 'GRASP server (default: relay.ngit.dev)' },
+        pushCostSats: { type: 'number', description: 'Optional pay-to-push cost in sats (synced to bridge + kind 30617 push_cost_sats)' },
       },
       required: ['name'],
     },
+  },
+  {
+    name: 'describeAgentAuth',
+    description: 'Show whether Nostr keys are loaded (hex/npub only — never returns private key). Use first in a session.',
+    inputSchema: { type: 'object', properties: {} },
   },
   {
     name: 'forkRepo',
@@ -514,6 +522,376 @@ const tools = [
       },
     },
   },
+  {
+    name: 'updatePullRequest',
+    description: 'Publish NIP-34 PR update (kind 1619): new tip commit + clone URLs',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ownerPubkey: { type: 'string' },
+        repoId: { type: 'string' },
+        pullRequestEventId: { type: 'string' },
+        pullRequestAuthor: { type: 'string' },
+        currentCommitId: { type: 'string' },
+        cloneUrls: { type: 'array', items: { type: 'string' } },
+        earliestUniqueCommit: { type: 'string' },
+        mergeBase: { type: 'string' },
+        privkey: { type: 'string' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['ownerPubkey', 'repoId', 'pullRequestEventId', 'pullRequestAuthor', 'currentCommitId', 'cloneUrls', 'privkey'],
+    },
+  },
+  {
+    name: 'publishStatusForRoot',
+    description: 'Publish NIP-34 status (1630 open, 1631 merged/applied, 1632 closed, 1633 draft) for an issue, PR, or patch root event',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        statusKind: { type: 'number', description: '1630 | 1631 | 1632 | 1633' },
+        rootEventId: { type: 'string' },
+        ownerPubkey: { type: 'string' },
+        rootEventAuthor: { type: 'string' },
+        repoId: { type: 'string' },
+        content: { type: 'string' },
+        privkey: { type: 'string' },
+        relays: { type: 'array', items: { type: 'string' } },
+        acceptedRevisionId: { type: 'string' },
+        revisionAuthor: { type: 'string' },
+        earliestUniqueCommit: { type: 'string' },
+        mergeCommitId: { type: 'string' },
+      },
+      required: ['statusKind', 'rootEventId', 'ownerPubkey', 'rootEventAuthor', 'privkey'],
+    },
+  },
+  {
+    name: 'createBountyInvoice',
+    description: 'Create Lightning invoice for bounty escrow (POST /api/bounty/create). Use GITTR_LNBITS_* env or pass lnbitsUrl + lnbitsAdminKey. Publish kind 9806 after pay via publishBountyToNostr.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueId: { type: 'string' },
+        amount: { type: 'number' },
+        description: { type: 'string' },
+        lnbitsUrl: { type: 'string' },
+        lnbitsAdminKey: { type: 'string' },
+      },
+      required: ['issueId', 'amount'],
+    },
+  },
+  {
+    name: 'publishBountyToNostr',
+    description: 'Publish gittr bounty metadata event (kind 9806)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueId: { type: 'string' },
+        repoEntity: { type: 'string', description: 'Entity string for repo tag (often npub or hex)' },
+        repoName: { type: 'string' },
+        amount: { type: 'number' },
+        status: { type: 'string' },
+        privkey: { type: 'string' },
+        relays: { type: 'array', items: { type: 'string' } },
+        paymentHash: { type: 'string' },
+        invoice: { type: 'string' },
+        withdrawId: { type: 'string' },
+        lnurl: { type: 'string' },
+        withdrawUrl: { type: 'string' },
+        claimedBy: { type: 'string' },
+      },
+      required: ['issueId', 'repoEntity', 'repoName', 'amount', 'privkey'],
+    },
+  },
+  {
+    name: 'listBountiesForIssue',
+    description: 'List kind 9806 bounty events linked to an issue id',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueId: { type: 'string' },
+        limit: { type: 'number' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['issueId'],
+    },
+  },
+  {
+    name: 'getIssueById',
+    description: 'Fetch single issue event (1621) by id from relays',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueId: { type: 'string' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['issueId'],
+    },
+  },
+  {
+    name: 'getPullRequestById',
+    description: 'Fetch single PR event (1618) by id from relays',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prId: { type: 'string' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['prId'],
+    },
+  },
+  {
+    name: 'closeIssue',
+    description: 'Convenience: publish status 1632 (closed) for an issue',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueId: { type: 'string' },
+        ownerPubkey: { type: 'string' },
+        repoId: { type: 'string' },
+        content: { type: 'string' },
+        privkey: { type: 'string' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['issueId', 'ownerPubkey', 'repoId', 'privkey'],
+    },
+  },
+  {
+    name: 'reopenIssue',
+    description: 'Convenience: publish status 1630 (open) for an issue',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueId: { type: 'string' },
+        ownerPubkey: { type: 'string' },
+        repoId: { type: 'string' },
+        content: { type: 'string' },
+        privkey: { type: 'string' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['issueId', 'ownerPubkey', 'repoId', 'privkey'],
+    },
+  },
+  {
+    name: 'markPullRequestMerged',
+    description: 'Convenience: publish status 1631 (merged/applied) for a PR root event',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prId: { type: 'string' },
+        ownerPubkey: { type: 'string' },
+        repoId: { type: 'string' },
+        mergeCommitId: { type: 'string' },
+        content: { type: 'string' },
+        privkey: { type: 'string' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['prId', 'ownerPubkey', 'repoId', 'privkey'],
+    },
+  },
+  {
+    name: 'mergePullRequest',
+    description:
+      'Full merge: git clone base repo, fetch PR head from PR clone URL(s), merge into base branch, push merged tree to gittr bridge, publish NIP-34 state (30618) and merged status (1631). Requires git on PATH and owner key. repoId optional if derivable from PR a-tag.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prId: { type: 'string', description: 'PR event id (kind 1618)' },
+        ownerPubkey: { type: 'string', description: 'Repo owner hex or npub (must match PR a-tag owner)' },
+        repoId: { type: 'string', description: 'Repository id/slug (optional if present on PR)' },
+        baseBranch: { type: 'string', description: 'Branch to merge into (default main)' },
+        mergeMessage: { type: 'string' },
+        privkey: { type: 'string' },
+        relays: { type: 'array', items: { type: 'string' } },
+        skipNostrStatus: { type: 'boolean', description: 'If true, only push to bridge + state, no 1631' },
+      },
+      required: ['prId', 'ownerPubkey', 'privkey'],
+    },
+  },
+  {
+    name: 'importRemoteToBridge',
+    description: 'Server-side git clone into bridge: import GitHub/Git URL into owner/repo on gittr (refetch)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cloneUrl: { type: 'string' },
+        ownerPubkey: { type: 'string' },
+        repo: { type: 'string' },
+        bridgeUrl: { type: 'string' },
+      },
+      required: ['cloneUrl', 'ownerPubkey', 'repo'],
+    },
+  },
+  {
+    name: 'bridgeRepoExists',
+    description: 'GET /api/nostr/repo/exists — check if repo exists on bridge',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ownerPubkey: { type: 'string' },
+        repo: { type: 'string' },
+        bridgeUrl: { type: 'string' },
+      },
+      required: ['ownerPubkey', 'repo'],
+    },
+  },
+  {
+    name: 'bridgeListFiles',
+    description: 'GET /api/nostr/repo/files — list files for branch',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ownerPubkey: { type: 'string' },
+        repo: { type: 'string' },
+        branch: { type: 'string' },
+        includeSizes: { type: 'boolean' },
+        bridgeUrl: { type: 'string' },
+      },
+      required: ['ownerPubkey', 'repo'],
+    },
+  },
+  {
+    name: 'bridgeGetFileContent',
+    description: 'GET /api/nostr/repo/file-content — raw file from bridge',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ownerPubkey: { type: 'string' },
+        repo: { type: 'string' },
+        path: { type: 'string' },
+        branch: { type: 'string' },
+        bridgeUrl: { type: 'string' },
+      },
+      required: ['ownerPubkey', 'repo', 'path'],
+    },
+  },
+  {
+    name: 'bridgeListRefs',
+    description: 'GET /api/nostr/repo/refs',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ownerPubkey: { type: 'string' },
+        repo: { type: 'string' },
+        bridgeUrl: { type: 'string' },
+      },
+      required: ['ownerPubkey', 'repo'],
+    },
+  },
+  {
+    name: 'bridgeListCommits',
+    description: 'GET /api/nostr/repo/commits',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ownerPubkey: { type: 'string' },
+        repo: { type: 'string' },
+        branch: { type: 'string' },
+        limit: { type: 'number' },
+        bridgeUrl: { type: 'string' },
+      },
+      required: ['ownerPubkey', 'repo'],
+    },
+  },
+  {
+    name: 'getPushPaywallStatus',
+    description: 'GET /api/nostr/repo/push-payment — push cost and whether payer has paid intent',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ownerPubkey: { type: 'string' },
+        repo: { type: 'string' },
+        payerPubkey: { type: 'string' },
+        ownerLnbitsUrl: { type: 'string' },
+        ownerLnbitsReadKey: { type: 'string' },
+        ownerBlinkApiKey: { type: 'string' },
+        bridgeUrl: { type: 'string' },
+      },
+      required: ['ownerPubkey', 'repo'],
+    },
+  },
+  {
+    name: 'createPushPaywallIntent',
+    description: 'POST push-payment action create_intent — invoice for pay-to-push (owner wallet keys in body)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ownerPubkey: { type: 'string' },
+        repo: { type: 'string' },
+        payerPubkey: { type: 'string', description: '64-char hex of who will push' },
+        ownerLnbitsUrl: { type: 'string' },
+        ownerLnbitsInvoiceKey: { type: 'string' },
+        ownerLnbitsAdminKey: { type: 'string' },
+        ownerBlinkApiKey: { type: 'string' },
+        bridgeUrl: { type: 'string' },
+      },
+      required: ['ownerPubkey', 'repo', 'payerPubkey'],
+    },
+  },
+  {
+    name: 'syncRepoPushPolicy',
+    description: 'POST /api/nostr/repo/push-policy-sync — upsert push paywall from signed kind 30617 (use announcement event JSON from publishRepoAnnouncement)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        signedAnnouncementEvent: { type: 'object', description: 'Full signed 30617 event {id,sig,...}' },
+        bridgeUrl: { type: 'string' },
+      },
+      required: ['signedAnnouncementEvent'],
+    },
+  },
+  {
+    name: 'bountyRelease',
+    description: 'POST /api/bounty/release — pay bounty to recipient Lightning address',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        bountyId: { type: 'string' },
+        recipientPubkey: { type: 'string' },
+        bountyAmount: { type: 'number' },
+        recipientLud16: { type: 'string' },
+        recipientLnurl: { type: 'string' },
+        lnbitsUrl: { type: 'string' },
+        lnbitsAdminKey: { type: 'string' },
+        bridgeUrl: { type: 'string' },
+      },
+      required: ['bountyId', 'recipientPubkey', 'bountyAmount'],
+    },
+  },
+  {
+    name: 'bountyCreateWithdraw',
+    description: 'POST /api/bounty/create-withdraw — LNURL-withdraw for bounty flow',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        amount: { type: 'number' },
+        issueId: { type: 'string' },
+        title: { type: 'string' },
+        lnbitsUrl: { type: 'string' },
+        lnbitsAdminKey: { type: 'string' },
+        lnbitsInvoiceKey: { type: 'string' },
+        bridgeUrl: { type: 'string' },
+      },
+      required: ['amount', 'issueId'],
+    },
+  },
+  {
+    name: 'bountyClaimWithdraw',
+    description: 'POST /api/bounty/claim-withdraw — claim withdraw to recipient',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        withdrawLinkId: { type: 'string' },
+        lnurl: { type: 'string' },
+        recipientLud16: { type: 'string' },
+        recipientLnurl: { type: 'string' },
+        lnbitsUrl: { type: 'string' },
+        lnbitsAdminKey: { type: 'string' },
+        issueEntity: { type: 'string' },
+        issueRepo: { type: 'string' },
+        bridgeUrl: { type: 'string' },
+      },
+    },
+  },
 ];
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -631,6 +1009,78 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'exploreRepos':
         result = await gittr.exploreRepos(args);
         break;
+      case 'describeAgentAuth':
+        result = gittr.describeAgentAuth();
+        break;
+      case 'updatePullRequest':
+        result = await gittr.updatePullRequest(args);
+        break;
+      case 'publishStatusForRoot':
+        result = await gittr.publishStatusForRoot(args);
+        break;
+      case 'createBountyInvoice':
+        result = await gittr.createBountyInvoice(args);
+        break;
+      case 'publishBountyToNostr':
+        result = await gittr.publishBountyToNostr(args);
+        break;
+      case 'listBountiesForIssue':
+        result = await gittr.listBountiesForIssue(args);
+        break;
+      case 'getIssueById':
+        result = await gittr.getIssueById(args);
+        break;
+      case 'getPullRequestById':
+        result = await gittr.getPullRequestById(args);
+        break;
+      case 'closeIssue':
+        result = await gittr.closeIssue(args);
+        break;
+      case 'reopenIssue':
+        result = await gittr.reopenIssue(args);
+        break;
+      case 'markPullRequestMerged':
+        result = await gittr.markPullRequestMerged(args);
+        break;
+      case 'mergePullRequest':
+        result = await gittr.mergePullRequest(args);
+        break;
+      case 'importRemoteToBridge':
+        result = await gittr.importRemoteToBridge(args);
+        break;
+      case 'bridgeRepoExists':
+        result = await gittr.bridgeRepoExists(args);
+        break;
+      case 'bridgeListFiles':
+        result = await gittr.bridgeListFiles(args);
+        break;
+      case 'bridgeGetFileContent':
+        result = await gittr.bridgeGetFileContent(args);
+        break;
+      case 'bridgeListRefs':
+        result = await gittr.bridgeListRefs(args);
+        break;
+      case 'bridgeListCommits':
+        result = await gittr.bridgeListCommits(args);
+        break;
+      case 'getPushPaywallStatus':
+        result = await gittr.getPushPaywallStatus(args);
+        break;
+      case 'createPushPaywallIntent':
+        result = await gittr.createPushPaywallIntent(args);
+        break;
+      case 'syncRepoPushPolicy':
+        result = await gittr.syncRepoPushPolicy(args);
+        break;
+      case 'bountyRelease':
+        result = await gittr.bountyRelease(args);
+        break;
+      case 'bountyCreateWithdraw':
+        result = await gittr.bountyCreateWithdraw(args);
+        break;
+      case 'bountyClaimWithdraw':
+        result = await gittr.bountyClaimWithdraw(args);
+        break;
       default:
         return { content: [{ type: 'text', text: `Unknown tool: ${name}` }], isError: true };
     }
@@ -639,8 +1089,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
     };
   } catch (error) {
+    const nextSteps =
+      Array.isArray(error.nextSteps) && error.nextSteps.length > 0
+        ? error.nextSteps
+        : suggestNextStepsForTool(name, error.message);
+    const payload = {
+      success: false,
+      tool: name,
+      error: error.message,
+      ...(error.reason ? { reason: error.reason } : {}),
+      nextSteps,
+      hint: 'Use nextSteps to decide retries, different relays, paywall flow, or prerequisite calls.',
+    };
     return {
-      content: [{ type: 'text', text: `Error: ${error.message}` }],
+      content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
       isError: true,
     };
   }

@@ -1,10 +1,31 @@
-const gittr = require('./index.js');
+'use strict';
 
-const PRIVKEY = 'bdaa56047a1248ce37546de06716f2eedce297e85ec1bdcf84c0c46345520f43';
-const PUBKEY = 'cfaa4b5f723dba321a1b901a1506fbcb989c032c352f815302865cba3a72b3cf';
+const gittr = require('./index.js');
+const { nip19 } = require('nostr-tools');
+
 const RELAY = 'wss://relay.ngit.dev';
 
+function loadTestPrivkey() {
+  const hex = process.env.GITTR_TEST_PRIVKEY;
+  if (hex && /^[0-9a-f]{64}$/i.test(String(hex).trim())) {
+    return String(hex).trim().toLowerCase();
+  }
+  const nsec = process.env.GITTR_TEST_NSEC;
+  if (nsec && String(nsec).startsWith('nsec')) {
+    const decoded = nip19.decode(String(nsec).trim());
+    if (decoded.type === 'nsec') {
+      const d = decoded.data;
+      return typeof d === 'string' ? d : Buffer.from(d).toString('hex');
+    }
+  }
+  throw new Error(
+    'Set GITTR_TEST_PRIVKEY (64-char hex) or GITTR_TEST_NSEC in the environment. Do not commit keys; see README / .env.example.'
+  );
+}
+
 async function main() {
+  const PRIVKEY = loadTestPrivkey();
+  const PUBKEY = gittr.getPublicKey(PRIVKEY);
   const repoName = 'test-repo-' + Date.now();
   
   console.log('=== Step 1: Create repo with README ===');

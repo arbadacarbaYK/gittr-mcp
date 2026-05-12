@@ -10,8 +10,8 @@ git clone https://github.com/arbadacarbaYK/gittr-mcp.git
 cd gittr-mcp
 npm install
 
-# Add to mcporter
-mcporter config add gittr-mcp --command "node $(pwd)/index.js"
+# Add to mcporter (stdio MCP entry is server.js, not index.js)
+mcporter config add gittr-mcp --command "node $(pwd)/server.js"
 ```
 
 ### Verify Installation

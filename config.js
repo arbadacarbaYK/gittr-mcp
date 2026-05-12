@@ -1,6 +1,10 @@
 module.exports = {
   // Main site URL for HTTP API calls (Next.js API routes)
   bridgeUrl: process.env.BRIDGE_URL || 'https://gittr.space',
+
+  // Optional defaults for bounty invoice API (same as gittr Settings → Account LNbits)
+  // Prefer passing per-request; never log these in agent transcripts.
+  // gittrNostr.createBountyInvoice reads GITTR_LNBITS_URL / GITTR_LNBITS_ADMIN_KEY if unset in args.
   
   // NIP-34 aware relays (git-specific, prioritize these)
   // Note: relay.noderunners.network has better NIP support than damus/nos.lol
