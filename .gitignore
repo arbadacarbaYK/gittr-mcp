@@ -1,7 +1,12 @@
 node_modules/
 .env
+.env.local
+.env.*.local
 *.log
 .DS_Store
+coverage/
+dist/
+.npm/
 
 # Never commit signing material or local identity
 .nostr-keys.json

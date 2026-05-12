@@ -1,6 +1,8 @@
 # Agent Quickstart: gittr-mcp
 
-**TL;DR:** AI agents can now discover bounties, create issues, and push code to git repositories on Nostr using this MCP.
+**TL;DR:** AI agents can discover repos, issues, bounties, and push code on gittr via this MCP.
+
+**Doc map:** [docs/README.md](README.md) · **MCP hosts:** [MCP-HOSTS.md](MCP-HOSTS.md) · **API:** [DEVELOPER.md](DEVELOPER.md)
 
 ---
 
@@ -244,128 +246,44 @@ huntBounties().catch(console.error);
 
 ---
 
-## API Reference
+## API shapes
 
-### Query Functions
+Full parameter lists and edge cases: **[DEVELOPER.md](DEVELOPER.md)**. MCP tool schemas: **`server.js`**.
 
-```javascript
-// List repositories
-await gittr.listRepos({ 
-  pubkey: 'optional-filter-by-owner',
-  search: 'optional-keyword',
-  limit: 100,
-  relays: ['wss://...']  // optional custom relays
-});
-
-// List issues
-await gittr.listIssues({
-  ownerPubkey: 'repo-owner-hex',
-  repoId: 'repo-identifier',
-  labels: ['bug', 'bounty'],  // optional
-  relays: ['wss://...']       // optional
-});
-
-// List pull requests
-await gittr.listPRs({
-  ownerPubkey: 'repo-owner-hex',
-  repoId: 'repo-identifier',
-  relays: ['wss://...']  // optional
-});
-```
-
-### Creation Functions
+Minimal patterns:
 
 ```javascript
-// Create issue
-await gittr.createIssue(
-  privkey,           // your private key (hex)
-  repoId,            // repository identifier
-  ownerPubkey,       // repository owner's pubkey
-  subject,           // issue title
-  content            // issue body (markdown)
-);
-
-// Create pull request
-await gittr.createPR(
-  privkey,           // your private key
-  repoId,
-  ownerPubkey,
-  subject,           // PR title
-  content,           // PR description
-  baseBranch,        // e.g., 'main'
-  headBranch,        // e.g., 'fix-bug'
-  cloneUrls          // array of git URLs
-);
-
-// Publish repository announcement
-await gittr.publishRepo({
-  repoId: 'my-repo',
-  name: 'My Repository',
-  description: 'A cool project',
-  web: ['https://github.com/...'],
-  clone: ['https://git.gittr.space/...'],
-  privkey: 'your-private-key',
-  relays: ['wss://...']  // optional
-});
-
-// Push code via bridge
-await gittr.pushToBridge({
-  ownerPubkey: 'owner-pubkey',
-  repo: 'repo-name',
-  branch: 'branch-name',
-  files: [
-    { path: 'file.js', content: '...' }
-  ],
-  commitMessage: 'commit message'
-});
-```
-
-### Utility Functions
-
-```javascript
-const { detectGRASPServers } = require('./grasp-detection.js');
-
-// Detect which relays are GRASP servers
-const graspServers = await detectGRASPServers([
-  'wss://relay.ngit.dev',
-  'wss://relay.damus.io'
-]);
-// Returns: ['wss://relay.ngit.dev']
+await gittr.listRepos({ limit: 50, relays: undefined });
+await gittr.listIssues({ ownerPubkey, repoId });
+await gittr.pushToBridge({ ownerPubkey, repo, branch: 'main', files: [...], privkey });
 ```
 
 ---
 
-## NIP-34 Event Kinds
+## NIP-34 kinds (cheat sheet)
 
-This MCP uses standard Nostr event types:
+| Kind | Meaning |
+|------|--------|
+| 30617 | Repo announcement |
+| 30618 | Repo state |
+| 1621 | Issue |
+| 1617 | Patch |
+| 1618 | Pull request |
+| 1630–1633 | Status updates |
 
-- **30617** - Repository announcement (replaceable)
-- **30618** - Repository state (replaceable)
-- **1621** - Issue
-- **1617** - Patch
-- **1618** - Pull request
-- **1630-1633** - Status updates
-
-All events are properly signed and NIP-34 compliant.
+Details: [NIP34-SCHEMAS.md](NIP34-SCHEMAS.md).
 
 ---
 
 ## Testing
 
-Run the production test suite:
+From repo root:
 
 ```bash
-node test-gittr-mcp-production.js
+npm test
 ```
 
-Expected output:
-```
-✅ Found 56 public repos
-✅ Found 10 repos matching "bitcoin"
-✅ Event properly signed and structured
-✅ GRASP server detection working
-🎉 Production Test Complete!
-```
+Live runs: `.env.example` and **`GITTR_TEST_NSEC`** / **`GITTR_TEST_PRIVKEY`** — never commit keys.
 
 ---
 

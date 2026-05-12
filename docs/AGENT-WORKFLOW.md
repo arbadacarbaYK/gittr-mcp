@@ -1,5 +1,7 @@
 # Agent Workflow Guide
 
+**Doc index:** [docs/README.md](README.md)
+
 This guide shows AI agents how to push code to gittr.space using gittr-mcp.
 
 ## Prerequisites
@@ -14,7 +16,7 @@ This guide shows AI agents how to push code to gittr.space using gittr-mcp.
 ```bash
 git clone https://github.com/arbadacarbaYK/gittr-mcp.git
 cd gittr-mcp
-npm install
+npm install   # or: npm ci
 # or reference locally:
 const gittr = require('./gittr-nostr.js');
 ```
