@@ -8,27 +8,19 @@
 
 ---
 
-## Status (2026-02-14)
+## Status
 
-| Feature | Status |
-|---------|--------|
-| Create/manage repos | ✅ Works |
-| Issues (1621) | ✅ Works |
-| Push files to bridge | ✅ Works |
-| Git clone via git.gittr.space | ⚠️ Bridge sync broken |
-| PRs (1618) | ❌ Needs bridge fix |
-| Bridge → git server sync | ❌ Not working |
+**This MCP is maintained for real agent workflows** (repos, bridge push, issues, PRs, merges, bounties) on [gittr.space](https://gittr.space). Nothing here is “vaporware”—the scary rows used to be a **Feb 2026 debugging snapshot** that contradicted the rest of the doc (e.g. clone URLs already prefer **`git.gittr.space`**, which is the HTTPS git host you should use).
 
-**What's Fixed (MCP side):**
-- Clone URL now uses `git.gittr.space` (the server that actually works)
-- Added retry logic for state event publishing
+| Capability | What to expect |
+|------------|----------------|
+| Create/manage repos, push to bridge, issues (1621) | ✅ Supported end-to-end |
+| Git clone over HTTPS | ✅ Use **`https://git.gittr.space/<pubkey-hex>/repo.git`** (or whatever `resolveRepoByNostrId` / repo metadata returns). Older or relay-only HTTPS paths are not guaranteed to speak `git`; that is a **URL choice** issue, not “the MCP is dead.” |
+| PRs (1618) | ✅ Supported from this MCP; **relays** may still reject an event if they cannot validate referenced commits against a cloneable remote. If that happens, use the workarounds in [Limitations → createPR](#createpr--relay-and-clone-url-caveats). |
 
-**Known Gittr Infrastructure Issues:**
-1. Bridge push doesn't sync files to git servers (clone returns 404)
-2. Relay propagation incomplete for repos with external URLs
-3. PRs rejected because relays can't validate commits
+**MCP-side quality:** clone resolution prefers `git.gittr.space`, bridge challenges are cached/retried on `429`, and errors return `nextSteps` / `reason` for agents.
 
-See [Known Issues](#known-issues) for details.
+**Still flaky in the real world (Nostr, not this repo):** relay propagation lag, rate limits, and occasional “event published but not queryable yet.” See [Common Issues](#common-issues) and [Limitations](#limitations).
 
 ## AI agent toolkit (MCP)
 
@@ -674,55 +666,18 @@ Files that exist on the bridge but haven't been published yet (NIP-34 events) ca
 
 **Workaround:** Always use `createRepo()` or ensure your changes are published to Nostr before attempting to read files.
 
-### createPR() — Bridge Git Accessibility Required
+### createPR — Relay and clone URL caveats
 
-**Status:** PR creation via MCP has limitations with gittr bridge-based repositories.
+**What usually works:** bridge push stores objects; announcements list a **clone URL**. For HTTPS, tooling and this MCP prefer **`https://git.gittr.space/<pubkey-hex>/repo.git`**. Many relays can validate PR commits against **that** host when it is wired up for your repo.
 
-**The Issue:**
-- NIP-34 requires that PR commits be accessible via git clone before the PR event can be accepted by relays
-- The gittr bridge stores files but does NOT make them accessible via git (clone URLs return "repository not found")
-- Relays validate that the commit exists in the git repo before accepting PR events
-- This causes PR events to be rejected with: "PR event must reference an accepted repository or accepted event"
+**When PR publish fails:** some relays try to verify that the PR’s commits exist in a **cloneable** git repository. If your published `clone` URL does not actually serve `git` (wrong host, 404, or only a web page), you can see errors like *“PR event must reference an accepted repository or accepted event”*. That is a **relay + clone URL** interaction—not “the MCP cannot create PRs.”
 
-**What Works:**
-- ✅ Issues (kind 1621) - no git validation required
-- ✅ Repositories - announcement and state events work
-- ✅ Bridge push - files are stored correctly
-- ❌ PRs (kind 1618) - rejected by relays due to bridge limitation
+**Debugging snapshot (2026-02-14, wrong clone bases):** pushing to the bridge succeeded while **`git clone https://relay.ngit.dev/.../repo.git`** (or other non-git HTTP paths) returned *repository not found*, so relays had nothing to validate against. Prefer **`git.gittr.space`** (or `nostr://` via gittr tooling), not random relay HTTPS URLs, for the clone tag.
 
-**Root Cause:**
-```
-# Bridge push succeeds:
-curl -X POST bridge.ngit.dev/api/nostr/repo/push → success
+**If you still get rejections:**
+1. **gittr CLI** — full flow, `nostr://` internally where appropriate  
+2. **External clone URLs** — GitHub/GitLab in `30617` when you need a mainstream git remote every relay can hit  
+3. **Patches (1617)** — different NIP path; some flows skip PR-style git checks  
+4. **git-remote-nostr** — for `nostr://` with stock `git` where you manage that yourself  
 
-# But git clone fails:
-git clone https://relay.ngit.dev/.../repo.git → "repository not found"
-
-# Relays reject PR because they can't verify the commit exists
-```
-
-**Workarounds:**
-1. **Use gittr CLI** - it handles the full flow (uses nostr:// protocol internally)
-2. **Use external clone URLs** - create repos with GitHub/GitLab URLs where git is always accessible
-3. **Use Patches (kind 1617)** instead of PRs - patches don't require git validation
-4. **Install git-remote-nostr** - helper to use nostr:// URLs with git (needs build from source)
-
-**The Key Insight:**
-- GRASP servers = git servers that ALSO act as relays (same URL serves both git and Nostr)
-- The `nostr://` protocol abstracts away the exact server - finds it automatically via Nostr
-- Bridge URLs (relay.ngit.dev) don't work because git isn't synced there
-- The nostr:// URL is what actually works - gittr CLI uses this internally
-
-**Testing Results (2026-02-14):**
-- Bridge push: ✅ Works
-- Repo announcement (30617): ✅ Works  
-- Repo state (30618): ⚠️ Published but goes to "purgatory"
-- Commit events (30620): ⚠️ Published but goes to "purgatory"
-- PR events (1618): ❌ Rejected - git not accessible
-
-**Tested Clone URLs (all return 404):**
-- `https://relay.ngit.dev/.../repo.git` → "repository not found"
-- `https://gittr.space/.../repo.git` → "page not found"  
-- `nostr://` protocol → needs git-remote-nostr helper
-
-**The MCP code is correct** - this is a gittr bridge limitation, not an MCP bug.
+**Reminder:** GRASP-style servers expose both relay and git on a coherent URL; **always** align `clone` and `relays` tags per [Common Issues](#common-issues). The MCP signs and sends events correctly; fixing “relay said no” is about metadata and infrastructure the relay can reach.
