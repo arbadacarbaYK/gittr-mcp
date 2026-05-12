@@ -53,6 +53,11 @@ function suggestNextStepsForTool(toolName, message) {
     push('Wait for Retry-After (or ~60s), reduce parallel calls, and avoid tight loops against the bridge.', steps);
   }
 
+  if (lower.includes('verification_failed')) {
+    push('Open the tool error JSON field `verification`: confirmed=false means no relay returned the event id after polling; confirmedOnRelays lists successes.', steps);
+    push('Fix clone/relays tags on 30617, widen relays, or increase GITTR_RELAY_VERIFY_TIMEOUT_MS, then retry publish.', steps);
+  }
+
   if (
     lower.includes('not discoverable') ||
     lower.includes('not queryable') ||

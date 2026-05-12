@@ -6,6 +6,8 @@ const { detectGraspFromRepoEvent } = require('./grasp-detection');
 const { normalizeOwnerPubkeyHexSync, privkeyToUint8Array } = require('./gittr-keys');
 const bridgeApi = require('./gittr-bridge-api');
 
+const RELAY_VERIFY_TIMEOUT_MS = Number(process.env.GITTR_RELAY_VERIFY_TIMEOUT_MS || 45000);
+
 // NIP-34 Event Kinds
 const KIND_REPOSITORY = 30617;           // Repository announcement
 const KIND_REPOSITORY_STATE = 30618;     // Repository state (refs, commits)
@@ -56,6 +58,89 @@ function buildReliabilityRelaySet(relays = []) {
   return [...new Set(all.filter((r) => typeof r === 'string' && r.trim().length > 0))];
 }
 
+/**
+ * Poll each relay individually until at least one returns the event twice (stability check) or timeout.
+ * Always returns a definitive object (never "maybe").
+ */
+async function verifyEventOnRelays(relays, eventId, kind, timeoutMs = RELAY_VERIFY_TIMEOUT_MS) {
+  const uniqueRelays = [...new Set((Array.isArray(relays) ? relays : []).filter((r) => typeof r === 'string' && r.trim()))];
+  const started = Date.now();
+  let attempts = 0;
+  if (!eventId || uniqueRelays.length === 0) {
+    return {
+      confirmed: false,
+      confirmedOnRelays: [],
+      missingOnRelays: uniqueRelays,
+      attempts: 0,
+      elapsedMs: 0,
+      eventId: eventId || null,
+      kind,
+      outcome: !eventId ? 'missing_event_id' : 'no_relays_to_query',
+    };
+  }
+  while (Date.now() - started < timeoutMs) {
+    attempts += 1;
+    const firstHit = [];
+    for (const relay of uniqueRelays) {
+      const p = new SimplePool();
+      try {
+        const evs = await p.querySync([relay], { ids: [eventId], kinds: [kind], limit: 1 });
+        if (Array.isArray(evs) && evs.length > 0) firstHit.push(relay);
+      } catch (_) {
+        /* relay query error — counts as missing for this round */
+      } finally {
+        try {
+          p.close([relay]);
+        } catch (_) {
+          /* ignore */
+        }
+      }
+    }
+    if (firstHit.length > 0) {
+      await new Promise((r) => setTimeout(r, 900));
+      const confirmedTwice = [];
+      for (const relay of firstHit) {
+        const p2 = new SimplePool();
+        try {
+          const ev2 = await p2.querySync([relay], { ids: [eventId], kinds: [kind], limit: 1 });
+          if (Array.isArray(ev2) && ev2.length > 0) confirmedTwice.push(relay);
+        } catch (_) {
+          /* ignore */
+        } finally {
+          try {
+            p2.close([relay]);
+          } catch (_) {
+            /* ignore */
+          }
+        }
+      }
+      if (confirmedTwice.length > 0) {
+        return {
+          confirmed: true,
+          outcome: 'readable_on_relays',
+          confirmedOnRelays: confirmedTwice,
+          missingOnRelays: uniqueRelays.filter((r) => !confirmedTwice.includes(r)),
+          attempts,
+          elapsedMs: Date.now() - started,
+          eventId,
+          kind,
+        };
+      }
+    }
+    await new Promise((r) => setTimeout(r, 1100));
+  }
+  return {
+    confirmed: false,
+    outcome: 'timeout_not_readable',
+    confirmedOnRelays: [],
+    missingOnRelays: uniqueRelays,
+    attempts,
+    elapsedMs: Date.now() - started,
+    eventId,
+    kind,
+  };
+}
+
 async function publishEventChecked(relays, event) {
   const pool = getPool();
   const pubs = pool.publish(relays, event);
@@ -68,29 +153,9 @@ async function publishEventChecked(relays, event) {
   throw new Error(`Publish rejected by all relays: ${reasons.join(' | ')}`);
 }
 
-async function waitForEventVisibility(relays, eventId, kind, timeoutMs = 6000) {
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    const pool = new SimplePool();
-    try {
-      const evs = await pool.querySync(relays, { ids: [eventId], kinds: [kind], limit: 1 });
-      if (Array.isArray(evs) && evs.length > 0) {
-        // Require second confirmation after a short delay to avoid transient/optimistic relay echoes.
-        await new Promise((r) => setTimeout(r, 1800));
-        const confirmPool = new SimplePool();
-        try {
-          const confirm = await confirmPool.querySync(relays, { ids: [eventId], kinds: [kind], limit: 1 });
-          if (Array.isArray(confirm) && confirm.length > 0) return true;
-        } finally {
-          try { confirmPool.close(relays); } catch (_) { /* ignore */ }
-        }
-      }
-    } finally {
-      try { pool.close(relays); } catch (_) { /* ignore */ }
-    }
-    await new Promise((r) => setTimeout(r, 1200));
-  }
-  return false;
+async function waitForEventVisibility(relays, eventId, kind, timeoutMs = RELAY_VERIFY_TIMEOUT_MS) {
+  const v = await verifyEventOnRelays(relays, eventId, kind, timeoutMs);
+  return v.confirmed;
 }
 
 async function ensureRepoDiscoverable({ ownerPubkey, repoId, relays = config.relays, timeoutMs = 6000 }) {
@@ -230,11 +295,16 @@ async function createIssue(privkeyOrOptions, repoIdArg, ownerPubkeyArg, subjectA
   } catch (_) {
     // best-effort bridge ingest
   }
-  const visible = await waitForEventVisibility(relaySet, event.id, KIND_ISSUE, 24000);
-  if (!visible) {
-    throw new Error('Issue publish acknowledged but event is not queryable on target relays yet.');
+  const visibility = await verifyEventOnRelays(relaySet, event.id, KIND_ISSUE, RELAY_VERIFY_TIMEOUT_MS);
+  if (!visibility.confirmed) {
+    const err = new Error(
+      `VERIFICATION_FAILED: kind ${KIND_ISSUE} event ${event.id} not readable on relays after ${visibility.elapsedMs}ms (${visibility.attempts} poll rounds).`
+    );
+    err.verification = visibility;
+    err.relayVerification = visibility;
+    throw err;
   }
-  
+
   return { event, success: true };
 }
 
@@ -387,11 +457,16 @@ async function createPR(privkeyOrOptions, repoIdArg, ownerPubkeyArg, subjectArg,
   } catch (_) {
     // best-effort bridge ingest
   }
-  const visible = await waitForEventVisibility(relaySet, event.id, KIND_PULL_REQUEST, 24000);
-  if (!visible) {
-    throw new Error('PR publish acknowledged but event is not queryable on target relays yet.');
+  const visibility = await verifyEventOnRelays(relaySet, event.id, KIND_PULL_REQUEST, RELAY_VERIFY_TIMEOUT_MS);
+  if (!visibility.confirmed) {
+    const err = new Error(
+      `VERIFICATION_FAILED: kind ${KIND_PULL_REQUEST} event ${event.id} not readable on relays after ${visibility.elapsedMs}ms (${visibility.attempts} poll rounds).`
+    );
+    err.verification = visibility;
+    err.relayVerification = visibility;
+    throw err;
   }
-  
+
   return { event, success: true };
 }
 
@@ -612,11 +687,16 @@ async function publishRepoAnnouncement({
   } catch (_) {
     // best-effort bridge ingest
   }
-  const visible = await waitForEventVisibility(relays, event.id, KIND_REPOSITORY, 8000);
-  if (!visible) {
-    throw new Error('Announcement publish acknowledged but event is not queryable on target relays yet.');
+  const visibility = await verifyEventOnRelays(relays, event.id, KIND_REPOSITORY, RELAY_VERIFY_TIMEOUT_MS);
+  if (!visibility.confirmed) {
+    const err = new Error(
+      `VERIFICATION_FAILED: kind ${KIND_REPOSITORY} event ${event.id} not readable on relays after ${visibility.elapsedMs}ms (${visibility.attempts} poll rounds).`
+    );
+    err.verification = visibility;
+    err.relayVerification = visibility;
+    throw err;
   }
-  
+
   return { event, success: true };
 }
 
@@ -953,7 +1033,9 @@ module.exports = {
   // Helpers
   getPublicKey,
   resolveRepoOwnerHex,
-  
+  verifyEventOnRelays,
+  waitForEventVisibility,
+
   // Event kinds
   KIND_REPOSITORY,
   KIND_REPOSITORY_STATE,

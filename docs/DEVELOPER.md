@@ -2,6 +2,17 @@
 
 Use **`require('gittr-mcp')`** (see `package.json` `main`) or import from this repo. For full flows, see [AGENT-WORKFLOW.md](AGENT-WORKFLOW.md).
 
+## Relay verification (agent contract)
+
+After publishing **30617**, **1621**, or **1618**, the library **polls relays** until either:
+
+- **`verification.confirmed === true`** and **`confirmedOnRelays`** lists where the event was read twice (stability check), or  
+- **`verification.confirmed === false`** with **`outcome: 'timeout_not_readable'`** and **`missingOnRelays`** — definitive failure for “readable on these relays within `GITTR_RELAY_VERIFY_TIMEOUT_MS`”.
+
+MCP tool errors from `publishRepoAnnouncement` / `createIssue` / `createPR` include a JSON **`verification`** object on failure (see `server.js`). There is no “maybe”: publish either **passes verification** or **throws `VERIFICATION_FAILED`…** with that object.
+
+**`createRepo`** additionally returns **`gitSmartHttpCheck`** (`cloneHttpVerified` true/false) from an HTTP probe of the primary `git.gittr.space` clone URL.
+
 ## API reference
 
 ### Repository operations

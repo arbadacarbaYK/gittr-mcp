@@ -35,6 +35,8 @@ module.exports = {
   // Helpers
   getPublicKey: gittrNostr.getPublicKey,
   resolveRepoOwnerHex: gittrNostr.resolveRepoOwnerHex,
+  verifyEventOnRelays: gittrNostr.verifyEventOnRelays,
+  probeGitSmartHttp: require('./gittr-verify.js').probeGitSmartHttp,
 
   // Agent-friendly convenience functions
   describeAgentAuth: gittrAgent.describeAgentAuth,

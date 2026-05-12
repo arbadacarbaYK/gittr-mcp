@@ -62,7 +62,8 @@ npm test        # smoke + happy-path dry-run
 
 - **Library entry:** `require('gittr-mcp')` → `index.js`. **MCP process:** `server.js` (also **`gittr-mcp`** npm bin).  
 - **Reference:** [docs/DEVELOPER.md](docs/DEVELOPER.md) (API, GRASP, errors), [docs/AGENT-WORKFLOW.md](docs/AGENT-WORKFLOW.md), [docs/SIGNING-GUIDE.md](docs/SIGNING-GUIDE.md), [docs/NIP34-SCHEMAS.md](docs/NIP34-SCHEMAS.md).  
-- **Doc index:** [docs/README.md](docs/README.md).
+- **Doc index:** [docs/README.md](docs/README.md).  
+- **Agent errors:** failed publish/verify paths return JSON with **`verification`** (`confirmed`, `confirmedOnRelays`, `missingOnRelays`, `elapsedMs`) — not ambiguous text. Tune **`GITTR_RELAY_VERIFY_TIMEOUT_MS`** / **`GITTR_DISCOVERABILITY_TIMEOUT_MS`** via `.env.example`.
 
 **Live integration tests** (real relays; optional LNbits): see `.env.example` — use **`GITTR_TEST_NSEC`** / **`GITTR_TEST_PRIVKEY`**, never commit keys.
 

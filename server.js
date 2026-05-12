@@ -1098,8 +1098,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       tool: name,
       error: error.message,
       ...(error.reason ? { reason: error.reason } : {}),
+      ...(error.verification ? { verification: error.verification } : {}),
+      ...(!error.verification && error.relayVerification ? { verification: error.relayVerification } : {}),
       nextSteps,
-      hint: 'Use nextSteps to decide retries, different relays, paywall flow, or prerequisite calls.',
+      hint: 'Use nextSteps to decide retries, different relays, paywall flow, or prerequisite calls. If verification is present, it is the definitive relay poll result (not a guess).',
     };
     return {
       content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],

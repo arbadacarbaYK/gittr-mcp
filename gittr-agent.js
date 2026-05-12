@@ -3,6 +3,7 @@
 
 const gittrNostr = require('./gittr-nostr.js');
 const bridgeApi = require('./gittr-bridge-api.js');
+const { probeGitSmartHttp } = require('./gittr-verify.js');
 const { withAgentHints, suggestNextStepsForTool } = require('./gittr-agent-outcomes.js');
 const { privkeyToUint8Array } = require('./gittr-keys.js');
 const { nip19 } = require('nostr-tools');
@@ -140,7 +141,9 @@ async function createRepo(options) {
   let pubkey = options.pubkey;
   const relays = options.relays || gittrNostr.config.relays;
   const requireDiscoverable = options.requireDiscoverable !== false;
-  const discoverabilityTimeoutMs = Number(options.discoverabilityTimeoutMs || 12000);
+  const discoverabilityTimeoutMs = Number(
+    options.discoverabilityTimeoutMs || process.env.GITTR_DISCOVERABILITY_TIMEOUT_MS || 45000
+  );
   const graspServer = options.graspServer || 'relay.ngit.dev';
   
   // Auto-load credentials if not provided
@@ -201,6 +204,7 @@ async function createRepo(options) {
   // Step 3: Publish announcement (optional push_cost_sats for pay-to-push; synced to bridge DB next)
   let announceResult = null;
   let announceError = null;
+  let announceRelayVerification = null;
   try {
     announceResult = await gittrNostr.publishRepoAnnouncement({
       repoId: name,
@@ -214,6 +218,7 @@ async function createRepo(options) {
     });
   } catch (e) {
     announceError = e.message || String(e);
+    announceRelayVerification = e.relayVerification || e.verification || null;
   }
 
   let pushPolicySync = null;
@@ -286,12 +291,24 @@ async function createRepo(options) {
     await new Promise((r) => setTimeout(r, 1500));
   }
 
+  let relayVerificationById = null;
+  if (announceResult?.event?.id && !discoverable) {
+    relayVerificationById = await gittrNostr.verifyEventOnRelays(
+      discoverabilityCheckedRelays,
+      announceResult.event.id,
+      gittrNostr.KIND_REPOSITORY,
+      Math.min(15000, Math.max(5000, Math.floor(discoverabilityTimeoutMs / 3)))
+    );
+  }
+
   if (requireDiscoverable && !discoverable) {
+    const gitSmartHttpCheck = await probeGitSmartHttp(userCloneUrls[0]);
     const effectiveAnnouncementError = announceError || 'Announcement not queryable on target relays after publish';
     return withAgentHints(
       {
         success: false,
-        error: 'Repository push succeeded on bridge, but repo announcement is not discoverable on relays yet.',
+        error:
+          'VERIFICATION_FAILED: repository is not discoverable via listRepos/getRepo on the checked relays within the timeout (see relayVerificationById).',
         repoId: name,
         name,
         description,
@@ -301,32 +318,44 @@ async function createRepo(options) {
         commit: pushResult?.refs?.[0]?.commit,
         announcementEvent: announceResult?.event,
         announcementError: effectiveAnnouncementError,
+        announceRelayVerification,
+        relayVerificationById,
+        gitSmartHttpCheck,
         stateEvent: stateResult?.event,
         pushPolicySync,
         bridgeEventForward,
         pubkey,
-        discoverable,
+        discoverable: false,
         discoverabilityError,
         discoverabilityCheckedRelays,
-        hint: 'Retry discovery later or publish on additional relays. Issues/PRs depend on accepted repository announcement.',
+        hint: 'Inspect relayVerificationById.confirmedOnRelays vs missingOnRelays; widen relays or wait and retry getRepo.',
       },
       {
-        reason: 'Relays have not yet accepted or replicated the kind 30617 announcement, or filters/timeouts missed it.',
+        reason:
+          relayVerificationById?.outcome === 'timeout_not_readable'
+            ? `Kind 30617 id ${announceResult?.event?.id || '?'} was not readable on any checked relay after ${relayVerificationById.elapsedMs}ms.`
+            : 'Repo listing query did not return the announcement before the discoverability timeout.',
         nextSteps: [
-          'Wait 30–120s and call listRepos or getRepo with the same relays used in createRepo.',
-          'Widen relays (e.g. wss://relay.ngit.dev, wss://ngit-relay.nostrver.se, wss://git.shakespeare.diy) and retry publishRepoAnnouncement if needed.',
-          'Bridge already has files: you may use bridgeListRefs / bridgeListFiles while waiting for Nostr visibility.',
-          'Do not create issues/PRs until the repo announcement is discoverable, or relays may reject child events.',
-        ],
+          'If relayVerificationById.confirmedOnRelays is non-empty but discoverable was false, widen getRepo relays to match those relays.',
+          'If confirmedOnRelays is empty, fix 30617 clone/relays tags or relay set; then retry publishRepoAnnouncement.',
+          'Use bridgeListRefs / bridgeListFiles if you only need bridge state while fixing Nostr metadata.',
+          gitSmartHttpCheck.cloneHttpVerified
+            ? null
+            : 'gitSmartHttpCheck.cloneHttpVerified is false: primary cloneUrl does not answer as git smart HTTP — fix clone URL in announcement.',
+        ].filter(Boolean),
       }
     );
   }
 
   if (!announceResult?.event) {
+    const gitSmartHttpCheck = await probeGitSmartHttp(userCloneUrls[0]);
     return withAgentHints(
       {
         success: false,
-        error: 'Repository announcement failed or was not accepted/queryable on relays.',
+        error:
+          announceRelayVerification || announceError?.includes('VERIFICATION_FAILED')
+            ? 'VERIFICATION_FAILED: repository announcement was published but not verified on relays (see announceRelayVerification / announcementError).'
+            : 'Repository announcement failed before a verifiable event id was available.',
         repoId: name,
         name,
         description,
@@ -336,6 +365,8 @@ async function createRepo(options) {
         commit: pushResult?.refs?.[0]?.commit,
         announcementEvent: null,
         announcementError: announceError || 'Missing announcement event',
+        announceRelayVerification,
+        gitSmartHttpCheck,
         stateEvent: stateResult?.event,
         pushPolicySync,
         bridgeEventForward,
@@ -354,6 +385,10 @@ async function createRepo(options) {
       }
     );
   }
+
+  const gitSmartHttpCheck = await probeGitSmartHttp(userCloneUrls[0]);
+  const relayListingOk = discoverable === true;
+  const gitHttpOk = gitSmartHttpCheck.cloneHttpVerified === true;
 
   return withAgentHints(
     {
@@ -374,13 +409,19 @@ async function createRepo(options) {
       discoverable,
       discoverabilityError,
       discoverabilityCheckedRelays,
+      gitSmartHttpCheck,
     },
     {
-      agentSummary: `Repo "${name}" is on the bridge and announced on Nostr (discoverable=${discoverable}).`,
-      whatHappensNext: 'Relays and gittr.space will index the announcement; downstream issues/PRs can be created once visible.',
+      agentSummary: `Repo "${name}" created. relayListingOk=${relayListingOk}; cloneHttpVerified=${gitHttpOk} (see gitSmartHttpCheck).`,
+      whatHappensNext: gitHttpOk
+        ? 'Use cloneUrl with git; createIssue/createPR with matching relays when possible.'
+        : 'Primary cloneUrl failed HTTPS git smart probe — fix announcement clone URLs if agents need stock git clone.',
       nextSteps: [
         `Open webUrl in a browser or share cloneUrl for git clone.`,
         `Next: createIssue / createPR using owner pubkey and repoId "${name}" with the same relay set when possible.`,
+        !gitHttpOk
+          ? 'gitSmartHttpCheck shows cloneHttpVerified=false: update 30617 clone to a URL that serves git-upload-pack (e.g. git.gittr.space) and re-publish.'
+          : null,
         pushPolicySync && pushPolicySync.ok === false
           ? 'Push policy sync had a problem; inspect pushPolicySync in this response.'
           : null,
