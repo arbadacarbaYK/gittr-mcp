@@ -10,6 +10,12 @@
 
 **Relays / rate limits** can still lag or throttle; tool responses often include `nextSteps` and `reason` for automation.
 
+### “Is it working or not?” (plain answer)
+
+**Yes — the MCP + bridge + normal gittr flows are meant to work in production.** Push, publish, issues, agents: that is one thing.
+
+**`git clone` is a second thing:** it only works against a URL that is **actually a git HTTP server**. This repo steers announcements toward **`https://git.gittr.space/…/repo.git`** for that. If someone puts a different `https://…` in kind **30617** and that host does **not** serve `git` (only a web page or a relay front door), then **`git clone` that URL can 404 while the bridge is still fine** — wrong door for `git`, not “everything is down.”
+
 ---
 
 ## If you are not a developer (“just make it work”)

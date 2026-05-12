@@ -139,7 +139,7 @@ async function main() {
     log('step createBountyInvoice');
     const inv = await gittr.createBountyInvoice({
       issueId: iss.event.id,
-      amount: Number(process.env.GITTR_BOUNTY_SATS || 10),
+      amount: Number(process.env.GITTR_BOUNTY_SATS || 10000),
       description: 'Happy path bounty',
       lnbitsUrl,
       lnbitsAdminKey,
