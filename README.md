@@ -32,7 +32,7 @@ See [Known Issues](#known-issues) for details.
 
 ## AI agent toolkit (MCP)
 
-The MCP server (`server.js`, package bin `gittr-mcp`) exposes tools for **Cursor, Claude Desktop, OpenClaw, Hermes**, etc. There is **no HTTP login session**: identity is a **Nostr private key** (hex or `nsec`, usually via `.nostr-keys.json` or per-tool `privkey`). **LNbits / Blink** values mirror the gittr web **Settings → Account** and **repo Settings** flows: the browser stores wallet config in `localStorage`; agents should pass the **same** URLs/keys via tool arguments or environment variables (`GITTR_LNBITS_URL`, `GITTR_LNBITS_ADMIN_KEY`, optional invoice key). Never commit secrets.
+The MCP server (`server.js`, package bin `gittr-mcp`) exposes tools for **Cursor, Claude Desktop, OpenClaw, Hermes**, etc. There is **no HTTP login session**: identity is a **Nostr private key** (hex or `nsec`). Easiest path: **`cp .nostr-keys.json.example .nostr-keys.json`** and fill it (that file stays local; see [MCP setup](#mcp-setup-common-ai-agents)). You can also pass **`privkey`** per tool, or use `~/.nostr-identity.json` / `~/.config/gittr/keys.json`. **LNbits / Blink** mirror gittr **Settings → Account** and **repo Settings**; pass the same URLs/keys via tool args or env (`GITTR_LNBITS_URL`, `GITTR_LNBITS_ADMIN_KEY`). Never commit real secrets—only the empty **`.nostr-keys.json.example`** belongs in git.
 
 **Agent-oriented responses:** many tools (and all MCP errors) return JSON with `agentSummary`, `whatHappensNext`, `nextSteps`, and on failure `reason` + `error`, so automations know what to retry or which prerequisite to run next (`gittr-agent-outcomes.js` + enriched handlers in `gittr-agent.js`).
 
@@ -62,7 +62,7 @@ npm run test:happy-path  # dry-run only
 Live integration (creates a real repo + issue on relays; optional LNbits bounty invoice):
 
 ```bash
-# See .env.example — use GITTR_TEST_NSEC or .nostr-keys.json
+# See .env.example — for live scripts use GITTR_TEST_NSEC or GITTR_TEST_PRIVKEY (never commit)
 HAPPY_PATH_LIVE=1 GITTR_TEST_NSEC=nsec1... npm run test:happy-path:live
 GITTR_TEST_NSEC=nsec1... npm run test:live:matrix
 ```
@@ -79,6 +79,7 @@ Live matrix reliability knobs:
 git clone https://github.com/arbadacarbaYK/gittr-mcp.git
 cd gittr-mcp
 npm install
+cp .nostr-keys.json.example .nostr-keys.json   # then edit with your nsec / hex key (see MCP setup)
 ```
 
 Optional global CLI (same binary the agents use):
@@ -99,28 +100,36 @@ The MCP server is **`server.js`** and speaks **stdio** (Cursor starts it with `n
 
 ### 1. Identity and bridge (all hosts)
 
-1. **Nostr key** — the server loads signing material from (first match wins):
-   - `./.nostr-keys.json` in the **current working directory** when the process starts, or  
+1. **Create your local keys file (not in git)**  
+   - In the repo you cloned, **copy** the committed template to a file Git will ignore:
+     ```bash
+     cp .nostr-keys.json.example .nostr-keys.json
+     ```
+   - Edit **`.nostr-keys.json`** and set **`nsec`** (NIP-19) **or** **`secretKey`** / **`private_key`** (64-char hex). Leave `npub` empty unless you want to cache it; it can be derived from `nsec`.  
+   - **`.nostr-keys.json` is in `.gitignore`** — only **`.nostr-keys.json.example`** (empty placeholders) ships on GitHub. Your filled file stays on your machine.
+
+2. **Where the MCP looks** (first match wins when the process starts):
+   - `./.nostr-keys.json` (working directory — often the clone if you use `cp` above), or  
    - `~/.nostr-identity.json`, or  
    - `~/.config/gittr/keys.json`  
 
-   Minimal file shape:
+   Minimal **filled** shape:
 
    ```json
    { "nsec": "nsec1…" }
    ```
 
-   Hex `secretKey` / `private_key` is also supported. **Never commit** this file; add it to `.gitignore` if you keep it in the repo folder.
+   Hex `secretKey` / `private_key` is also supported instead of `nsec`.
 
-2. **Bridge URL** — default is `https://gittr.space` from `config.js`. Override with:
+3. **Bridge URL** — default is `https://gittr.space` from `config.js`. Override with:
 
    ```bash
    export BRIDGE_URL=https://gittr.space
    ```
 
-3. **Optional env** — see [`.env.example`](.env.example) for `GITTR_LNBITS_*`, test relays, etc. Copy to `.env` for your own notes; MCP clients usually need the same keys in their `env` block.
+4. **Optional env** — see [`.env.example`](.env.example) for `GITTR_LNBITS_*`, test relays, etc. Copy to `.env` for your own notes; MCP clients usually need the same keys in their `env` block.
 
-4. **Quick self-check** (terminal, from repo root):
+5. **Quick self-check** (terminal, from repo root — after you created `.nostr-keys.json`):
 
    ```bash
    npm run test:happy-path
@@ -162,7 +171,7 @@ Example: **your current file + gittr** (replace the path with your real clone pa
 - **`args`**: must be an **array** with one element: the absolute path to `server.js` inside your clone.  
 - **`env`**: optional if defaults are fine; add `GITTR_LNBITS_URL` / `GITTR_LNBITS_ADMIN_KEY` here if you use bounties from the agent.
 
-**Keys file:** put `.nostr-keys.json` in your home directory **or** pass nothing extra if you already use `~/.nostr-identity.json`. If the file only lives next to the repo, either copy it to `~/.nostr-identity.json` or add a **`cwd`** field on the `gittr` entry pointing at the repo folder **if your Cursor build supports `cwd` for MCP** (feature availability varies).
+**Keys file:** after `cp .nostr-keys.json.example .nostr-keys.json` and editing it, either set MCP **`cwd`** to the clone (if your Cursor build supports it) so the process sees `./.nostr-keys.json`, or keep using `~/.nostr-identity.json`. If the file only lives next to the repo, either copy it to `~/.nostr-identity.json` or add **`cwd`** on the `gittr` entry pointing at the repo folder **if your Cursor build supports `cwd` for MCP** (feature availability varies).
 
 Save the file, then **reload MCP** or restart Cursor. You should see two servers (e.g. `streamable-mcp-server` and `gittr`) and gittr’s tools under the gittr server.
 

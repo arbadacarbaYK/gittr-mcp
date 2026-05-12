@@ -12,6 +12,17 @@ cd gittr-mcp
 npm install  # install dependencies
 ```
 
+### Credentials (Nostr)
+
+Agents need a **signing key** (same as the gittr web app identity). From the repo root:
+
+```bash
+cp .nostr-keys.json.example .nostr-keys.json
+# Edit .nostr-keys.json: set nsec (NIP-19) or a 64-char hex private key field supported by the loader
+```
+
+**`.nostr-keys.json` is gitignored** — only **`.nostr-keys.json.example`** (empty placeholders) belongs in the repository. Alternatively put the same JSON in `~/.nostr-identity.json`, or pass `privkey` on each tool call.
+
 ---
 
 ## 5-Minute Agent Workflow

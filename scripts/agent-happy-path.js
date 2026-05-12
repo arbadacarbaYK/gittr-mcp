@@ -88,7 +88,7 @@ async function main() {
     } catch (e) {
       log('bridge ping failed (offline or blocked)', e.message);
     }
-    log('done', 'Dry run finished. For live: --live or HAPPY_PATH_LIVE=1 and GITTR_TEST_NSEC (or .nostr-keys.json).');
+    log('done', 'Dry run finished. For live: --live or HAPPY_PATH_LIVE=1 and GITTR_TEST_NSEC / GITTR_TEST_PRIVKEY (or a filled .nostr-keys.json from .nostr-keys.json.example).');
     return;
   }
 
@@ -99,7 +99,7 @@ async function main() {
   }
   if (!privkey) {
     console.error(
-      'Live run needs GITTR_TEST_PRIVKEY / GITTR_TEST_NSEC or .nostr-keys.json in cwd or HOME.'
+      'Live run needs GITTR_TEST_PRIVKEY / GITTR_TEST_NSEC, or a filled .nostr-keys.json (copy from .nostr-keys.json.example) in cwd or HOME.'
     );
     process.exit(1);
   }

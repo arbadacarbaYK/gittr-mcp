@@ -61,9 +61,9 @@ function describeAgentAuth() {
   if (!creds) {
     return {
       configured: false,
-      hint: 'Set .nostr-keys.json or pass privkey on each tool. Optional: GITTR_LNBITS_URL, GITTR_LNBITS_ADMIN_KEY for bounties.',
+      hint: 'Set .nostr-keys.json (from repo template) or pass privkey on each tool. Optional: GITTR_LNBITS_URL, GITTR_LNBITS_ADMIN_KEY for bounties.',
       nextSteps: [
-        'Create `.nostr-keys.json` with `nsec` (or hex secret) in the project dir or `~/.nostr-identity.json`.',
+        'Run `cp .nostr-keys.json.example .nostr-keys.json`, add `nsec` (or hex secret), keep the file local (gitignored). Or use `~/.nostr-identity.json`.',
         'Or pass `privkey` on each mutating tool (pushToBridge, createRepo, mergePullRequest, …).',
       ],
       whatHappensNext: 'Once configured, mutating calls will sign bridge challenges and Nostr events.',
