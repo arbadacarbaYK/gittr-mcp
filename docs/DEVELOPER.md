@@ -74,9 +74,11 @@ Needs GRASP/Nostr visibility — not for files that exist only on the bridge bef
 
 ### PRs (kind 1618)
 
-Bridge push stores objects; announcements carry **clone** URLs. Prefer **`https://git.gittr.space/...`** for HTTPS git. Some relays verify PR commits against a **cloneable** `git` remote—if your published `clone` URL does not serve `git`, you may see errors like *PR event must reference an accepted repository*. That is relay + URL policy, not a broken MCP client.
+**Publish PR event:** succeeds or fails per relay response — binary.
 
-**If publish fails:** gittr CLI / `nostr://`, external GitHub/GitLab clone URLs in **30617**, patches (**1617**), or `git-remote-nostr`—see historical context in git history if needed.
+**“Can relays / others verify my commits?”** depends on your published **`clone`** URL: if that URL does **not** answer `git` HTTP, verification fails — treat that as **bad metadata for git workflows**, same as a failed `git clone` on that URL. Prefer **`https://git.gittr.space/...`** (or another URL you have confirmed with `git ls-remote`), then re-publish if needed.
+
+**If publish fails:** gittr CLI / `nostr://`, external GitHub/GitLab in **30617**, patches (**1617**), or `git-remote-nostr`.
 
 **Rule of thumb:** same host in `clone` (https) and `relays` (`wss://`) where your relay set requires GRASP pairing; when in doubt, follow [Common issues](#common-issues) and gittr.space UI defaults.
 

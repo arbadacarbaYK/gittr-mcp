@@ -5,16 +5,24 @@
 | Capability | Notes |
 |------------|--------|
 | Repos, bridge push, issues | Supported end-to-end |
-| HTTPS `git clone` | Prefer **`https://git.gittr.space/<hex-pubkey>/repo.git`** (or URLs from `resolveRepoByNostrId`). |
+| HTTPS `git clone` | **Pass/fail per URL:** only counts as success if `git clone` (or `git ls-remote`) works on the **`clone` URL you published**. Use **`https://git.gittr.space/<hex-pubkey>/repo.git`** unless you know another URL serves git HTTP. |
 | PRs | MCP sends signed events; **relays** may reject if they cannot validate commits—[docs/DEVELOPER.md#limitations](docs/DEVELOPER.md#limitations). |
 
 **Relays / rate limits** can still lag or throttle; tool responses often include `nextSteps` and `reason` for automation.
 
-### “Is it working or not?” (plain answer)
+### What “success” means (no mixed signals)
 
-**Yes — the MCP + bridge + normal gittr flows are meant to work in production.** Push, publish, issues, agents: that is one thing.
+Each step **either succeeded or it did not**. There is no third state like “bridge happy but git irrelevant.”
 
-**`git clone` is a second thing:** it only works against a URL that is **actually a git HTTP server**. This repo steers announcements toward **`https://git.gittr.space/…/repo.git`** for that. If someone puts a different `https://…` in kind **30617** and that host does **not** serve `git` (only a web page or a relay front door), then **`git clone` that URL can 404 while the bridge is still fine** — wrong door for `git`, not “everything is down.”
+| Step | Pass / fail | How you know |
+|------|----------------|--------------|
+| **Bridge push** | Pass only if the API returns success and you got refs/commits. | Tool response / HTTP error. |
+| **Publish to relays (30617 / 30618)** | Pass only if events were accepted and show up as you expect. | Tool response; relay errors are **fail** for that step. |
+| **`git clone` using your published `clone` URL** | Pass only if `git clone` (or `git ls-remote`) against **that exact URL** works. | Exit code 0. **404 / “not a repository” = fail** for *that* step — your announcement points at a URL that is **not** serving git HTTP for that path. |
+
+So: a **failed `git clone`** is a **failed clone step**, full stop. It does **not** rewrite history on the bridge push; it means **your repo metadata (the `clone` URL in 30617) is wrong for people who use stock `git` over HTTPS.** Fix the URL (this MCP defaults toward **`https://git.gittr.space/<hex-pubkey>/repo.git`**) and re-publish — then re-check `git clone` until that step **passes**.
+
+**Why `relay.ngit.dev` URLs confused people:** some `https://relay.ngit.dev/…/repo.git` shapes are **not** a public git HTTP endpoint for that path (relay ≠ same as “git smart HTTP on this URL”). If clone fails there, treat it as **wrong clone URL for `git`**, not as “everything else magically OK.”
 
 ---
 
