@@ -1,6 +1,16 @@
 #!/usr/bin/env node
 'use strict';
 
+/**
+ * Live integration matrix (mutates bridge + relays). Requires GITTR_TEST_NSEC or GITTR_TEST_PRIVKEY.
+ *
+ * Covers: repo + bridge reads, issue create + close (1632), feature branch push, PR create (1618),
+ * mergePullRequest (git merge + bridge push + 30618 + 1631). Requires `git` on PATH for merge.
+ *
+ * Run:  GITTR_TEST_NSEC=nsec1... npm run test:live:matrix
+ * Skip merge (e.g. no git): GITTR_SKIP_MERGE_LIFECYCLE=1 npm run test:live:matrix
+ */
+
 const gittr = require('../index.js');
 const { nip19 } = require('nostr-tools');
 
@@ -131,10 +141,7 @@ async function retry(name, fn, {
     content: 'Created by matrix',
     privkey: nsec,
     relays,
-  }), { attempts: 3, delayMs: 3000 }), {
-    allowFail: true,
-    data: { expected: 'May fail during relay visibility lag even after publish ack' },
-  });
+  }), { attempts: 3, delayMs: 3000 }));
 
   const listedIssues = await run('issues:list', () => retry('issues:list', async () => {
     const rows = await gittr.listIssues({ ownerPubkey: hex, repoId: lifecycleRepo, relays });
@@ -147,37 +154,80 @@ async function retry(name, fn, {
     fail('issues:list_semantic', 'Created issue not returned by listIssues', { createdIssueId: issue.event.id, listedCount: listedIssues.length });
   }
   const statusIssueId = issue?.event?.id || (Array.isArray(listedIssues) && listedIssues.length > 0 ? listedIssues[0].id : null);
-  if (statusIssueId) {
+  if (!statusIssueId) {
+    fail('issues:create_required', 'No issue id for close lifecycle', { issue });
+  } else {
     const byId = await run('issues:getById', () => retry('issues:getById', async () => {
       const found = await gittr.getIssueById({ issueId: statusIssueId, relays });
       if (found?.error) throw new Error(found.error);
       return found;
     }, { attempts: 5, delayMs: 3000 }));
     if (byId?.error) fail('issues:getById_semantic', byId.error, byId);
-    await run('issues:close_status_1632', () => retry('issues:close_status_1632', () => gittr.publishStatusForRoot({
-      statusKind: 1632,
-      rootEventId: statusIssueId,
-      ownerPubkey: hex,
-      rootEventAuthor: hex,
-      repoId: lifecycleRepo,
-      content: 'closing test issue',
-      privkey: nsec,
-      relays,
-    }), { attempts: 4, delayMs: 2500 }), { allowFail: true });
+
+    const closed = await run('issues:closeIssue', () => retry('issues:closeIssue', async () => {
+      const r = await gittr.closeIssue({
+        issueId: statusIssueId,
+        ownerPubkey: hex,
+        repoId: lifecycleRepo,
+        content: 'closed by agent-live-matrix',
+        privkey: nsec,
+        relays,
+      });
+      if (r.error || r.success === false || !r.event?.id) throw new Error(r.error || JSON.stringify(r));
+      return r;
+    }, { attempts: 5, delayMs: 3000 }));
+    if (closed?.error) fail('issues:closeIssue_semantic', closed.error, closed);
   }
 
   await run('prs:list', () => gittr.listPRs({ ownerPubkey: hex, repoId: lifecycleRepo, relays }));
-  await run('prs:create_minimal', () => gittr.createPR({
-    ownerPubkey: hex,
-    repoId: lifecycleRepo,
-    subject: 'Matrix PR probe',
-    content: 'PR probe',
-    commitId: created?.commit || 'HEAD',
-    cloneUrls: [created?.cloneUrl].filter(Boolean),
-    branchName: 'main',
-    privkey: nsec,
-    relays,
-  }), { allowFail: true, data: { expected: 'May fail due to relay repo acceptance validation' } });
+
+  const skipMerge = process.env.GITTR_SKIP_MERGE_LIFECYCLE === '1' || process.env.GITTR_SKIP_MERGE_LIFECYCLE === 'true';
+  if (skipMerge) {
+    warn('prs:merge_skipped', 'GITTR_SKIP_MERGE_LIFECYCLE set — mergePullRequest not run', {});
+  } else if (!created || created.success === false || !created.cloneUrl) {
+    warn('prs:merge_skipped', 'createRepo did not succeed with cloneUrl — cannot run merge lifecycle on fresh repo', {
+      createdSuccess: created?.success,
+      cloneUrl: created?.cloneUrl,
+    });
+  } else {
+    const featBranch = `feat-mx-${Date.now()}`;
+    const pushFeat = await run('repo:push_feature', () => gittr.pushToBridge({
+      ownerPubkey: hex,
+      repo,
+      branch: featBranch,
+      files: [{ path: 'README.md', content: `# ${repo}\n\nmatrix feature\n` }],
+      privkey: nsec,
+    }));
+    const tip = pushFeat?.refs?.[0]?.commit;
+    if (!tip) fail('repo:push_feature_semantic', 'feature push missing commit', pushFeat);
+
+    const prEv = await run('prs:create_feature', () => retry('prs:create_feature', () => gittr.createPR({
+      ownerPubkey: hex,
+      repoId: repo,
+      subject: 'Matrix PR merge lifecycle',
+      content: 'merge via matrix',
+      commitId: tip,
+      cloneUrls: [created.cloneUrl],
+      branchName: featBranch,
+      privkey: nsec,
+      relays,
+    }), { attempts: 4, delayMs: 4000 }));
+    if (!prEv?.event?.id) fail('prs:create_feature_semantic', 'createPR missing event id', prEv);
+
+    const merged = await run('prs:mergePullRequest', async () => {
+      const r = await gittr.mergePullRequest({
+        prId: prEv.event.id,
+        ownerPubkey: hex,
+        repoId: repo,
+        privkey: nsec,
+        relays,
+        mergeMessage: `Merge matrix PR (${repo})`,
+      });
+      if (!r.success) throw new Error(JSON.stringify(r));
+      return r;
+    });
+    if (!merged?.success) fail('prs:mergePullRequest_semantic', 'merge reported failure', merged);
+  }
 
   await run('paywall:get_status', () => gittr.getPushPaywallStatus({ ownerPubkey: hex, repo, payerPubkey: hex, bridgeUrl }));
   await run('paywall:create_intent_without_wallet', () => gittr.createPushPaywallIntent({ ownerPubkey: hex, repo, payerPubkey: hex, bridgeUrl }), {
@@ -185,7 +235,7 @@ async function retry(name, fn, {
     data: { expected: 'Should fail unless owner LNbits/Blink keys are provided' },
   });
 
-  await run('bounty:create_invoice_without_lnbits', () => gittr.createBountyInvoice({ issueId: issue?.event?.id || 'dummy', amount: 10, bridgeUrl }), {
+  await run('bounty:create_invoice_without_lnbits', () => gittr.createBountyInvoice({ issueId: issue?.event?.id || 'dummy', amount: Number(process.env.GITTR_BOUNTY_SATS || 10000), bridgeUrl }), {
     allowFail: true,
     data: { expected: 'Should fail unless GITTR_LNBITS_* provided' },
   });

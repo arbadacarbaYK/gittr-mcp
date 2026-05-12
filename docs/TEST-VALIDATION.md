@@ -58,6 +58,16 @@ Tested complete agent workflow following AGENT-QUICKSTART.md:
 
 ## Testing the MCP
 
+**Default CI / `npm test`:** smoke exports + happy-path **dry-run only** (no relays mutations, no merge, no close).
+
+**Prove issue close + PR merge (`mergePullRequest`)** with your test key and `git` on PATH:
+
+```bash
+GITTR_TEST_NSEC=nsec1... npm run test:live:matrix
+```
+
+**Single-repo happy path including close + merge:** `HAPPY_PATH_LIVE=1 GITTR_TEST_NSEC=… npm run test:happy-path:live`
+
 Run validation yourself:
 
 ```bash

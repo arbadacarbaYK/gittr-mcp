@@ -13,6 +13,7 @@
     "test:happy-path": "node scripts/agent-happy-path.js",
     "test:happy-path:live": "HAPPY_PATH_LIVE=1 node scripts/agent-happy-path.js",
     "test:live:matrix": "node scripts/agent-live-matrix.js",
+    "test:live:admin": "node scripts/agent-live-matrix.js",
     "server": "node server.js"
   },
   "keywords": [

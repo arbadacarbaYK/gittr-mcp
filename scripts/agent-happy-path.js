@@ -16,12 +16,13 @@
  *   GITTR_TEST_REPO — repo name (default agent-hp-<timestamp>)
  *   GITTR_LNBITS_URL, GITTR_LNBITS_ADMIN_KEY — optional bounty step
  *   HAPPY_PATH_SKIP_BOUNTY=1 — skip invoice even if LNbits set
- *   HAPPY_PATH_LIVE=1 or --live — perform real createRepo / issue / bounty
+ *   HAPPY_PATH_LIVE=1 or --live — perform real createRepo → issue → close → feature branch → PR → mergePullRequest (needs `git` on PATH)
  */
 
 'use strict';
 
 const gittr = require('../index.js');
+const { nip19 } = require('nostr-tools');
 
 const live =
   process.argv.includes('--live') || process.env.HAPPY_PATH_LIVE === '1' || process.env.HAPPY_PATH_LIVE === 'true';
@@ -152,6 +153,78 @@ async function main() {
   } else {
     log('step bounty', 'skipped (set GITTR_LNBITS_URL + GITTR_LNBITS_ADMIN_KEY or HAPPY_PATH_SKIP_BOUNTY=1)');
   }
+
+  log('step closeIssue');
+  const ownerNpub = nip19.npubEncode(pk);
+  const closeOut = await gittr.closeIssue({
+    issueId: iss.event.id,
+    ownerPubkey: pk,
+    repoId: repoName,
+    content: 'Closed by agent-happy-path live test',
+    privkey,
+    relays,
+  });
+  if (closeOut.error || closeOut.success === false || !closeOut.event?.id) {
+    throw new Error(`closeIssue failed: ${JSON.stringify(closeOut)}`);
+  }
+  log('closeIssue ok', { issueId: iss.event.id.slice(0, 12) });
+
+  const featBranch = `feat-hp-${Date.now()}`;
+  log('step pushToBridge feature branch', featBranch);
+  const pushFeat = await gittr.pushToBridge({
+    ownerPubkey: pk,
+    repo: repoName,
+    branch: featBranch,
+    files: [
+      {
+        path: 'README.md',
+        content: `# ${repoName}\n\nHappy path feature branch.\n`,
+      },
+    ],
+    privkey,
+  });
+  const tip = pushFeat?.refs?.[0]?.commit;
+  if (!tip) {
+    throw new Error(`pushToBridge feature branch missing commit: ${JSON.stringify(pushFeat)}`);
+  }
+  log('push feature ok', { branch: featBranch, tip: tip.slice(0, 12) });
+
+  const cloneUrl =
+    cr.cloneUrl || `https://git.gittr.space/${ownerNpub}/${repoName}.git`;
+  log('step createPR');
+  const pr = await gittr.createPR({
+    ownerPubkey: pk,
+    repoId: repoName,
+    subject: 'Happy path PR (merge me)',
+    content: 'Opened by agent-happy-path live test',
+    commitId: tip,
+    cloneUrls: [cloneUrl],
+    branchName: featBranch,
+    privkey,
+    relays,
+  });
+  if (!pr?.event?.id) {
+    throw new Error(`createPR failed: ${JSON.stringify(pr)}`);
+  }
+  log('createPR ok', { prId: pr.event.id.slice(0, 12) });
+
+  log('step mergePullRequest (git + bridge + Nostr)');
+  const mergeOut = await gittr.mergePullRequest({
+    prId: pr.event.id,
+    ownerPubkey: pk,
+    repoId: repoName,
+    privkey,
+    relays,
+    mergeMessage: `Merge PR from agent-happy-path (${repoName})`,
+  });
+  if (!mergeOut.success) {
+    throw new Error(`mergePullRequest failed: ${JSON.stringify(mergeOut)}`);
+  }
+  log('mergePullRequest ok', {
+    bridgeCommit: mergeOut.bridgeCommit?.slice(0, 12),
+    status1631: mergeOut.statusEvent?.id?.slice(0, 12) || null,
+    statusError: mergeOut.statusError || null,
+  });
 
   log('done', { repoName, ownerPubkey: pk.slice(0, 16) + '…' });
   process.exit(0);

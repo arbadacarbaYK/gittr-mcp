@@ -67,6 +67,16 @@ npm test        # smoke + happy-path dry-run
 
 **Live integration tests** (real relays; optional LNbits): see `.env.example` — use **`GITTR_TEST_NSEC`** / **`GITTR_TEST_PRIVKEY`**, never commit keys.
 
+**Prove admin tools (close issue + merge PR + git):** same keys, **`git` on PATH**, then:
+
+```bash
+GITTR_TEST_NSEC=nsec1... npm run test:live:matrix
+# or the same script:
+GITTR_TEST_NSEC=nsec1... npm run test:live:admin
+```
+
+To only skip the git merge section: `GITTR_SKIP_MERGE_LIFECYCLE=1`.
+
 ```bash
 HAPPY_PATH_LIVE=1 GITTR_TEST_NSEC=nsec1... npm run test:happy-path:live
 ```
