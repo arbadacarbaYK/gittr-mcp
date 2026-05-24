@@ -66,6 +66,8 @@ module.exports = {
   unstarRepo: gittrAgent.unstarRepo,
   listStars: gittrAgent.listStars,
   watchRepo: gittrAgent.watchRepo,
+  unwatchRepo: gittrAgent.unwatchRepo,
+  listWatchedRepos: gittrAgent.listWatchedRepos,
   getTrendingRepos: gittrAgent.getTrendingRepos,
   getRepoContributors: gittrAgent.getRepoContributors,
   getBranches: gittrAgent.getBranches,

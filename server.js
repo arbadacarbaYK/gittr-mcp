@@ -243,16 +243,18 @@ const tools = [
   },
   {
     name: 'addCollaborator',
-    description: 'Add a collaborator to a repository',
+    description:
+      'Add maintainer on kind 30617 (republishes full announcement with updated maintainers tag — matches gittr UI)',
     inputSchema: {
       type: 'object',
       properties: {
+        ownerPubkey: { type: 'string', description: 'Repository owner pubkey (must sign)' },
         repoId: { type: 'string' },
         collaboratorPubkey: { type: 'string', description: 'Collaborator\'s pubkey' },
         privkey: { type: 'string', description: 'Private key (auto-loaded)' },
         relays: { type: 'array', items: { type: 'string' } },
       },
-      required: ['repoId', 'collaboratorPubkey'],
+      required: ['ownerPubkey', 'repoId', 'collaboratorPubkey'],
     },
   },
   // Issue operations
@@ -419,7 +421,8 @@ const tools = [
   },
   {
     name: 'watchRepo',
-    description: 'Watch a repository for updates (notifications)',
+    description:
+      'Watch a repo (NIP-51 kind 10018 followed-repos list — publishes full `a` tag set, same as gittr Watch button)',
     inputSchema: {
       type: 'object',
       properties: {
@@ -429,6 +432,31 @@ const tools = [
         relays: { type: 'array', items: { type: 'string' } },
       },
       required: ['ownerPubkey', 'repoId'],
+    },
+  },
+  {
+    name: 'unwatchRepo',
+    description: 'Unwatch a repo (republish kind 10018 without this repo)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ownerPubkey: { type: 'string' },
+        repoId: { type: 'string' },
+        privkey: { type: 'string' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['ownerPubkey', 'repoId'],
+    },
+  },
+  {
+    name: 'listWatchedRepos',
+    description: 'List repos from your latest kind 10018 followed-repos event on relays',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pubkey: { type: 'string' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
     },
   },
   {
@@ -486,7 +514,8 @@ const tools = [
   },
   {
     name: 'createRelease',
-    description: 'Create a release (tag a version)',
+    description:
+      'Not supported on gittr (returns guidance). UI releases are local until next 30617 push; use git tags + publishRepoState instead.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -992,6 +1021,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case 'watchRepo':
         result = await gittr.watchRepo(args);
+        break;
+      case 'unwatchRepo':
+        result = await gittr.unwatchRepo(args);
+        break;
+      case 'listWatchedRepos':
+        result = await gittr.listWatchedRepos(args);
         break;
       case 'getTrendingRepos':
         result = await gittr.getTrendingRepos(args);

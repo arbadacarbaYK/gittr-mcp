@@ -766,6 +766,39 @@ async function listBountiesForIssue({ issueId, relays = config.relays, limit = 3
   });
 }
 
+/** Parse kind 30617 announcement for republish (gittr UI shape). */
+function parse30617Announcement(event) {
+  if (!event || event.kind !== KIND_REPOSITORY) return null;
+  const single = (name) => {
+    const t = event.tags.find((x) => x[0] === name);
+    return t && t[1] != null ? String(t[1]) : '';
+  };
+  const multi = (name) =>
+    event.tags
+      .filter((t) => t[0] === name)
+      .flatMap((t) => t.slice(1).filter((v) => v != null && String(v).trim() !== ''));
+  const maintainers = [];
+  const mergeMaintainers = [];
+  for (const t of event.tags || []) {
+    if (t[0] === 'maintainers') maintainers.push(..._hexPubkeysFromTagTail(t));
+    if (t[0] === 'merge_maintainers') mergeMaintainers.push(..._hexPubkeysFromTagTail(t));
+  }
+  const pushCostRaw = single('push_cost_sats');
+  return {
+    repoId: single('d'),
+    name: single('name') || single('d'),
+    description: single('description') || '',
+    web: multi('web'),
+    clone: multi('clone'),
+    relayUrls: multi('relays'),
+    pushCostSats: pushCostRaw ? Number(pushCostRaw) : undefined,
+    maintainers: [...new Set(maintainers)],
+    mergeMaintainers: [...new Set(mergeMaintainers)],
+    forkedFrom: single('forkedFrom') || undefined,
+    source: single('source') || undefined,
+  };
+}
+
 // Publish repository announcement (kind 30617)
 async function publishRepoAnnouncement({
   repoId,
@@ -776,6 +809,10 @@ async function publishRepoAnnouncement({
   privkey,
   relays = config.relays,
   pushCostSats,
+  maintainers,
+  mergeMaintainers,
+  forkedFrom,
+  source,
 }) {
   const sk = privkeyToUint8Array(privkey);
   const webUrls = Array.isArray(web) ? web : [];
@@ -792,6 +829,15 @@ async function publishRepoAnnouncement({
   if (pushCostSats != null && Number.isFinite(Number(pushCostSats)) && Number(pushCostSats) >= 0) {
     tags.push(['push_cost_sats', String(Math.floor(Number(pushCostSats)))]);
   }
+
+  if (forkedFrom) tags.push(['forkedFrom', String(forkedFrom)]);
+  if (source) tags.push(['source', String(source)]);
+
+  const maint = [...new Set((maintainers || []).map((h) => normalizeOwnerPubkeyHexSync(h)).filter(Boolean))];
+  if (maint.length > 0) tags.push(['maintainers', ...maint]);
+
+  const mergeMaint = [...new Set((mergeMaintainers || []).map((h) => normalizeOwnerPubkeyHexSync(h)).filter(Boolean))];
+  if (mergeMaint.length > 0) tags.push(['merge_maintainers', ...mergeMaint]);
   
   // Clone tags: single tag with all clone URLs
   if (clone && clone.length > 0) {
@@ -1260,8 +1306,10 @@ module.exports = {
   repoSlugFromHttpsGitUrl,
   requireRepoActingAuthority,
   fetchLatestRepo30617,
+  parse30617Announcement,
 
   // Event kinds
+  KIND_GIT_REPOSITORIES_LIST: 10018,
   KIND_REPOSITORY,
   KIND_REPOSITORY_STATE,
   KIND_ISSUE,

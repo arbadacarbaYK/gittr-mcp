@@ -215,6 +215,8 @@ async function createRepo(options) {
       privkey,
       relays: announceRelays.length > 0 ? announceRelays : ['wss://relay.ngit.dev'],
       pushCostSats,
+      forkedFrom: options.forkedFrom,
+      source: options.source,
     });
   } catch (e) {
     announceError = e.message || String(e);
@@ -597,13 +599,34 @@ async function forkRepo(options) {
   const forkedDescription = newRepoDescription || 
     `Forked from ${sourceRepo.name}${sourceRepo.description ? ': ' + sourceRepo.description : ''}`;
   
+  const ownerHex = await gittrNostr.resolveRepoOwnerHex(sourceOwnerPubkey);
+  const sourceNpub = nip19.npubEncode(ownerHex);
+  const forkedFrom = `${sourceNpub}/${sourceRepoId}`;
+  const cloneUrl =
+    (sourceRepo.clone && sourceRepo.clone[0]) ||
+    `https://git.gittr.space/${ownerHex}/${sourceRepoId}.git`;
+
+  let importResult = null;
+  try {
+    importResult = await importRemoteToBridge({
+      cloneUrl,
+      ownerPubkey: pubkey,
+      repo: newRepoName,
+    });
+  } catch (e) {
+    importResult = { ok: false, error: e.message };
+  }
+
   return createRepo({
     name: newRepoName,
     description: forkedDescription,
-    files: [], // Fork starts empty, user can pull from source
+    files: [],
     privkey,
     relays,
-    graspServer
+    graspServer,
+    forkedFrom,
+    source: cloneUrl,
+    importResult,
   });
 }
 
@@ -628,47 +651,60 @@ async function myRepos(options = {}) {
  */
 async function addCollaborator(options) {
   const {
+    ownerPubkey,
     repoId,
     collaboratorPubkey,
     privkey,
-    relays = gittrNostr.config.relays
+    relays = gittrNostr.config.relays,
   } = options;
-  
-  // Auto-load credentials
+
+  if (!ownerPubkey || !repoId || !collaboratorPubkey) {
+    throw new Error('ownerPubkey, repoId, and collaboratorPubkey are required');
+  }
+
   if (!privkey) {
     const creds = loadCredentials();
-    if (creds) {
-      privkey = creds.nsec || creds.secretKey || creds.private_key;
-    }
+    if (creds) privkey = creds.nsec || creds.secretKey || creds.private_key;
   }
-  
-  if (!privkey) {
-    throw new Error('Private key required');
+  if (!privkey) throw new Error('Private key required');
+
+  const ownerHex = await gittrNostr.resolveRepoOwnerHex(ownerPubkey);
+  const signerHex = gittrNostr.getPublicKey(privkey);
+  if (signerHex.toLowerCase() !== ownerHex.toLowerCase()) {
+    throw new Error('addCollaborator must be signed by the repository owner (republish full kind 30617)');
   }
-  
-  // Publish a maintainer event (kind 30617 with maintainers tag)
-  const { finalizeEvent } = require('nostr-tools');
-  const pubkey = gittrNostr.getPublicKey(privkey);
-  
-  const unsignedEvent = {
-    kind: 30617,
-    created_at: Math.floor(Date.now() / 1000),
-    tags: [
-      ['d', repoId],
-      ['maintainers', pubkey, collaboratorPubkey]
-    ],
-    content: ''
+
+  const latest = await gittrNostr.fetchLatestRepo30617({ ownerPubkey: ownerHex, repoId, relays });
+  if (!latest) {
+    throw new Error(`No kind 30617 on relays for ${ownerHex}/${repoId}. Publish the repo before adding maintainers.`);
+  }
+
+  const parsed = gittrNostr.parse30617Announcement(latest);
+  const collabHex = await gittrNostr.resolveRepoOwnerHex(collaboratorPubkey);
+  const maintainers = [...new Set([ownerHex, ...(parsed.maintainers || []), collabHex])];
+
+  const result = await gittrNostr.publishRepoAnnouncement({
+    repoId: parsed.repoId || repoId,
+    name: parsed.name || repoId,
+    description: parsed.description,
+    web: parsed.web,
+    clone: parsed.clone,
+    privkey,
+    relays: parsed.relayUrls?.length ? parsed.relayUrls : relays,
+    pushCostSats: parsed.pushCostSats,
+    maintainers,
+    mergeMaintainers: parsed.mergeMaintainers,
+    forkedFrom: parsed.forkedFrom,
+    source: parsed.source,
+  });
+
+  return {
+    success: true,
+    event: result.event,
+    collaborator: collabHex,
+    maintainers,
+    agentSummary: `Republished kind 30617 with ${maintainers.length} maintainer(s) (full announcement, not a stub event).`,
   };
-  
-  const event = finalizeEvent(unsignedEvent, privkeyToUint8Array(privkey));
-  const pool = new (require('nostr-tools')).SimplePool();
-  try {
-    await pool.publish(relays, event);
-  } finally {
-    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
-  }
-  
-  return { success: true, event, collaborator: collaboratorPubkey };
 }
 
 /**
@@ -1105,48 +1141,151 @@ async function listStars(options = {}) {
   });
 }
 
-/**
- * Watch a repository for updates (notifications)
- */
-async function watchRepo(options) {
-  const {
-    ownerPubkey,
-    repoId,
-    privkey,
-    relays = gittrNostr.config.relays
-  } = options;
-  
-  if (!privkey) {
-    const creds = loadCredentials();
-    if (creds && creds.nsec) privkey = creds.nsec || creds.secretKey || creds.private_key;
+const KIND_GIT_REPOSITORIES_LIST = 10018;
+
+function parseWatchedRepoAddresses(event) {
+  const out = new Set();
+  if (!event || event.kind !== KIND_GIT_REPOSITORIES_LIST) return out;
+  for (const t of event.tags || []) {
+    if (t[0] === 'a' && typeof t[1] === 'string' && /^30617:[0-9a-f]{64}:.+/i.test(t[1])) {
+      out.add(t[1]);
+    }
   }
-  
-  if (!privkey) {
-    throw new Error('Private key required');
+  return out;
+}
+
+async function fetchLatestWatchedRepoAddresses(pubkeyHex, relays) {
+  const pool = new (require('nostr-tools')).SimplePool();
+  try {
+    const events = await pool.querySync(relays, {
+      kinds: [KIND_GIT_REPOSITORIES_LIST],
+      authors: [pubkeyHex],
+      limit: 10,
+    });
+    events.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+    return parseWatchedRepoAddresses(events[0]);
+  } finally {
+    try {
+      if (relays?.length) pool.close(relays);
+    } catch (_) {
+      /* ignore */
+    }
   }
-  
+}
+
+async function publishWatchedRepoList(addresses, privkey, relays) {
+  const tags = [...addresses].sort().map((address) => ['a', address]);
   const { finalizeEvent } = require('nostr-tools');
-  
-  // Use kind 10001 for follows (or create custom)
-  // For now, we'll use a generic follow kind
   const unsignedEvent = {
-    kind: 10001, // Kind 10001 = relay list metadata (used for follows here)
+    kind: KIND_GIT_REPOSITORIES_LIST,
     created_at: Math.floor(Date.now() / 1000),
-    tags: [
-      ['a', `30617:${ownerPubkey}:${repoId}`]
-    ],
-    content: `Watching ${repoId}`
+    tags,
+    content: '',
   };
-  
   const event = finalizeEvent(unsignedEvent, privkeyToUint8Array(privkey));
   const pool = new (require('nostr-tools')).SimplePool();
   try {
     await pool.publish(relays, event);
   } finally {
-    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+    try {
+      if (relays?.length) pool.close(relays);
+    } catch (_) {
+      /* ignore */
+    }
   }
-  
-  return { success: true, event, action: 'watching', repo: `${ownerPubkey}/${repoId}` };
+  return event;
+}
+
+function repoAddress(ownerHex, repoId) {
+  return `30617:${ownerHex.toLowerCase()}:${repoId}`;
+}
+
+/**
+ * Watch a repository (NIP-51 kind 10018 — full followed-repo list, matches gittr.space).
+ */
+async function watchRepo(options) {
+  const { ownerPubkey, repoId, privkey, relays = gittrNostr.config.relays } = options;
+
+  if (!privkey) {
+    const creds = loadCredentials();
+    if (creds && creds.nsec) privkey = creds.nsec || creds.secretKey || creds.private_key;
+  }
+  if (!privkey) throw new Error('Private key required');
+
+  const signerHex = gittrNostr.getPublicKey(privkey);
+  const ownerHex = await gittrNostr.resolveRepoOwnerHex(ownerPubkey);
+  const address = repoAddress(ownerHex, repoId);
+  const watched = await fetchLatestWatchedRepoAddresses(signerHex, relays);
+  watched.add(address);
+  const event = await publishWatchedRepoList(watched, privkey, relays);
+
+  return {
+    success: true,
+    event,
+    action: 'watching',
+    repo: `${ownerHex}/${repoId}`,
+    watchedCount: watched.size,
+  };
+}
+
+/**
+ * Unwatch a repository (republish kind 10018 without this repo's `a` tag).
+ */
+async function unwatchRepo(options) {
+  const { ownerPubkey, repoId, privkey, relays = gittrNostr.config.relays } = options;
+
+  if (!privkey) {
+    const creds = loadCredentials();
+    if (creds && creds.nsec) privkey = creds.nsec || creds.secretKey || creds.private_key;
+  }
+  if (!privkey) throw new Error('Private key required');
+
+  const signerHex = gittrNostr.getPublicKey(privkey);
+  const ownerHex = await gittrNostr.resolveRepoOwnerHex(ownerPubkey);
+  const address = repoAddress(ownerHex, repoId);
+  const watched = await fetchLatestWatchedRepoAddresses(signerHex, relays);
+  watched.delete(address);
+  const event = await publishWatchedRepoList(watched, privkey, relays);
+
+  return {
+    success: true,
+    event,
+    action: 'unwatched',
+    repo: `${ownerHex}/${repoId}`,
+    watchedCount: watched.size,
+  };
+}
+
+/**
+ * List watched repos from latest kind 10018 on relays.
+ */
+async function listWatchedRepos(options = {}) {
+  const { pubkey, relays = gittrNostr.config.relays } = options;
+
+  let targetPubkey = pubkey;
+  if (!targetPubkey) {
+    const creds = loadCredentials();
+    const pk = creds && (creds.nsec || creds.secretKey || creds.private_key);
+    targetPubkey = pk ? gittrNostr.getPublicKey(pk) : null;
+  } else if (targetPubkey.startsWith('npub')) {
+    try {
+      const d = nip19.decode(targetPubkey);
+      targetPubkey = typeof d.data === 'string' ? d.data : null;
+    } catch (_) {
+      return { error: 'Invalid npub' };
+    }
+  }
+  if (!targetPubkey) return { error: 'No pubkey provided and no credentials found' };
+
+  const addresses = await fetchLatestWatchedRepoAddresses(targetPubkey, relays);
+  return [...addresses].map((a) => {
+    const m = /^30617:([0-9a-f]{64}):(.+)$/i.exec(a);
+    return {
+      address: a,
+      ownerPubkey: m?.[1] || null,
+      repoId: m?.[2] || null,
+    };
+  });
 }
 
 /**
@@ -1251,29 +1390,48 @@ async function getRepoContributors(options) {
  */
 async function getBranches(options) {
   const { ownerPubkey, repoId, relays = gittrNostr.config.relays } = options;
-  
+
   if (!ownerPubkey || !repoId) {
     throw new Error('ownerPubkey and repoId required');
   }
-  
-  // Get repo state events (kind 30618) to find branches
+
+  const base = gittrNostr.config.bridgeUrl || 'https://gittr.space';
+  try {
+    const r = await bridgeApi.bridgeListRefs({ ownerPubkey, repo: repoId }, base);
+    if (r.ok && Array.isArray(r.refs)) {
+      const branches = r.refs
+        .filter((x) => x.ref && x.ref.startsWith('refs/heads/'))
+        .map((x) => ({
+          name: x.ref.replace('refs/heads/', ''),
+          ref: x.ref,
+          commit: x.commit,
+          source: 'bridge',
+        }));
+      if (branches.length > 0) return branches;
+    }
+  } catch (_) {
+    /* fall through */
+  }
+
+  const ownerHex = await gittrNostr.resolveRepoOwnerHex(ownerPubkey);
   const pool = new (require('nostr-tools')).SimplePool();
   let events = [];
-  
   try {
     events = await pool.querySync(relays, {
       kinds: [30618],
       '#d': [repoId],
-      authors: [ownerPubkey],
-      limit: 20
+      authors: [ownerHex],
+      limit: 20,
     });
   } finally {
-    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+    try {
+      if (relays?.length) pool.close(relays);
+    } catch (_) {
+      /* ignore */
+    }
   }
-  
-  // Extract refs/branches from state events
+
   const branches = new Set(['main', 'master']);
-  
   for (const event of events) {
     for (const tag of event.tags) {
       if (tag[0].startsWith('refs/heads/')) {
@@ -1283,8 +1441,7 @@ async function getBranches(options) {
       }
     }
   }
-  
-  return Array.from(branches).map(name => ({ name }));
+  return Array.from(branches).map((name) => ({ name, source: 'nostr-30618' }));
 }
 
 /**
@@ -1292,24 +1449,39 @@ async function getBranches(options) {
  */
 async function getCommitHistory(options) {
   const { ownerPubkey, repoId, branch = 'main', limit = 50, relays = gittrNostr.config.relays } = options;
-  
-  // Get state events to find commits
+
+  const base = gittrNostr.config.bridgeUrl || 'https://gittr.space';
+  try {
+    const r = await bridgeApi.bridgeListCommits(
+      { ownerPubkey, repo: repoId, branch, limit },
+      base
+    );
+    if (r.ok && Array.isArray(r.commits)) {
+      return r.commits.slice(0, limit).map((c) => ({ ...c, source: 'bridge' }));
+    }
+  } catch (_) {
+    /* fall through */
+  }
+
+  const ownerHex = await gittrNostr.resolveRepoOwnerHex(ownerPubkey);
   const pool = new (require('nostr-tools')).SimplePool();
   let events = [];
-  
   try {
     events = await pool.querySync(relays, {
       kinds: [30618],
       '#d': [repoId],
-      authors: [ownerPubkey],
-      limit: limit
+      authors: [ownerHex],
+      limit,
     });
   } finally {
-    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+    try {
+      if (relays?.length) pool.close(relays);
+    } catch (_) {
+      /* ignore */
+    }
   }
-  
+
   const commits = [];
-  
   for (const event of events) {
     for (const tag of event.tags) {
       if (tag[0].startsWith('refs/heads/') && tag[0].includes(branch)) {
@@ -1317,103 +1489,77 @@ async function getCommitHistory(options) {
           sha: tag[1],
           ref: tag[0],
           timestamp: event.created_at,
-          eventId: event.id
+          eventId: event.id,
+          source: 'nostr-30618',
         });
       }
     }
   }
-  
   return commits.slice(0, limit);
 }
 
 /**
- * Create a release (tag a version)
+ * Releases on gittr.space are stored in the web app's local repo record and embedded
+ * into the next kind 30617 publish — not as separate Nostr release kinds.
  */
-async function createRelease(options) {
-  const {
-    ownerPubkey,
-    repoId,
-    version,        // e.g., "v1.0.0"
-    tagName,        // e.g., "v1.0.0"
-    targetCommit,   // Commit SHA to tag
-    releaseNotes,   // Markdown release notes
-    privkey,
-    relays = gittrNostr.config.relays
-  } = options;
-  
-  if (!privkey) {
-    const creds = loadCredentials();
-    if (creds && creds.nsec) privkey = creds.nsec || creds.secretKey || creds.private_key;
-  }
-  
-  if (!privkey) {
-    throw new Error('Private key required');
-  }
-  
-  const { finalizeEvent } = require('nostr-tools');
-  
-  // Use kind 30617 with special tags for release
-  const unsignedEvent = {
-    kind: 30617,
-    created_at: Math.floor(Date.now() / 1000),
-    tags: [
-      ['d', repoId],
-      ['version', version || tagName],
-      ['t', tagName || version],
-      ...(targetCommit ? [['commit', targetCommit]] : [])
-    ],
-    content: releaseNotes || `Release ${version || tagName}`
-  };
-  
-  const event = finalizeEvent(unsignedEvent, privkeyToUint8Array(privkey));
-  const pool = new (require('nostr-tools')).SimplePool();
-  try {
-    await pool.publish(relays, event);
-  } finally {
-    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
-  }
-  
-  return { success: true, event, version: version || tagName };
+async function createRelease() {
+  return withAgentHints(
+    {
+      success: false,
+      supported: false,
+      error: 'createRelease is not a Nostr/bridge API on gittr.space',
+    },
+    {
+      reason:
+        'gittr UI keeps releases in localStorage and merges them into the next Push to Nostr (30617), not via a dedicated MCP event kind.',
+      nextSteps: [
+        'Create a git tag on the bridge (git push refs/tags/v1.0.0) then publishRepoState.',
+        'Or manage releases in the gittr web UI Releases tab, then Push to Nostr.',
+        'For software APK/catalog listings use NIP-82 kinds 3063/30063 (see gittr /apps), not this tool.',
+      ],
+    }
+  );
 }
 
 /**
- * List releases for a repository
+ * List git tags from the bridge when available (not gittr UI release notes).
  */
 async function listReleases(options) {
-  const { ownerPubkey, repoId, limit = 20, relays = gittrNostr.config.relays } = options;
-  
+  const { ownerPubkey, repoId, limit = 20 } = options;
+
   if (!ownerPubkey || !repoId) {
     throw new Error('ownerPubkey and repoId required');
   }
-  
-  const pool = new (require('nostr-tools')).SimplePool();
-  let events = [];
-  
+
+  const base = gittrNostr.config.bridgeUrl || 'https://gittr.space';
   try {
-    events = await pool.querySync(relays, {
-      kinds: [30617],
-      '#d': [repoId],
-      authors: [ownerPubkey],
-      '#t': ['*'],  // Tags with versions
-      limit: limit
-    });
-  } finally {
-    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+    const r = await bridgeApi.bridgeListRefs({ ownerPubkey, repo: repoId }, base);
+    if (r.ok && Array.isArray(r.refs)) {
+      const tags = r.refs
+        .filter((x) => x.ref && x.ref.startsWith('refs/tags/'))
+        .map((x) => ({
+          version: x.ref.replace('refs/tags/', ''),
+          ref: x.ref,
+          commit: x.commit,
+          source: 'bridge-git-tag',
+        }))
+        .slice(0, limit);
+      return withAgentHints(tags, {
+        agentSummary: `${tags.length} git tag(s) on bridge (not the same as gittr UI "Releases" notes).`,
+        nextSteps: [
+          'For human release notes shown on gittr.space, use the web UI or embed in the next 30617 publish.',
+        ],
+      });
+    }
+  } catch (_) {
+    /* ignore */
   }
-  
-  const releases = events.map(event => {
-    const versionTag = event.tags.find(t => t[0] === 't');
-    const commitTag = event.tags.find(t => t[0] === 'commit');
-    return {
-      version: versionTag?.[1],
-      releaseNotes: event.content,
-      commit: commitTag?.[1],
-      created_at: event.created_at,
-      eventId: event.id
-    };
-  }).filter(r => r.version);
-  
-  return releases;
+
+  return withAgentHints([], {
+    supported: false,
+    reason: 'No tags on bridge; gittr UI release list is browser-local until owner pushes 30617.',
+    nextSteps: ['Use bridgeListRefs after pushing tags, or open Releases on gittr.space.'],
+  });
 }
 
 /**
@@ -2247,6 +2393,8 @@ module.exports = {
   unstarRepo,
   listStars,
   watchRepo,
+  unwatchRepo,
+  listWatchedRepos,
   getTrendingRepos,
   getRepoContributors,
   getBranches,

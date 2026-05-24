@@ -52,13 +52,16 @@ These are the **processes** people actually run; each maps to MCP tools the agen
 - **`importRemoteToBridge`** — server-side import/refetch into bridge storage.
 
 ### Discover & social
-- **`listRepos`**, **`searchRepos`**, **`myRepos`**, **`exploreRepos`**, **`getTrendingRepos`**  
-- **`starRepo`**, **`unstarRepo`**, **`listStars`** — NIP-25 kind **7** on the repo’s **30617** event (`#e` + `#k` `30617`, `+` to star, `-` to unstar; same as gittr.space). Repo must be published on Nostr first.  
-- **`watchRepo`** — separate from star (NIP-51 list on gittr UI; MCP helper may differ — see tool description).  
+- **`listRepos`**, **`searchRepos`**, **`myRepos`**, **`exploreRepos`**, **`getTrendingRepos`** (trending = recent repos, not engagement rank)  
+- **`starRepo`**, **`unstarRepo`**, **`listStars`** — NIP-25 on the repo’s **30617** event (same as gittr Star button).  
+- **`watchRepo`**, **`unwatchRepo`**, **`listWatchedRepos`** — NIP-51 kind **10018** followed-repo list (same as gittr Watch).  
 - **`getRepoContributors`**
 
-### Releases
-- **`createRelease`**, **`listReleases`**
+**Parity details:** [docs/MCP-GITTR-PARITY.md](docs/MCP-GITTR-PARITY.md) — what matches gittr.space vs caveats.
+
+### Releases & tags
+- **`listReleases`** — git **tags** from bridge (`refs/tags/*`), not the web UI “Releases” notes.  
+- **`createRelease`** — returns guidance only (gittr stores release notes in the UI until the next **30617** push).
 
 ### Lightning bounties & pay-to-push
 - Bounties: **`listBounties`**, **`createBountyInvoice`**, **`publishBountyToNostr`**, **`submitBounty`**, **`listBountiesForIssue`**, release/withdraw tools.  
@@ -191,6 +194,7 @@ GITTR_TEST_NSEC=nsec1... npm run test:live:matrix
 | [docs/DEVELOPER.md](docs/DEVELOPER.md) | API, verification contract, GRASP |
 | [docs/SIGNING-GUIDE.md](docs/SIGNING-GUIDE.md) | Keys and NIP-98 |
 | [docs/NIP34-SCHEMAS.md](docs/NIP34-SCHEMAS.md) | Event kinds |
+| [docs/MCP-GITTR-PARITY.md](docs/MCP-GITTR-PARITY.md) | MCP vs gittr.space feature map |
 
 ---
 
