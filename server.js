@@ -375,12 +375,14 @@ const tools = [
   },
   {
     name: 'starRepo',
-    description: 'Star a repository (show appreciation)',
+    description:
+      'Star a repo (NIP-25 kind 7 on the latest kind 30617 event: tags e+k+p, content +). Requires a published repo announcement on relays.',
     inputSchema: {
       type: 'object',
       properties: {
-        ownerPubkey: { type: 'string', description: 'Repository owner pubkey' },
-        repoId: { type: 'string', description: 'Repository ID' },
+        ownerPubkey: { type: 'string', description: 'Repository owner pubkey (hex or npub)' },
+        repoId: { type: 'string', description: 'Repository name / d-tag' },
+        repoEventId: { type: 'string', description: 'Optional: specific 30617 event id (skips lookup)' },
         privkey: { type: 'string', description: 'Private key (auto-loaded)' },
         relays: { type: 'array', items: { type: 'string' } },
       },
@@ -389,12 +391,14 @@ const tools = [
   },
   {
     name: 'unstarRepo',
-    description: 'Remove a star from a repository',
+    description:
+      'Unstar a repo (NIP-25 kind 7 on the 30617 event with content "-"). Same tags as starRepo.',
     inputSchema: {
       type: 'object',
       properties: {
-        ownerPubkey: { type: 'string', description: 'Repository owner pubkey' },
-        repoId: { type: 'string', description: 'Repository ID' },
+        ownerPubkey: { type: 'string', description: 'Repository owner pubkey (hex or npub)' },
+        repoId: { type: 'string', description: 'Repository name / d-tag' },
+        repoEventId: { type: 'string', description: 'Optional: specific 30617 event id (skips lookup)' },
         privkey: { type: 'string', description: 'Private key (auto-loaded)' },
         relays: { type: 'array', items: { type: 'string' } },
       },
@@ -403,7 +407,8 @@ const tools = [
   },
   {
     name: 'listStars',
-    description: 'Get repositories a user has starred',
+    description:
+      'List repos a user starred (kind 7 with #k 30617 and #e pointing at 30617 events; latest reaction per repo wins)',
     inputSchema: {
       type: 'object',
       properties: {

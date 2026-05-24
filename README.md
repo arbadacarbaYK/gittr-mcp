@@ -53,7 +53,9 @@ These are the **processes** people actually run; each maps to MCP tools the agen
 
 ### Discover & social
 - **`listRepos`**, **`searchRepos`**, **`myRepos`**, **`exploreRepos`**, **`getTrendingRepos`**  
-- **`starRepo`**, **`unstarRepo`**, **`listStars`**, **`watchRepo`**, **`getRepoContributors`**
+- **`starRepo`**, **`unstarRepo`**, **`listStars`** — NIP-25 kind **7** on the repo’s **30617** event (`#e` + `#k` `30617`, `+` to star, `-` to unstar; same as gittr.space). Repo must be published on Nostr first.  
+- **`watchRepo`** — separate from star (NIP-51 list on gittr UI; MCP helper may differ — see tool description).  
+- **`getRepoContributors`**
 
 ### Releases
 - **`createRelease`**, **`listReleases`**

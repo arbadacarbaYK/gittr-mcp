@@ -835,109 +835,212 @@ async function submitBounty(options) {
   return { success: true, event, issueId, prUrl };
 }
 
+const KIND_REPOSITORY = 30617;
+const KIND_REACTION = 7;
+
+/** Match gittr UI: latest kind 7 per `#e` target; `+` / `⭐` = starred, `-` = unstarred. */
+function aggregateMyStarredRepoEventIds(events, myPubkey) {
+  const pk = myPubkey.toLowerCase();
+  const byTarget = new Map();
+  for (const ev of events) {
+    if (ev.kind !== KIND_REACTION) continue;
+    if (ev.pubkey.toLowerCase() !== pk) continue;
+    const kTag = ev.tags.find((t) => t[0] === 'k')?.[1];
+    if (kTag && kTag !== '30617' && kTag !== String(KIND_REPOSITORY)) continue;
+    const eid = ev.tags.find((t) => t[0] === 'e')?.[1];
+    if (!eid || !/^[0-9a-f]{64}$/i.test(eid)) continue;
+    const prev = byTarget.get(eid);
+    if (!prev || (ev.created_at || 0) >= (prev.created_at || 0)) {
+      byTarget.set(eid, ev);
+    }
+  }
+  const out = [];
+  for (const [eid, ev] of byTarget) {
+    if (ev.content === '+' || ev.content === '⭐') {
+      out.push({ repoEventId: eid, starredAt: ev.created_at });
+    }
+  }
+  return out;
+}
+
+function repoAnnouncementMatches(event, ownerHex, repoId) {
+  const d = event.tags.find((t) => t[0] === 'd')?.[1]?.trim();
+  if (d && d === repoId) return true;
+  const want = `30617:${ownerHex}:${repoId}`.toLowerCase();
+  return event.tags.some(
+    (t) => t[0] === 'a' && typeof t[1] === 'string' && t[1].toLowerCase() === want
+  );
+}
+
+/** Latest kind 30617 event id (same contract as gittr ui/src/lib/nostr/repo-stars.ts). */
+async function resolveLatestRepoAnnouncementEventId(ownerPubkey, repoId, relays) {
+  const ownerHex = await gittrNostr.resolveRepoOwnerHex(ownerPubkey);
+  const pool = new (require('nostr-tools')).SimplePool();
+  let events = [];
+  try {
+    events = await pool.querySync(relays, {
+      kinds: [KIND_REPOSITORY],
+      authors: [ownerHex],
+      limit: 80,
+    });
+  } finally {
+    try {
+      if (relays?.length) pool.close(relays);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+  let latest = null;
+  for (const event of events) {
+    if (!repoAnnouncementMatches(event, ownerHex, repoId)) continue;
+    if (!latest || (event.created_at || 0) >= (latest.created_at || 0)) {
+      latest = event;
+    }
+  }
+  if (!latest?.id) {
+    throw new Error(
+      `No kind 30617 repo announcement on relays for ${ownerHex}/${repoId}. Owner must publish to Nostr before stars work.`
+    );
+  }
+  return { repoEventId: latest.id, ownerHex, repoId };
+}
+
 /**
- * Star a repository (show appreciation)
+ * Star a repository (NIP-25 kind 7 on the repo's 30617 event — matches gittr.space UI).
  */
 async function starRepo(options) {
   const {
     ownerPubkey,
     repoId,
+    repoEventId: repoEventIdArg,
     privkey,
-    relays = gittrNostr.config.relays
+    relays = gittrNostr.config.relays,
   } = options;
-  
+
   if (!privkey) {
     const creds = loadCredentials();
     if (creds && creds.nsec) privkey = creds.nsec || creds.secretKey || creds.private_key;
   }
-  
+
   if (!privkey) {
     throw new Error('Private key required');
   }
-  
+
+  const { repoEventId, ownerHex } = repoEventIdArg
+    ? {
+        repoEventId: repoEventIdArg,
+        ownerHex: await gittrNostr.resolveRepoOwnerHex(ownerPubkey),
+      }
+    : await resolveLatestRepoAnnouncementEventId(ownerPubkey, repoId, relays);
+
   const { finalizeEvent } = require('nostr-tools');
-  const pubkey = gittrNostr.getPublicKey(privkey);
-  
-  // Publish a like/reaction event
+
   const unsignedEvent = {
-    kind: 7, // Kind 7 = reaction
+    kind: KIND_REACTION,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
-      ['p', ownerPubkey],
-      ['a', `30617:${ownerPubkey}:${repoId}`]
+      ['e', repoEventId],
+      ['k', '30617'],
+      ['p', ownerHex.toLowerCase()],
     ],
-    content: '⭐'
+    content: '+',
   };
-  
+
   const event = finalizeEvent(unsignedEvent, privkeyToUint8Array(privkey));
   const pool = new (require('nostr-tools')).SimplePool();
   try {
     await pool.publish(relays, event);
   } finally {
-    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+    try {
+      if (relays?.length) pool.close(relays);
+    } catch (_) {
+      /* ignore */
+    }
   }
-  
-  return { success: true, event, action: 'starred', repo: `${ownerPubkey}/${repoId}` };
+
+  return {
+    success: true,
+    event,
+    action: 'starred',
+    repoEventId,
+    repo: `${ownerHex}/${repoId}`,
+  };
 }
 
 /**
- * Unstar a repository
+ * Unstar a repository (NIP-25 kind 7 with content "-" on the 30617 event).
  */
 async function unstarRepo(options) {
   const {
     ownerPubkey,
     repoId,
+    repoEventId: repoEventIdArg,
     privkey,
-    relays = gittrNostr.config.relays
+    relays = gittrNostr.config.relays,
   } = options;
-  
+
   if (!privkey) {
     const creds = loadCredentials();
     if (creds && creds.nsec) privkey = creds.nsec || creds.secretKey || creds.private_key;
   }
-  
+
   if (!privkey) {
     throw new Error('Private key required');
   }
-  
+
+  const { repoEventId, ownerHex } = repoEventIdArg
+    ? {
+        repoEventId: repoEventIdArg,
+        ownerHex: await gittrNostr.resolveRepoOwnerHex(ownerPubkey),
+      }
+    : await resolveLatestRepoAnnouncementEventId(ownerPubkey, repoId, relays);
+
   const { finalizeEvent } = require('nostr-tools');
-  const pubkey = gittrNostr.getPublicKey(privkey);
-  
-  // Publish removal of reaction (kind 7 with content empty or '-' to remove)
+
   const unsignedEvent = {
-    kind: 7,
+    kind: KIND_REACTION,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
-      ['p', ownerPubkey],
-      ['a', `30617:${ownerPubkey}:${repoId}`]
+      ['e', repoEventId],
+      ['k', '30617'],
+      ['p', ownerHex.toLowerCase()],
     ],
-    content: ''  // Empty removes the reaction
+    content: '-',
   };
-  
+
   const event = finalizeEvent(unsignedEvent, privkeyToUint8Array(privkey));
   const pool = new (require('nostr-tools')).SimplePool();
   try {
     await pool.publish(relays, event);
   } finally {
-    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+    try {
+      if (relays?.length) pool.close(relays);
+    } catch (_) {
+      /* ignore */
+    }
   }
-  
-  return { success: true, event, action: 'unstarred', repo: `${ownerPubkey}/${repoId}` };
+
+  return {
+    success: true,
+    event,
+    action: 'unstarred',
+    repoEventId,
+    repo: `${ownerHex}/${repoId}`,
+  };
 }
 
 /**
- * Get repositories a user has starred
+ * List repositories a user has starred (NIP-25 on kind 30617 — matches gittr Stars page).
  */
 async function listStars(options = {}) {
   const { pubkey, relays = gittrNostr.config.relays } = options;
-  
+
   let targetPubkey = pubkey;
   if (!targetPubkey) {
     const creds = loadCredentials();
     const pk = creds && (creds.nsec || creds.secretKey || creds.private_key);
     targetPubkey = pk ? gittrNostr.getPublicKey(pk) : null;
   } else if (targetPubkey.startsWith('npub')) {
-    const { nip19 } = require('nostr-tools');
     try {
       const d = nip19.decode(targetPubkey);
       targetPubkey = typeof d.data === 'string' ? d.data : null;
@@ -945,41 +1048,61 @@ async function listStars(options = {}) {
       return { error: 'Invalid npub' };
     }
   }
-  
+
   if (!targetPubkey) {
     return { error: 'No pubkey provided and no credentials found' };
   }
-  
-  // Query kind 7 events (reactions) that reference repo events
+
   const pool = new (require('nostr-tools')).SimplePool();
   let events = [];
-  
+
   try {
     events = await pool.querySync(relays, {
-      kinds: [7],
+      kinds: [KIND_REACTION],
       authors: [targetPubkey],
-      '#a': ['30617*'],  // Any repo reference
-      limit: 100
+      '#k': ['30617'],
+      limit: 500,
     });
   } finally {
-    try { if (relays && relays.length) pool.close(relays); } catch (_) { /* ignore */ }
+    try {
+      if (relays?.length) pool.close(relays);
+    } catch (_) {
+      /* ignore */
+    }
   }
-  
-  // Extract repo refs from the events
-  const starredRepos = events
-    .filter(e => e.content === '⭐')
-    .map(e => {
-      const repoTag = e.tags.find(t => t[0] === 'a' && t[1]?.startsWith('30617:'));
-      const parts = repoTag?.[1]?.split(':') || [];
-      return {
-        ownerPubkey: parts[1],
-        repoId: parts[2],
-        starredAt: e.created_at
-      };
-    })
-    .filter(r => r.ownerPubkey && r.repoId);
-  
-  return starredRepos;
+
+  const starred = aggregateMyStarredRepoEventIds(events, targetPubkey);
+  if (starred.length === 0) {
+    return [];
+  }
+
+  const pool2 = new (require('nostr-tools')).SimplePool();
+  let announcements = [];
+  try {
+    announcements = await pool2.querySync(relays, {
+      kinds: [KIND_REPOSITORY],
+      ids: starred.map((s) => s.repoEventId),
+    });
+  } finally {
+    try {
+      if (relays?.length) pool2.close(relays);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  const annById = new Map(announcements.map((e) => [e.id, e]));
+
+  return starred.map(({ repoEventId, starredAt }) => {
+    const ann = annById.get(repoEventId);
+    const dTag = ann?.tags.find((t) => t[0] === 'd')?.[1];
+    return {
+      repoEventId,
+      ownerPubkey: ann?.pubkey || null,
+      repoId: dTag || null,
+      starredAt,
+    };
+  });
 }
 
 /**
