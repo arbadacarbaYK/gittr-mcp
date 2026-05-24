@@ -48,7 +48,7 @@ All these publish signed Nostr events to relays:
 | `createRepo()` | 30617 + bridge push | `privkey` (for both) |
 | `forkRepo()` | 30617 | `privkey` |
 | `addCollaborator()` | (meta event) | `privkey` |
-| `starRepo()` / `unstarRepo()` | (meta event) | `privkey` |
+| `starRepo()` / `unstarRepo()` | kind **7** (NIP-25 on kind **30617** event id) | `privkey` |
 | `watchRepo()` | (meta event) | `privkey` |
 | `createRelease()` | (meta event) | `privkey` |
 | `submitBounty()` | (meta event) | `privkey` |
