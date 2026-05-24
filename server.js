@@ -691,7 +691,7 @@ const tools = [
   {
     name: 'mergePullRequest',
     description:
-      'Full merge: git clone base repo, fetch PR head from PR clone URL(s), merge into base branch, push merged tree to gittr bridge, publish NIP-34 state (30618) and merged status (1631). Requires git on PATH and owner key. repoId optional if derivable from PR a-tag.',
+      'Full merge: git clone/fetch with signed HTTPS auth, merge PR head, push to bridge, optional 30618+1631. Signer must be repo owner OR on latest kind 30617 merge_maintainers (if that tag exists) OR on maintainers when merge_maintainers is absent. Requires git on PATH. repoId optional if derivable from PR a-tag.',
     inputSchema: {
       type: 'object',
       properties: {

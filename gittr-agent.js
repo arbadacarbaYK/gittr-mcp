@@ -623,7 +623,8 @@ async function myRepos(options = {}) {
 }
 
 /**
- * Add collaborator to a repo
+ * Add collaborator to a repo (publishes 30617 with `maintainers` tag — push + merge unless owner also sets `merge_maintainers`).
+ * For merge-only rights without push, owner should publish 30617 including `merge_maintainers` with the delegate pubkey (see docs/NIP34-SCHEMAS.md).
  */
 async function addCollaborator(options) {
   const {
@@ -1451,6 +1452,14 @@ async function closeIssue(options) {
       nextSteps: ['Pass issueId (1621 event id), ownerPubkey, repoId, and privkey.'],
     };
   }
+  if (!privkey) {
+    return {
+      success: false,
+      error: 'privkey is required',
+      reason: 'closeIssue must sign kind 1632 with the repository owner private key.',
+      nextSteps: ['Pass privkey (nsec or hex) for the repo owner.'],
+    };
+  }
   const issue = await getIssueById({ issueId, relays });
   if (issue.error) {
     return { success: false, error: issue.error, nextSteps: issue.nextSteps, reason: issue.reason };
@@ -1494,6 +1503,14 @@ async function reopenIssue(options) {
       error: 'issueId, ownerPubkey, repoId are required',
       reason: 'Cannot publish status without issue id, repo owner, and repo slug.',
       nextSteps: ['Pass issueId, ownerPubkey, repoId, and privkey.'],
+    };
+  }
+  if (!privkey) {
+    return {
+      success: false,
+      error: 'privkey is required',
+      reason: 'reopenIssue must sign kind 1630 with the repository owner private key.',
+      nextSteps: ['Pass privkey (nsec or hex) for the repo owner.'],
     };
   }
   const issue = await getIssueById({ issueId, relays });
@@ -1549,9 +1566,43 @@ async function markPullRequestMerged(options) {
       ],
     };
   }
+  if (!privkey) {
+    return {
+      success: false,
+      error: 'privkey is required',
+      reason: 'markPullRequestMerged must sign a kind 1631 event with the repository owner key.',
+      nextSteps: ['Pass privkey (nsec or hex) for the repo owner, or use mergePullRequest which requires the same.'],
+    };
+  }
+  const ownerHex = await gittrNostr.resolveRepoOwnerHex(ownerPubkey);
   const pr = await getPullRequestById({ prId, relays });
   if (pr.error) {
     return { success: false, error: pr.error, nextSteps: pr.nextSteps, reason: pr.reason };
+  }
+  const aVals = tagValuesAll(pr.event, 'a');
+  const aTag = aVals[0] || pr.event.tags.find((t) => t[0] === 'a')?.[1];
+  const am = aTag && /^30617:([0-9a-f]{64}):(.+)$/i.exec(aTag);
+  if (am) {
+    const prOwnerHex = am[1].toLowerCase();
+    const prRepoId = am[2];
+    if (prOwnerHex !== ownerHex) {
+      return {
+        success: false,
+        error: `ownerPubkey does not match PR a-tag owner (PR targets ${prOwnerHex.slice(0, 12)}…, you passed ${ownerHex.slice(0, 12)}…)`,
+        reason: 'Refusing to publish merge status for a PR that targets a different repository owner.',
+        nextSteps: ['Pass ownerPubkey that matches the PR 30617 a-tag.'],
+        prId,
+      };
+    }
+    if (prRepoId !== repoId) {
+      return {
+        success: false,
+        error: `repoId does not match PR a-tag (PR repo "${prRepoId}", you passed "${repoId}")`,
+        reason: 'Refusing to publish merge status when repo slug does not match the PR target.',
+        nextSteps: ['Pass repoId from the PR a-tag (30617:owner:repo).'],
+        prId,
+      };
+    }
   }
   let out;
   try {
@@ -1629,6 +1680,12 @@ async function gitTry(cmd, args, opts = {}) {
  * Full PR merge for agents: clone base repo, fetch PR head (from PR clone URLs + branch or tip commit),
  * merge into base branch, push merged tree to gittr bridge, publish 30618 + 1631 on Nostr.
  * Requires `git` on PATH. Set GITTR_MERGE_CLONE_DEPTH (default 80) to tune shallow clones.
+ * `git clone` / `git fetch` to gittr HTTPS git hosts send the same Nostr auth as `pushToBridge`
+ * (bridge push-challenge + signed kind 30617 for the repo in the URL), via `http.*.extraHeader`.
+ * Host list defaults to git.gittr.space, relay.ngit.dev, ngit-relay.nostrver.se, git.shakespeare.diy;
+ * override with `GITTR_GIT_AUTH_HOSTS` (comma-separated hostnames).
+ * **Authorization:** signer must be the repo owner, or allowed to merge per latest kind 30617 on relays
+ * (`merge_maintainers` if present — strict merge list; otherwise owner + `maintainers`).
  * Always returns an object (success true/false) with agent-oriented nextSteps / reason — does not throw.
  */
 async function mergePullRequest(options) {
@@ -1717,6 +1774,29 @@ async function mergePullRequest(options) {
       };
     }
 
+    try {
+      await gittrNostr.requireRepoActingAuthority({
+        ownerPubkey: ownerHex,
+        repoId,
+        privkey,
+        relays,
+        label: 'mergePullRequest',
+        tier: 'merge',
+      });
+    } catch (e) {
+      return {
+        success: false,
+        error: e.message,
+        reason: 'Merge requires the owner key, or a pubkey on 30617 merge_maintainers (if set), else owner + maintainers.',
+        nextSteps: [
+          'Use the repo owner nsec/hex, or be listed on the latest 30617 for this repo.',
+          'For merge-only delegates, owner publishes `merge_maintainers` on kind 30617 with your pubkey.',
+        ],
+        prId,
+        repoId,
+      };
+    }
+
     const headBranch = pr.branchName || 'main';
     const tipCommit = pr.commit && /^[0-9a-f]{7,40}$/i.test(pr.commit) ? pr.commit.toLowerCase() : null;
     const cloneUrls = [...new Set((pr.clone || []).filter(Boolean))];
@@ -1746,12 +1826,18 @@ async function mergePullRequest(options) {
     const depth = Math.max(10, Math.min(500, Number(process.env.GITTR_MERGE_CLONE_DEPTH || 80)));
     tmpRoot = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'gittr-mcp-merge-'));
     const workDir = path.join(tmpRoot, 'work');
+    const bridgeUrl = gittrNostr.config.bridgeUrl;
 
     let cloned = false;
     let lastCloneErr = null;
     for (const url of baseCloneCandidates) {
       try {
-        await gitTry('git', ['clone', '--depth', String(depth), url, workDir]);
+        const gitAuth = await gittrNostr.buildGitHttpsAuthGitConfigArgs({
+          httpsGitUrl: url,
+          privkey,
+          bridgeUrl,
+        });
+        await gitTry('git', [...gitAuth, 'clone', '--depth', String(depth), url, workDir]);
         cloned = true;
         break;
       } catch (e) {
@@ -1803,7 +1889,21 @@ async function mergePullRequest(options) {
     let mergeErr = null;
     for (const headUrl of cloneUrls) {
       try {
-        await gitTry('git', ['-C', workDir, 'fetch', '--depth', String(depth), headUrl, `${headBranch}:refs/gittr-merge-head`]);
+        const gitAuthHead = await gittrNostr.buildGitHttpsAuthGitConfigArgs({
+          httpsGitUrl: headUrl,
+          privkey,
+          bridgeUrl,
+        });
+        await gitTry('git', [
+          ...gitAuthHead,
+          '-C',
+          workDir,
+          'fetch',
+          '--depth',
+          String(depth),
+          headUrl,
+          `${headBranch}:refs/gittr-merge-head`,
+        ]);
         await gitTry('git', ['-C', workDir, 'merge', 'refs/gittr-merge-head', '--no-ff', '-m', mergeMessage || `Merge pull request ${prId.slice(0, 8)}`]);
         merged = true;
         break;
@@ -1814,7 +1914,21 @@ async function mergePullRequest(options) {
     if (!merged && tipCommit) {
       for (const headUrl of cloneUrls) {
         try {
-          await gitTry('git', ['-C', workDir, 'fetch', '--depth', String(depth), headUrl, tipCommit]);
+          const gitAuthHead = await gittrNostr.buildGitHttpsAuthGitConfigArgs({
+            httpsGitUrl: headUrl,
+            privkey,
+            bridgeUrl,
+          });
+          await gitTry('git', [
+            ...gitAuthHead,
+            '-C',
+            workDir,
+            'fetch',
+            '--depth',
+            String(depth),
+            headUrl,
+            tipCommit,
+          ]);
           await gitTry('git', ['-C', workDir, 'merge', 'FETCH_HEAD', '--no-ff', '-m', mergeMessage || `Merge pull request ${prId.slice(0, 8)}`]);
           merged = true;
           break;

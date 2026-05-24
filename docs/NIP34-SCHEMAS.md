@@ -15,7 +15,8 @@ Source: https://github.com/nostrability/schemata
 - `web` - Browsing URL (can be multiple)
 - `clone` - Git clone URL (can be multiple)
 - `relays` - Nostr relay URLs (can be multiple)
-- `maintainers` - Other recognized maintainer pubkeys
+- `maintainers` - Other recognized maintainer pubkeys (push + repo moderation when `merge_maintainers` is absent; see gittr-mcp `requireRepoActingAuthority`)
+- `merge_maintainers` - Optional. When present on the **latest** 30617, **only** the owner and these pubkeys may merge (kind 1631 / `mergePullRequest`). Omit this tag to allow everyone in `maintainers` to merge as well.
 - `r` with marker `"euc"` - Earliest unique commit ID
 - `t` - Hashtags/labels
 

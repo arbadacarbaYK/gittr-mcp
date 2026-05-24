@@ -106,12 +106,28 @@ const result = await gittr.createRepo({
 
 ---
 
+## MCP identity binding (mandatory, relay-backed)
+
+There is **no environment flag** to skip this. The MCP will not let a caller use one identity’s `privkey` while targeting another user’s repository unless that pubkey is **explicitly authorized on the owner’s latest kind 30617** as read from relays.
+
+| Action | Who may sign |
+|--------|----------------|
+| **`pushToBridge`** | Repository **owner**, or any hex pubkey listed on the latest 30617 **`maintainers`** tags (plus the event author). |
+| **`mergePullRequest`**, **`markPullRequestMerged`** (kind **1631**) | Repository **owner**, or — if the latest 30617 includes any **`merge_maintainers`** tag — **only** owner + pubkeys on those tags. If **`merge_maintainers` is absent**, merge follows the same set as push (owner + `maintainers`). |
+| **Other `publishStatusForRoot` kinds** (1630 reopen, 1632 close, 1633 draft) | Same rule as **push** (owner + `maintainers`). |
+
+Non-owners **must** pass **`repoId`** so the MCP can query `30617` with `#d` and `authors=[owner]`. If relays return no announcement, non-owner actions are **denied** (fail closed).
+
+Contributors who are **not** on `maintainers` / `merge_maintainers` can still open **PRs** (`createPR` signs as themselves; no repo-owner impersonation).
+
+---
+
 ## Security Benefits
 
-1. **No more unauthenticated pushes** — agents must prove they own the key
-2. **Rate limiting** — per-pubkey limits prevent abuse
-3. **Audit trail** — every push logged with pubkey
-4. **Ownership enforcement** — agents can only push to their own repos (unless collaborator)
+1. **No unauthenticated bridge pushes** — challenge + `Authorization: Nostr …` is always required when pushing.
+2. **No cross-repo identity confusion in the MCP** — owner actions require the owner’s key unless explicitly relaxed.
+3. **Rate limiting** — per-pubkey limits prevent abuse (bridge-side).
+4. **Audit trail** — pushes and signed events are attributable to a pubkey.
 
 ---
 

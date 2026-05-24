@@ -38,6 +38,132 @@ async function resolveRepoOwnerHex(ownerPubkey) {
   return s.toLowerCase();
 }
 
+/**
+ * Latest kind 30617 for this repo from relays (author = owner, d = repoId).
+ */
+async function fetchLatestRepo30617({ ownerPubkey, repoId, relays = config.relays }) {
+  const ownerHex = await resolveRepoOwnerHex(ownerPubkey);
+  const relaySet = buildReliabilityRelaySet(Array.isArray(relays) ? relays : []);
+  if (relaySet.length === 0) {
+    throw new Error('No relays configured to verify repository permissions (kind 30617).');
+  }
+  const pool = getPool();
+  const rid = String(repoId || '').trim();
+  if (!rid) return null;
+  const events = await pool.querySync(relaySet, {
+    kinds: [KIND_REPOSITORY],
+    authors: [ownerHex],
+    '#d': [rid],
+    limit: 40,
+  });
+  if (!Array.isArray(events) || events.length === 0) return null;
+  events.sort((a, b) => b.created_at - a.created_at);
+  return events[0];
+}
+
+function _hexPubkeysFromTagTail(tag) {
+  const out = [];
+  if (!Array.isArray(tag)) return out;
+  for (let i = 1; i < tag.length; i++) {
+    const h = normalizeOwnerPubkeyHexSync(tag[i]);
+    if (h) out.push(h);
+  }
+  return out;
+}
+
+/** Owner + `maintainers` tag pubkeys (NIP-34 optional maintainers on 30617). */
+function pushAuthorizedPubkeySetFrom30617(ev) {
+  const s = new Set();
+  if (!ev?.pubkey) return s;
+  s.add(ev.pubkey.toLowerCase());
+  for (const t of ev.tags || []) {
+    if (t[0] === 'maintainers') {
+      for (const h of _hexPubkeysFromTagTail(t)) s.add(h);
+    }
+  }
+  return s;
+}
+
+/**
+ * Pubkeys allowed to merge: if `merge_maintainers` exists on 30617, only owner + those
+ * (strict merge delegation). Otherwise owner + `maintainers` (same as push).
+ */
+function mergeAuthorizedPubkeySetFrom30617(ev) {
+  if (!ev?.pubkey) return new Set();
+  const owner = ev.pubkey.toLowerCase();
+  const mergeTags = (ev.tags || []).filter((t) => t[0] === 'merge_maintainers');
+  if (mergeTags.length === 0) {
+    return pushAuthorizedPubkeySetFrom30617(ev);
+  }
+  const s = new Set([owner]);
+  for (const t of mergeTags) {
+    for (const h of _hexPubkeysFromTagTail(t)) s.add(h);
+  }
+  return s;
+}
+
+/**
+ * Enforce on-chain repo ACL from latest owner-signed 30617:
+ * - Owner may always act.
+ * - Otherwise require a relay-visible 30617 and a pubkey on `maintainers` (push / issue status)
+ *   or on `merge_maintainers` when that tag is present (merge / merged status only).
+ * There is no environment bypass.
+ */
+async function requireRepoActingAuthority({
+  ownerPubkey,
+  repoId,
+  privkey,
+  relays = config.relays,
+  label = 'gittr',
+  tier = 'push',
+}) {
+  if (!privkey) {
+    throw new Error(`${label}: privkey is required.`);
+  }
+  const signerHex = getPublicKey(privkey).toLowerCase();
+  let ownerHex = normalizeOwnerPubkeyHexSync(ownerPubkey);
+  if (!ownerHex) ownerHex = await resolveRepoOwnerHex(ownerPubkey);
+  ownerHex = String(ownerHex || '').toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(ownerHex)) {
+    throw new Error(`${label}: could not resolve ownerPubkey to 64-char hex.`);
+  }
+  if (signerHex === ownerHex) {
+    return { mode: 'owner', ownerHex, tier };
+  }
+
+  const rid = repoId != null && String(repoId).trim() ? String(repoId).trim() : '';
+  if (!rid) {
+    throw new Error(
+      `${label}: repoId is required when the signer is not the repository owner ` +
+        '(load kind 30617 from relays and check maintainers / merge_maintainers tags).'
+    );
+  }
+
+  const repo30617 = await fetchLatestRepo30617({ ownerPubkey: ownerHex, repoId: rid, relays });
+  if (!repo30617) {
+    throw new Error(
+      `${label}: permission denied — no kind 30617 for this repo on relays ` +
+        `(author ${ownerHex.slice(0, 12)}…, d="${rid}"). Non-owners cannot act until the repo announcement is readable.`
+    );
+  }
+
+  const allowed =
+    tier === 'merge'
+      ? mergeAuthorizedPubkeySetFrom30617(repo30617)
+      : pushAuthorizedPubkeySetFrom30617(repo30617);
+
+  if (!allowed.has(signerHex)) {
+    const extra =
+      tier === 'merge'
+        ? ' Merge: if `merge_maintainers` is set on 30617, only those pubkeys plus the owner may merge; otherwise owner + `maintainers` may merge.'
+        : ' Push / repo status: only pubkeys on the `maintainers` tag (plus the owner) may act without being the owner.';
+    throw new Error(
+      `${label}: permission denied — this key is not authorized (${tier}) for this repository.${extra}`
+    );
+  }
+  return { mode: 'maintainer', ownerHex, repo30617Id: repo30617.id, tier };
+}
+
 // Relay pool (singleton)
 let pool = null;
 
@@ -533,7 +659,19 @@ async function publishStatusForRoot(options) {
   if (![1630, 1631, 1632, 1633].includes(statusKind)) {
     throw new Error('statusKind must be 1630–1633');
   }
+  if (!privkey) {
+    throw new Error('publishStatusForRoot: privkey is required to sign status events.');
+  }
   const ownerHex = await resolveRepoOwnerHex(ownerPubkey);
+  const statusTier = statusKind === 1631 ? 'merge' : 'push';
+  await requireRepoActingAuthority({
+    ownerPubkey: ownerHex,
+    repoId,
+    privkey,
+    relays,
+    label: 'publishStatusForRoot',
+    tier: statusTier,
+  });
   const rootAuthorHex = await resolveRepoOwnerHex(rootEventAuthor);
   const revAuthorHex = revisionAuthor ? await resolveRepoOwnerHex(revisionAuthor) : null;
   const sk = privkeyToUint8Array(privkey);
@@ -804,43 +942,126 @@ function buildSignedAuthEventHeader({ repo, privkey }) {
   return Buffer.from(JSON.stringify(signed), 'utf8').toString('base64');
 }
 
+/** Repo id from https://host/<npub|hex>/<repo>.git path (last segment). */
+function repoSlugFromHttpsGitUrl(httpsGitUrl) {
+  try {
+    const u = new URL(httpsGitUrl);
+    const segs = u.pathname.replace(/^\//, '').split('/').filter(Boolean);
+    if (!segs.length) return '';
+    return segs[segs.length - 1].replace(/\.git$/i, '');
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Same Nostr auth as pushToBridge, passed to git via http.extraHeader so clone/fetch
+ * to gittr HTTPS git hosts are authenticated (matches bridge + UI expectation).
+ */
+async function buildGitHttpsAuthGitConfigArgs({ httpsGitUrl, privkey, bridgeUrl = config.bridgeUrl }) {
+  if (!httpsGitUrl) return [];
+  let hostname;
+  try {
+    const u = new URL(String(httpsGitUrl).trim());
+    if (u.protocol !== 'https:') return [];
+    hostname = u.hostname.toLowerCase();
+  } catch {
+    return [];
+  }
+  const allow = (process.env.GITTR_GIT_AUTH_HOSTS ||
+    'git.gittr.space,relay.ngit.dev,ngit-relay.nostrver.se,git.shakespeare.diy'
+  )
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  if (!allow.includes(hostname)) return [];
+
+  if (!privkey) {
+    throw new Error(
+      `Git HTTPS auth: privkey is required for signed git traffic to ${hostname} (no anonymous clone/fetch).`
+    );
+  }
+
+  const repoSlug = repoSlugFromHttpsGitUrl(httpsGitUrl);
+  if (!repoSlug) {
+    throw new Error(`Git HTTPS auth: could not parse repo id from URL: ${httpsGitUrl}`);
+  }
+
+  const pubkeyHex = getPublicKey(privkey);
+  let authHeader = getCachedAuth(bridgeUrl, pubkeyHex);
+  if (!authHeader) {
+    let challengeData;
+    try {
+      challengeData = await getBridgeChallenge(bridgeUrl);
+    } catch (e) {
+      throw new Error(
+        `Git HTTPS auth: could not reach bridge push-challenge at ${bridgeUrl}: ${e?.message || e}`
+      );
+    }
+    if (!challengeData?.challenge) {
+      throw new Error(
+        `Git HTTPS auth: bridge did not return a challenge (${bridgeUrl}/api/nostr/repo/push-challenge)`
+      );
+    }
+    const auth = await signChallenge(challengeData.challenge, privkey);
+    authHeader = Buffer.from(
+      JSON.stringify({
+        pubkey: auth.pubkey,
+        sig: auth.sig,
+        created_at: auth.created_at,
+      })
+    ).toString('base64');
+    setCachedAuth(bridgeUrl, pubkeyHex, authHeader);
+  }
+
+  const xNostr = buildSignedAuthEventHeader({ repo: repoSlug, privkey });
+  const key = `http.https://${hostname}/.extraHeader`;
+  const authorization = `Authorization: Nostr ${authHeader}`;
+  return ['-c', `${key}=${authorization}`, '-c', `${key}=X-Nostr-Auth-Event: ${xNostr}`];
+}
+
 // Push files to bridge - REQUIRES privkey for authentication
 async function pushToBridge({ ownerPubkey, repo, branch, files, commitMessage, privkey }) {
   if (!privkey) {
     throw new Error('Authentication required: privkey must be provided. The bridge now requires Nostr authentication.');
   }
 
+  await requireRepoActingAuthority({
+    ownerPubkey,
+    repoId: repo,
+    privkey,
+    relays: config.relays,
+    label: 'pushToBridge',
+    tier: 'push',
+  });
+
   const pubkeyHex = getPublicKey(privkey);
   let authHeader = getCachedAuth(config.bridgeUrl, pubkeyHex);
 
   if (!authHeader) {
-    let challengeData;
-    let useAuth = true;
-    try {
-      challengeData = await getBridgeChallenge(config.bridgeUrl);
-    } catch (e) {
-      useAuth = false;
+    const challengeData = await getBridgeChallenge(config.bridgeUrl);
+    if (!challengeData?.challenge) {
+      throw new Error(
+        `pushToBridge: bridge did not return a push challenge (${config.bridgeUrl}/api/nostr/repo/push-challenge). ` +
+          'Refusing push without signed challenge authentication.'
+      );
     }
-    if (useAuth && challengeData?.challenge) {
-      const auth = await signChallenge(challengeData.challenge, privkey);
-      const authPayload = JSON.stringify({
-        pubkey: auth.pubkey,
-        sig: auth.sig,
-        created_at: auth.created_at
-      });
-      authHeader = Buffer.from(authPayload).toString('base64');
-      setCachedAuth(config.bridgeUrl, pubkeyHex, authHeader);
-    }
+    const auth = await signChallenge(challengeData.challenge, privkey);
+    const authPayload = JSON.stringify({
+      pubkey: auth.pubkey,
+      sig: auth.sig,
+      created_at: auth.created_at,
+    });
+    authHeader = Buffer.from(authPayload).toString('base64');
+    setCachedAuth(config.bridgeUrl, pubkeyHex, authHeader);
   }
 
   const headers = {
     'Content-Type': 'application/json',
     // ngit bridge prefers this signed 30617 event auth path
-    'X-Nostr-Auth-Event': buildSignedAuthEventHeader({ repo, privkey })
+    'X-Nostr-Auth-Event': buildSignedAuthEventHeader({ repo, privkey }),
+    Authorization: `Nostr ${authHeader}`,
   };
-  if (authHeader) {
-    headers['Authorization'] = `Nostr ${authHeader}`;
-  }
 
   const doPush = () => fetch(`${config.bridgeUrl}/api/nostr/repo/push`, {
     method: 'POST',
@@ -1035,6 +1256,10 @@ module.exports = {
   resolveRepoOwnerHex,
   verifyEventOnRelays,
   waitForEventVisibility,
+  buildGitHttpsAuthGitConfigArgs,
+  repoSlugFromHttpsGitUrl,
+  requireRepoActingAuthority,
+  fetchLatestRepo30617,
 
   // Event kinds
   KIND_REPOSITORY,

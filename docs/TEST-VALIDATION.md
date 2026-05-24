@@ -68,6 +68,8 @@ GITTR_TEST_NSEC=nsec1... npm run test:live:matrix
 
 **Single-repo happy path including close + merge:** `HAPPY_PATH_LIVE=1 GITTR_TEST_NSEC=… npm run test:happy-path:live`
 
+`mergePullRequest` runs `git clone` / `git fetch` with the same signed Nostr HTTPS headers as `pushToBridge` (bridge push-challenge plus `X-Nostr-Auth-Event` for the repo slug in each URL). Hosts default to git.gittr.space and the usual ngit relays; set `GITTR_GIT_AUTH_HOSTS` (comma-separated) if your git remote uses another hostname.
+
 Run validation yourself:
 
 ```bash
