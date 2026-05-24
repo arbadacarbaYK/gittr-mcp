@@ -1,37 +1,107 @@
 # gittr-mcp
 
-**MCP (stdio) for [gittr.space](https://gittr.space)** — agents use your **Nostr key** to push over the bridge, open issues/PRs, merge with git, and handle **Lightning** paywalls/bounties. No vendor login: same identity as the website.
+**Let your AI agent (or app) use [gittr.space](https://gittr.space) like a developer would** — create repos, push code, open and merge pull requests, manage issues, and work with Lightning bounties — using your **Nostr identity**, not a GitHub login.
 
-| Capability | Notes |
-|------------|--------|
-| Repos, bridge push, issues | Supported end-to-end |
-| HTTPS `git clone` | **Pass/fail per URL:** only counts as success if `git clone` (or `git ls-remote`) works on the **`clone` URL you published**. Use **`https://git.gittr.space/<hex-pubkey>/repo.git`** unless you know another URL serves git HTTP. |
-| PRs | MCP sends signed events; **relays** may reject if they cannot validate commits—[docs/DEVELOPER.md#limitations](docs/DEVELOPER.md#limitations). |
-
-**Relays / rate limits** can still lag or throttle; tool responses often include `nextSteps` and `reason` for automation.
-
-### What “success” means (no mixed signals)
-
-Each step **either succeeded or it did not**. There is no third state like “bridge happy but git irrelevant.”
-
-| Step | Pass / fail | How you know |
-|------|----------------|--------------|
-| **Bridge push** | Pass only if the API returns success and you got refs/commits. | Tool response / HTTP error. |
-| **Publish to relays (30617 / 30618)** | Pass only if events were accepted and show up as you expect. | Tool response; relay errors are **fail** for that step. |
-| **`git clone` using your published `clone` URL** | Pass only if `git clone` (or `git ls-remote`) against **that exact URL** works. | Exit code 0. **404 / “not a repository” = fail** for *that* step — your announcement points at a URL that is **not** serving git HTTP for that path. |
-
-So: a **failed `git clone`** is a **failed clone step**, full stop. It does **not** rewrite history on the bridge push; it means **your repo metadata (the `clone` URL in 30617) is wrong for people who use stock `git` over HTTPS.** Fix the URL (this MCP defaults toward **`https://git.gittr.space/<hex-pubkey>/repo.git`**) and re-publish — then re-check `git clone` until that step **passes**.
-
-**Why `relay.ngit.dev` URLs confused people:** some `https://relay.ngit.dev/…/repo.git` shapes are **not** a public git HTTP endpoint for that path (relay ≠ same as “git smart HTTP on this URL”). If clone fails there, treat it as **wrong clone URL for `git`**, not as “everything else magically OK.”
+Works with **Cursor**, **Claude Desktop**, **VS Code / Copilot MCP**, **Windsurf**, **OpenClaw**, or any host that speaks the [Model Context Protocol](https://modelcontextprotocol.io/) over stdio.
 
 ---
 
-## If you are not a developer (“just make it work”)
+## Why use this?
 
-1. Install [Node 18+](https://nodejs.org/).  
-2. Clone this repo and run **`npm install`** (or **`npm ci`** if you develop here).  
-3. **`cp .nostr-keys.json.example .nostr-keys.json`** and put your **`nsec`** (or hex private key) in that file. It stays on your machine only (gitignored).  
-4. In **Cursor**: open MCP config and **add** a server (do not erase your other MCPs). Example:
+| Without gittr-mcp | With gittr-mcp |
+|-------------------|----------------|
+| You copy-paste between chat and the gittr website | The agent calls tools: push files, publish repo metadata, open issues/PRs |
+| Custom scripts for NIP-98 bridge auth and NIP-34 signing | Signing, challenge handling, and relay checks are built in |
+| Unclear whether a push “really” landed on Nostr | Tools return pass/fail plus `verification` / `nextSteps` for automation |
+
+**End result:** one MCP server connects your agent to **decentralized git on Nostr** — same account as on gittr.space (`nsec` / keys file), no separate vendor account for the agent.
+
+---
+
+## What you can do (workflows)
+
+These are the **processes** people actually run; each maps to MCP tools the agent can call.
+
+### Ship a new project
+1. **`createRepo`** — push initial files to the bridge **and** publish Nostr kinds **30617** + **30618** in one step (best default for agents).  
+2. Or step-by-step: **`pushToBridge`** → **`publishRepoAnnouncement`** → **`publishRepoState`**.
+
+### Day-to-day development
+- **`pushToBridge`** — update files on a branch (NIP-98 auth to gittr bridge).  
+- **`getFile`**, **`bridgeListFiles`**, **`bridgeGetFileContent`**, **`getBranches`**, **`getCommitHistory`** — read repo state without cloning.  
+- **`resolveRepoByNostrId`** — find clone URLs and relays from npub + repo name.
+
+### Issues (bug reports, tasks)
+- **`listIssues`**, **`createIssue`**, **`getIssueById`**  
+- **`closeIssue`**, **`reopenIssue`** — publish NIP-34 status events (1632 / 1630).
+
+### Pull requests (code review flow)
+| Step | Tool | Notes |
+|------|------|--------|
+| List / open PR | **`listPRs`**, **`createPR`** | Signed Nostr events (kind **1618**). |
+| Full PR with git branches | **`createPRViaGittrCLI`** | Recommended when the agent has **`git`** on PATH. |
+| Update PR tip | **`updatePullRequest`** | New commit + clone URLs on the PR event. |
+| Merge into `main` | **`mergePullRequest`** | **Real git merge**: clone/fetch, merge, push bridge, publish **30618** + merged status **1631**. Repo owner or listed maintainer; **`git` required**. |
+| Mark merged (Nostr only) | **`markPullRequestMerged`** | Status only — no git merge. |
+
+**Honest limits on PRs:** Creating and listing PRs via MCP is supported. **Merging** needs **`git`** installed and permission on the repo. Some relays are strict about **clone URL + relay** matching in repo announcements — if PR publish fails, fix metadata (see [Limitations](#limitations-prs--clone-urls)) or use **`createPRViaGittrCLI`**. Details: [docs/DEVELOPER.md#limitations](docs/DEVELOPER.md#limitations).
+
+### Fork, mirror, import
+- **`forkRepo`** — fork an existing gittr repo under your key.  
+- **`mirrorRepo`** — copy from GitHub/GitLab URL to gittr.  
+- **`importRemoteToBridge`** — server-side import/refetch into bridge storage.
+
+### Discover & social
+- **`listRepos`**, **`searchRepos`**, **`myRepos`**, **`exploreRepos`**, **`getTrendingRepos`**  
+- **`starRepo`**, **`unstarRepo`**, **`listStars`**, **`watchRepo`**, **`getRepoContributors`**
+
+### Releases
+- **`createRelease`**, **`listReleases`**
+
+### Lightning bounties & pay-to-push
+- Bounties: **`listBounties`**, **`createBountyInvoice`**, **`publishBountyToNostr`**, **`submitBounty`**, **`listBountiesForIssue`**, release/withdraw tools.  
+- Paywall: **`getPushPaywallStatus`**, **`createPushPaywallIntent`**, **`syncRepoPushPolicy`**.  
+- Optional LNbits: set **`GITTR_LNBITS_URL`** and **`GITTR_LNBITS_ADMIN_KEY`** in MCP env (see `.env.example`).
+
+### Session / keys
+- **`describeAgentAuth`** — run once: confirms keys load (never returns `nsec`).  
+- **`loadCredentials`**, **`getPublicKey`** — debugging helpers.
+
+**Full tool list:** 50+ tools in `server.js` (search for `name:`). Library API: [docs/DEVELOPER.md](docs/DEVELOPER.md).
+
+---
+
+## Install (5 minutes)
+
+### Requirements
+- **Node.js 18+**
+- A **Nostr private key** (`nsec` or hex) — same identity you use on gittr.space
+
+### 1. Get the server
+
+```bash
+git clone https://github.com/arbadacarbaYK/gittr-mcp.git
+cd gittr-mcp
+npm install
+```
+
+### 2. Add your key (local only, never commit)
+
+```bash
+cp .nostr-keys.json.example .nostr-keys.json
+```
+
+Edit `.nostr-keys.json` and set your **`nsec`** (or hex `secretKey`). The file is gitignored.
+
+Lookup order: `./.nostr-keys.json` → `~/.nostr-identity.json` → `~/.config/gittr/keys.json`.
+
+### 3. Wire up your MCP host
+
+**Important:** **Add** a new server entry — do **not** replace your entire MCP config.
+
+#### Cursor
+
+Edit `~/.cursor/mcp.json` (or project MCP settings). Use an **absolute** path:
 
 ```json
 {
@@ -39,67 +109,101 @@ So: a **failed `git clone`** is a **failed clone step**, full stop. It does **no
     "gittr": {
       "command": "node",
       "args": ["/ABSOLUTE/PATH/TO/gittr-mcp/server.js"],
-      "env": { "BRIDGE_URL": "https://gittr.space" }
+      "env": {
+        "BRIDGE_URL": "https://gittr.space"
+      }
     }
   }
 }
 ```
 
-5. Restart / reload MCP. Ask the agent to run **`describeAgentAuth`** once to confirm keys load.
+Reload MCP or restart Cursor.
 
-**Other apps** (Claude Desktop, Windsurf, OpenClaw, …): same stdio idea — [docs/MCP-HOSTS.md](docs/MCP-HOSTS.md).
+#### Claude Desktop
+
+Quit Claude, edit `claude_desktop_config.json` (path depends on OS — see Anthropic docs), same `mcpServers` block as above, restart.
+
+#### VS Code / Copilot, Windsurf, OpenClaw, custom apps
+
+Same stdio contract: `command`: `node`, `args`: `["/path/to/server.js"]`, optional `env`.  
+OpenClaw / mcporter: [docs/MCP-HOSTS.md](docs/MCP-HOSTS.md).
+
+#### Embed as a library (no MCP)
+
+```javascript
+const gittr = require('gittr-mcp');
+await gittr.pushToBridge({ /* ... */ });
+```
+
+Entry point: `index.js`. MCP process: `server.js` (npm bin **`gittr-mcp`**).
+
+### 4. Verify
+
+In chat, ask the agent to call **`describeAgentAuth`**, or from the repo:
+
+```bash
+npm test
+```
 
 ---
 
-## If you develop or script against this repo
+## What to ask your agent
+
+Examples that map to the workflows above:
+
+- “Create a repo `my-demo` with a README and publish it on gittr.”  
+- “Push these file changes to `my-demo` on `main`.”  
+- “Open an issue: login button broken.”  
+- “List open PRs on npub…/my-demo and merge PR `<id>` if I’m the owner.”  
+- “Mirror `https://github.com/user/repo` to gittr as `repo-name`.”
+
+Agents should read tool results as JSON; many responses include **`agentSummary`** and **`nextSteps`**.
+
+---
+
+## Limitations (PRs & clone URLs)
+
+Short version — full detail in [docs/DEVELOPER.md](docs/DEVELOPER.md):
+
+1. **Bridge push** and **Nostr publish** are separate steps unless you use **`createRepo`**. Pushing alone does not make the repo visible everywhere.  
+2. **`git clone`** only “works” for others if your published **`clone`** URL serves git HTTP. This MCP defaults toward **`https://git.gittr.space/<hex-pubkey>/<repo>.git`**. A failed clone means fix the URL in **30617**, not “ignore and continue.”  
+3. **`mergePullRequest`** needs **`git`** on the machine running MCP and maintainer/owner rights.  
+4. Relays can rate-limit or lag; failed verification is a **failed** publish, not “maybe OK.”
+
+---
+
+## For developers
 
 ```bash
-git clone https://github.com/arbadacarbaYK/gittr-mcp.git
-cd gittr-mcp
-npm ci          # reproducible install (uses package-lock.json)
-npm test        # smoke + happy-path dry-run
-```
-
-- **Library entry:** `require('gittr-mcp')` → `index.js`. **MCP process:** `server.js` (also **`gittr-mcp`** npm bin).  
-- **Reference:** [docs/DEVELOPER.md](docs/DEVELOPER.md) (API, GRASP, errors), [docs/AGENT-WORKFLOW.md](docs/AGENT-WORKFLOW.md), [docs/SIGNING-GUIDE.md](docs/SIGNING-GUIDE.md), [docs/NIP34-SCHEMAS.md](docs/NIP34-SCHEMAS.md).  
-- **Doc index:** [docs/README.md](docs/README.md).  
-- **Agent errors:** failed publish/verify paths return JSON with **`verification`** (`confirmed`, `confirmedOnRelays`, `missingOnRelays`, `elapsedMs`) — not ambiguous text. Tune **`GITTR_RELAY_VERIFY_TIMEOUT_MS`** / **`GITTR_DISCOVERABILITY_TIMEOUT_MS`** via `.env.example`.
-
-**Live integration tests** (real relays; optional LNbits): see `.env.example` — use **`GITTR_TEST_NSEC`** / **`GITTR_TEST_PRIVKEY`**, never commit keys.
-
-**Prove admin tools (close issue + merge PR + git):** same keys, **`git` on PATH**, then:
-
-```bash
+npm ci
+npm test
+# Live tests (real relays; optional LNbits) — see .env.example
 GITTR_TEST_NSEC=nsec1... npm run test:live:matrix
-# or the same script:
-GITTR_TEST_NSEC=nsec1... npm run test:live:admin
 ```
 
-To only skip the git merge section: `GITTR_SKIP_MERGE_LIFECYCLE=1`.
-
-```bash
-HAPPY_PATH_LIVE=1 GITTR_TEST_NSEC=nsec1... npm run test:happy-path:live
-```
-
----
-
-## What the MCP exposes (summary)
-
-Auth helpers, repo lifecycle (`createRepo`, `pushToBridge`, publish **30617/30618**), bridge file/ref APIs, issues/PRs/merge, push paywall intents, bounties, relay overrides. Full tool list is in **`server.js`**.
+| Doc | Contents |
+|-----|----------|
+| [docs/MCP-HOSTS.md](docs/MCP-HOSTS.md) | Per-host MCP config |
+| [docs/AGENT-WORKFLOW.md](docs/AGENT-WORKFLOW.md) | Step-by-step push + publish |
+| [docs/AGENT-QUICKSTART.md](docs/AGENT-QUICKSTART.md) | Copy-paste agent prompts |
+| [docs/DEVELOPER.md](docs/DEVELOPER.md) | API, verification contract, GRASP |
+| [docs/SIGNING-GUIDE.md](docs/SIGNING-GUIDE.md) | Keys and NIP-98 |
+| [docs/NIP34-SCHEMAS.md](docs/NIP34-SCHEMAS.md) | Event kinds |
 
 ---
 
 ## Security
 
-- Do **not** commit `.nostr-keys.json` or real env secrets. Only **`.nostr-keys.json.example`** belongs in git.  
-- Bridge auth is **NIP-98**; treat transcripts as sensitive.
+- Do **not** commit `.nostr-keys.json`, `.env`, or real `nsec` values.  
+- Bridge auth uses **NIP-98**; treat agent transcripts as sensitive.  
+- Only **`.nostr-keys.json.example`** belongs in git.
 
 ---
 
-## Support & links
+## Links
 
-- **Repo:** https://github.com/arbadacarbaYK/gittr-mcp  
-- **gittr:** https://gittr.space  
-- **NIP-34:** https://github.com/nostr-protocol/nips/blob/master/34.md  
+- **This repo:** https://github.com/arbadacarbaYK/gittr-mcp  
+- **gittr.space:** https://gittr.space  
+- **NIP-34 (git on Nostr):** https://github.com/nostr-protocol/nips/blob/master/34.md  
 
 MIT License.
