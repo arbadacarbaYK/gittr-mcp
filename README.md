@@ -69,7 +69,8 @@ These are the **processes** people actually run; each maps to MCP tools the agen
 - Optional LNbits: set **`GITTR_LNBITS_URL`** and **`GITTR_LNBITS_ADMIN_KEY`** in MCP env (see `.env.example`).
 
 ### Session / keys
-- **`describeAgentAuth`** — run once: confirms keys load (never returns `nsec`).  
+- **`describeAgentAuth`** — run once: confirms keys load (never returns `nsec`); if unconfigured it tells the agent to ask you about a test keypair.  
+- **`setupTestKeypair`** — after your explicit OK, writes a disposable test identity to `.nostr-keys.json` (replace with your real `nsec` anytime).  
 - **`loadCredentials`**, **`getPublicKey`** — debugging helpers.
 
 **Full tool list:** 50+ tools in `server.js` (search for `name:`). Library API: [docs/DEVELOPER.md](docs/DEVELOPER.md).
@@ -99,6 +100,8 @@ cp .nostr-keys.json.example .nostr-keys.json
 Edit `.nostr-keys.json` and set your **`nsec`** (or hex `secretKey`). The file is gitignored.
 
 Lookup order: `./.nostr-keys.json` → `~/.nostr-identity.json` → `~/.config/gittr/keys.json`.
+
+**No key yet? Test keypair flow.** If no credentials are found, `describeAgentAuth` and all key-missing errors tell the agent to ask you whether a disposable **test keypair** should be created. If you agree, the agent calls **`setupTestKeypair({ confirm: true })`** — it writes a fresh identity into `.nostr-keys.json` (flagged `"generated": true`, file mode 600, never committed) and everything auto-loads it from then on. Replace the `nsec` in that file with your real key whenever you're ready; `describeAgentAuth` keeps reminding the agent that a test key is active. It never runs without `confirm: true` and never overwrites existing credentials unless you explicitly ask for `force: true` — anything published under a keypair stays under that identity forever, so this is always your call, not the agent's.
 
 ### 3. Wire up your MCP host
 

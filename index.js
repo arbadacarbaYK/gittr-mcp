@@ -42,6 +42,7 @@ module.exports = {
 
   // Agent-friendly convenience functions
   describeAgentAuth: gittrAgent.describeAgentAuth,
+  setupTestKeypair: gittrAgent.setupTestKeypair,
   createRepo: gittrAgent.createRepo,
   getRepo: gittrAgent.getRepo,
   resolveRepoByNostrId: gittrAgent.resolveRepoByNostrId,

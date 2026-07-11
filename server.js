@@ -183,6 +183,18 @@ const tools = [
     inputSchema: { type: 'object', properties: {} },
   },
   {
+    name: 'setupTestKeypair',
+    description:
+      'Create a disposable TEST Nostr keypair and write .nostr-keys.json so all tools auto-load it. ASK THE USER FIRST — a keypair is a permanent Nostr identity. Without confirm:true this only returns the question to ask. Never overwrites real credentials unless force:true.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        confirm: { type: 'boolean', description: 'Must be true after the user explicitly agreed to use a test keypair' },
+        force: { type: 'boolean', description: 'Overwrite an existing keys file (only if the user asked for a fresh test identity)' },
+      },
+    },
+  },
+  {
     name: 'forkRepo',
     description: 'Fork an existing repository',
     inputSchema: {
@@ -1051,6 +1063,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case 'describeAgentAuth':
         result = gittr.describeAgentAuth();
+        break;
+      case 'setupTestKeypair':
+        result = gittr.setupTestKeypair(args);
         break;
       case 'updatePullRequest':
         result = await gittr.updatePullRequest(args);

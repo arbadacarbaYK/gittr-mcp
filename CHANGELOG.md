@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.2 (2026-07-12)
+
+### Features
+- New `setupTestKeypair` tool: consent-gated creation of a disposable test identity written to `.nostr-keys.json` (`generated: true`, mode 600). Requires `confirm: true`; never overwrites existing credentials without `force: true`; never returns the `nsec` to the agent.
+- `describeAgentAuth` now guides the agent when unconfigured (`askUser` prompt: real nsec vs. test keypair) and flags an active generated key (`generatedTestKey` + reminder to swap in the real key).
+- All "Private key required" errors now include the full recovery path (pass privkey / keys file / consent-gated test keypair).
+
+### Tests
+- Added `tests/setup-test-keypair.test.js` covering the ask→confirm→create→refuse-overwrite→force flow in an isolated temp HOME.
+
 ## 1.0.1 (2026-02-16)
 
 ### Features
