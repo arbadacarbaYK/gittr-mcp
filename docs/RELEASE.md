@@ -1,54 +1,51 @@
 # Releasing gittr-mcp
 
-The `.mcpb` file is a **snapshot bundle** for Claude Desktop / Smithery — not a symlink to the repo.
+The `.mcpb` is a **snapshot bundle** (not a symlink). Releases are **automatic** — you should not need to remember `npm run release`.
 
-## After you change gittr-mcp
+## Recommended: bump version (fully automatic)
 
-### Every push to `main`
+```bash
+npm version patch   # or minor / major
+```
 
-CI (when workflows are on GitHub) runs tests and verifies the MCPB **builds**. No upload yet.
+That single command:
 
-### When you want a new `.mcpb` on GitHub Releases
+1. Runs tests
+2. Bumps `package.json` and syncs `server.json` + `mcpb/manifest.json`
+3. Commits and tags `vX.Y.Z`
+4. Builds the `.mcpb`
+5. Pushes `main` + tag to GitHub
+6. Creates/updates the GitHub Release and uploads `gittr-mcp-X.Y.Z.mcpb`
 
-1. Bump **`version`** in `package.json` (+ `CHANGELOG.md` entry).
-2. Commit and push `main`.
-3. Run **one command** (uses your `GITHUB_PLATFORM_TOKEN` — no browser needed):
+Uses `GITHUB_PLATFORM_TOKEN` from your environment or `../gittr/.env`.
+
+## Safety net: git hook after any commit
+
+On `npm install`, hooks install automatically (`prepare` script).
+
+If you **manually** change `version` in `package.json` and commit, the **post-commit hook** checks GitHub — if the `.mcpb` asset is missing, it runs the release upload for you.
+
+Skip once: `GITTR_MCP_SKIP_AUTO_RELEASE=1 git commit ...`
+
+## Manual release (same as auto)
 
 ```bash
 npm run release
 ```
 
-That will:
-
-- Run tests
-- Build `dist/gittr-mcp-<version>.mcpb` and `gittr-mcp-<version>.mcpb` (repo root, for Google form uploads)
-- Create git tag `v<version>` and push it
-- Create/update the GitHub Release and attach the `.mcpb`
-
-### Build only (no GitHub upload)
+## Local `.mcpb` only (no GitHub)
 
 ```bash
 npm run build:mcpb
 ```
 
-Outputs:
+Creates:
 
 - `dist/gittr-mcp-<version>.mcpb`
-- `gittr-mcp-<version>.mcpb` in repo root (gitignored)
+- `gittr-mcp-<version>.mcpb` in repo root (for Google form uploads)
 
-`npm run sync-versions` aligns `server.json` and `mcpb/manifest.json` with `package.json`.
+## Future: GitHub Actions
 
-## Optional: fully automatic on GitHub (needs `workflow` PAT once)
+`.github/workflows/release.yml` is ready locally. When a PAT with **`workflow`** scope can push it, tag pushes will also run in CI (redundant with the above until then).
 
-The repo includes `.github/workflows/release.yml` — on every `v*` tag push, GitHub Actions builds the MCPB, attaches it to the release, and (optionally) publishes npm + MCP Registry.
-
-Your current PAT cannot push workflow files. To enable:
-
-1. Regenerate GitHub PAT with **`workflow`** scope, or
-2. Paste `.github/workflows/release.yml` and the updated `ci.yml` via the GitHub web UI once.
-
-Until then, **`npm run release`** does the same GitHub upload via API.
-
-## One-time secrets (optional)
-
-- **`NPM_TOKEN`** on GitHub: auto `npm publish` from Actions when workflows are enabled.
+Optional: add **`NPM_TOKEN`** secret for npm publish from Actions.

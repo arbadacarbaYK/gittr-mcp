@@ -28,7 +28,11 @@
     "build:mcpb": "node scripts/build-mcpb.js",
     "prebuild:mcpb": "node scripts/sync-versions.js",
     "release": "bash scripts/publish-release.sh",
-    "release:prepare": "npm test && npm run build:mcpb"
+    "release:prepare": "npm test && npm run build:mcpb",
+    "preversion": "npm test",
+    "version": "node scripts/sync-versions.js && git add server.json mcpb/manifest.json",
+    "postversion": "npm run build:mcpb && bash scripts/publish-release.sh --skip-test --skip-tag",
+    "prepare": "bash scripts/install-git-hooks.sh"
   },
   "keywords": [
     "gittr",
