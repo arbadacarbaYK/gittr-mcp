@@ -1,14 +1,23 @@
 {
   "name": "gittr-mcp",
   "version": "1.0.2",
+  "mcpName": "io.github.arbadacarbaYK/gittr-mcp",
   "description": "Model Context Protocol server for gittr.space - Git on Nostr",
   "main": "index.js",
+  "files": [
+    "*.js",
+    "docs",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    ".nostr-keys.json.example"
+  ],
   "bin": {
     "gittr-mcp": "./server.js"
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node tests/smoke.js && node tests/setup-test-keypair.test.js && node scripts/agent-happy-path.js",
+    "test": "node tests/smoke.js && node tests/setup-test-keypair.test.js && node tests/public-read-tags.test.js && node scripts/agent-happy-path.js",
     "test:smoke": "node tests/smoke.js",
     "test:happy-path": "node scripts/agent-happy-path.js",
     "test:happy-path:live": "HAPPY_PATH_LIVE=1 node scripts/agent-happy-path.js",

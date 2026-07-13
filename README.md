@@ -1,5 +1,7 @@
 # gittr-mcp
 
+<!-- mcp-name: io.github.arbadacarbaYK/gittr-mcp -->
+
 **Let your AI agent (or app) use [gittr.space](https://gittr.space) like a developer would** — create repos, push code, open and merge pull requests, manage issues, and work with Lightning bounties — using your **Nostr identity**, not a GitHub login.
 
 Works with **Cursor**, **Claude Desktop**, **VS Code / Copilot MCP**, **Windsurf**, **OpenClaw**, or any host that speaks the [Model Context Protocol](https://modelcontextprotocol.io/) over stdio.
@@ -24,7 +26,15 @@ These are the **processes** people actually run; each maps to MCP tools the agen
 
 ### Ship a new project
 1. **`createRepo`** — push initial files to the bridge **and** publish Nostr kinds **30617** + **30618** in one step (best default for agents).  
+   Pass **`publicRead: false`** to create a **private** repo (code/clone/API/SSH readable only by you and listed maintainers). The announcement name/description still appear on relays — only file access is gated.  
 2. Or step-by-step: **`pushToBridge`** → **`publishRepoAnnouncement`** → **`publishRepoState`**.
+
+### Private repositories
+- Set **`publicRead: false`** on **`createRepo`**, **`publishRepoAnnouncement`**, **`forkRepo`**, or **`mirrorRepo`**.
+- Private repos are **hidden from Explore/home/profile listings** for strangers.
+- **Direct URL** still shows the repo name with a **Private** badge; unauthorized viewers see a lock screen (no code).
+- **SSH / CLI / API reads** use the same ACL as the web UI: your **npub** must be owner or maintainer (`addCollaborator` or Settings → Contributors on gittr.space).
+- **SSH key registration** is unchanged — keys identify *you*; private repos only check whether *your pubkey* has read permission.
 
 ### Day-to-day development
 - **`pushToBridge`** — update files on a branch (NIP-98 auth to gittr bridge).  

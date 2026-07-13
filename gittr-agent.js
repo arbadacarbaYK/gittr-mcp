@@ -293,6 +293,8 @@ async function createRepo(options) {
       pushCostSats,
       forkedFrom: options.forkedFrom,
       source: options.source,
+      publicRead: options.publicRead,
+      publicWrite: options.publicWrite,
     });
   } catch (e) {
     announceError = e.message || String(e);
@@ -703,6 +705,8 @@ async function forkRepo(options) {
     forkedFrom,
     source: cloneUrl,
     importResult,
+    publicRead: options.publicRead,
+    publicWrite: options.publicWrite,
   });
 }
 
@@ -772,6 +776,9 @@ async function addCollaborator(options) {
     mergeMaintainers: parsed.mergeMaintainers,
     forkedFrom: parsed.forkedFrom,
     source: parsed.source,
+    // Preserve visibility — republishing must not flip a private repo public.
+    publicRead: parsed.publicRead,
+    publicWrite: parsed.publicWrite,
   });
 
   return {
@@ -884,7 +891,9 @@ async function mirrorRepo(options) {
     web: webUrl ? [webUrl] : [],
     clone: cloneUrls,
     privkey,
-    relays
+    relays,
+    publicRead: options.publicRead,
+    publicWrite: options.publicWrite,
   });
   
   return {

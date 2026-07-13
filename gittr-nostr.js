@@ -796,6 +796,9 @@ function parse30617Announcement(event) {
     mergeMaintainers: [...new Set(mergeMaintainers)],
     forkedFrom: single('forkedFrom') || undefined,
     source: single('source') || undefined,
+    // Visibility (gittr extension): missing tag = public-read, owner-only write.
+    publicRead: single('public-read') !== 'false',
+    publicWrite: single('public-write') === 'true',
   };
 }
 
@@ -813,6 +816,8 @@ async function publishRepoAnnouncement({
   mergeMaintainers,
   forkedFrom,
   source,
+  publicRead,
+  publicWrite,
 }) {
   const sk = privkeyToUint8Array(privkey);
   const webUrls = Array.isArray(web) ? web : [];
@@ -832,6 +837,12 @@ async function publishRepoAnnouncement({
 
   if (forkedFrom) tags.push(['forkedFrom', String(forkedFrom)]);
   if (source) tags.push(['source', String(source)]);
+
+  // Visibility tags (gittr extension to NIP-34, same normalization as the web UI):
+  // anything except an explicit false stays public-read, write stays owner-only
+  // unless explicitly opened. The bridge stores these for SSH/API enforcement.
+  tags.push(['public-read', publicRead === false ? 'false' : 'true']);
+  tags.push(['public-write', publicWrite === true ? 'true' : 'false']);
 
   const maint = [...new Set((maintainers || []).map((h) => normalizeOwnerPubkeyHexSync(h)).filter(Boolean))];
   if (maint.length > 0) tags.push(['maintainers', ...maint]);

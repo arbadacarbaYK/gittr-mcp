@@ -1,0 +1,45 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.arbadacarbaYK/gittr-mcp",
+  "title": "gittr-mcp",
+  "description": "Git on Nostr via gittr.space: repos, push, issues, PRs, stars, bounties. Nostr identity (NIP-34).",
+  "status": "active",
+  "repository": {
+    "url": "https://github.com/arbadacarbaYK/gittr-mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://gittr.space",
+  "version": "1.0.2",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "gittr-mcp",
+      "version": "1.0.2",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "description": "gittr bridge / UI origin (default https://gittr.space)",
+          "isRequired": false,
+          "format": "string",
+          "name": "BRIDGE_URL"
+        },
+        {
+          "description": "LNbits URL for Lightning bounty invoices (optional)",
+          "isRequired": false,
+          "format": "string",
+          "name": "GITTR_LNBITS_URL"
+        },
+        {
+          "description": "LNbits admin key for bounty invoices (optional)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "GITTR_LNBITS_ADMIN_KEY"
+        }
+      ]
+    }
+  ]
+}
