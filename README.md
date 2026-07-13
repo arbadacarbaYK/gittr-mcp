@@ -95,11 +95,15 @@ These are the **processes** people actually run; each maps to MCP tools the agen
 
 ### 1. Get the server
 
+**Clone (developers / Cursor):**
+
 ```bash
 git clone https://github.com/arbadacarbaYK/gittr-mcp.git
 cd gittr-mcp
 npm install
 ```
+
+**Claude Desktop one-click (`.mcpb`):** download the latest bundle from [GitHub Releases](https://github.com/arbadacarbaYK/gittr-mcp/releases) (`gittr-mcp-x.y.z.mcpb`). New releases are built automatically when we push a `v*` tag — see [docs/RELEASE.md](docs/RELEASE.md).
 
 ### 2. Add your key (local only, never commit)
 

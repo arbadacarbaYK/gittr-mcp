@@ -6,6 +6,8 @@ node_modules/
 .DS_Store
 coverage/
 dist/
+*.mcpb
+.mcpb-stage/
 .npm/
 
 # Never commit signing material or local identity

@@ -23,7 +23,12 @@
     "test:happy-path:live": "HAPPY_PATH_LIVE=1 node scripts/agent-happy-path.js",
     "test:live:matrix": "node scripts/agent-live-matrix.js",
     "test:live:admin": "node scripts/agent-live-matrix.js",
-    "server": "node server.js"
+    "server": "node server.js",
+    "sync-versions": "node scripts/sync-versions.js",
+    "build:mcpb": "node scripts/build-mcpb.js",
+    "prebuild:mcpb": "node scripts/sync-versions.js",
+    "release": "bash scripts/publish-release.sh",
+    "release:prepare": "npm test && npm run build:mcpb"
   },
   "keywords": [
     "gittr",
@@ -47,6 +52,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@anthropic-ai/mcpb": "^1.0.0",
     "nodemon": "^3.1.0"
   },
   "engines": {
