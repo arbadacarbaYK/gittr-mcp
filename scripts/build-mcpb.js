@@ -56,7 +56,10 @@ copyJsAndDocs();
 fs.writeFileSync(path.join(stageDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 
 console.log('[build-mcpb] npm ci --omit=dev (production deps only)…');
-execFileSync('npm', ['ci', '--omit=dev'], { cwd: stageDir, stdio: 'inherit' });
+execFileSync('npm', ['ci', '--omit=dev', '--ignore-scripts'], {
+  cwd: stageDir,
+  stdio: 'inherit',
+});
 
 rmrf(outDist);
 fs.mkdirSync(distDir, { recursive: true });
