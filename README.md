@@ -188,9 +188,18 @@ Agents should read tool results as JSON; many responses include **`agentSummary`
 Short version — full detail in [docs/DEVELOPER.md](docs/DEVELOPER.md):
 
 1. **Bridge push** and **Nostr publish** are separate steps unless you use **`createRepo`**. Pushing alone does not make the repo visible everywhere.  
-2. **`git clone`** only “works” for others if your published **`clone`** URL serves git HTTP. This MCP defaults toward **`https://git.gittr.space/<hex-pubkey>/<repo>.git`**. A failed clone means fix the URL in **30617**, not “ignore and continue.”  
+2. **`git clone`** only “works” for others if your published **`clone`** URL serves git HTTP. This MCP defaults toward **`https://git.gittr.space/<hex-pubkey>/<repo>.git`**. A failed clone means fix the URL in **30617**, not “ignore and continue.” Host-only values like `https://git.gittr.space` are rejected/expanded on publish.  
 3. **`mergePullRequest`** needs **`git`** on the machine running MCP and maintainer/owner rights.  
 4. Relays can rate-limit or lag; failed verification is a **failed** publish, not “maybe OK.”
+
+### Do MCP users get gittr’s filter / CORS server fixes?
+
+**Mostly yes, without updating MCP.** Browser/`filter`/`uploadpack`/CORS fixes live on **`git.gittr.space`**. Anyone (including agents via MCP) cloning that host benefits as soon as the server is fixed.
+
+**MCP package updates are separate.** Cursor/Claude do **not** auto-pull new MCP code. To get new tools or clone-tag logic:
+
+- **git clone install:** `cd gittr-mcp && git pull && npm install`, then reload MCP / restart the host  
+- **Claude `.mcpb`:** download the latest from [Releases](https://github.com/arbadacarbaYK/gittr-mcp/releases) and reinstall the bundle
 
 ---
 

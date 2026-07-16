@@ -850,9 +850,27 @@ async function publishRepoAnnouncement({
   const mergeMaint = [...new Set((mergeMaintainers || []).map((h) => normalizeOwnerPubkeyHexSync(h)).filter(Boolean))];
   if (mergeMaint.length > 0) tags.push(['merge_maintainers', ...mergeMaint]);
   
-  // Clone tags: single tag with all clone URLs
+  // Clone tags: single tag with all clone URLs.
+  // Never publish host-only values (https://git.gittr.space) — expand to
+  // https://host/<hex>/<repo>.git so browser clients (gitworkshop) can fetch.
   if (clone && clone.length > 0) {
-    const cloneValues = clone.filter((u) => u && typeof u === 'string');
+    const ownerHex = getPublicKey(privkey);
+    const cloneValues = [];
+    for (const u of clone) {
+      if (!u || typeof u !== 'string') continue;
+      let next = u.trim();
+      if (!next) continue;
+      try {
+        const parsed = new URL(next.startsWith('http') ? next : `https://${next}`);
+        const path = parsed.pathname.replace(/\/+$/, '');
+        if (!path || path === '') {
+          next = `${parsed.protocol}//${parsed.host}/${ownerHex}/${repoId}.git`;
+        }
+      } catch {
+        // keep as-is
+      }
+      if (!cloneValues.includes(next)) cloneValues.push(next);
+    }
     if (cloneValues.length > 0) tags.push(['clone', ...cloneValues]);
   }
   
