@@ -19,6 +19,7 @@ This document tracks how MCP tools map to the **current** gittr web app (`ngit` 
 | Bridge reads | `bridgeListFiles`, `bridgeGetFileContent`, `bridgeListRefs`, `bridgeListCommits` | same HTTP API as the site |
 | Import / mirror | `importRemoteToBridge`, `mirrorRepo` | `/api/nostr/repo/clone`, GitHub import patterns |
 | Maintainers | `addCollaborator` | republish **30617** with `maintainers` tag (owner must sign) |
+| App announce (Zapstore) | `announceSoftwareFromForgeRelease`, `fetchForgeReleases`, `deleteSoftwareAnnounce` | NIP-82 kinds **32267** / **30063** / **3063** from forge Release APK (Code sidebar **Announce app**) |
 
 ## Partial / caveats
 
@@ -29,14 +30,14 @@ This document tracks how MCP tools map to the **current** gittr web app (`ngit` 
 | **Fork** | `forkRepo` imports clone + `forkedFrom` on **30617** | UI fork flow also sets local `forkedFrom` before publish |
 | **Trending** | `getTrendingRepos` = recent **30617** only | Not real engagement ranking |
 | **Contributors** | `getRepoContributors` from issues/PRs on relays | UI also uses local `contributors[]` weights |
-| **gittr Pages** | no MCP tool | NIP-5A kind **35128** + Blossom — use web UI or separate publish script |
+| **Nostr Pages** | no MCP tool | NIP-5A kind **35128** + Blossom — use web UI or separate publish script |
 
 ## Not the same as the website
 
 | MCP tool | Reality on gittr.space |
 |----------|------------------------|
-| `createRelease` | **Unsupported** — releases live in browser storage until owner **Push to Nostr** embeds them in **30617** |
-| `listReleases` | Returns **git tags** from bridge `refs`, not UI release notes |
+| `createRelease` | **Unsupported** for UI release notes — use `announceSoftwareFromForgeRelease` for Zapstore/NIP-82, or git tags + `publishRepoState` |
+| `listReleases` | Returns **git tags** from bridge `refs`, not UI release notes and not Zapstore releases |
 | `getTrendingRepos` | Heuristic only |
 
 ## Recommended agent flows
@@ -45,5 +46,6 @@ This document tracks how MCP tools map to the **current** gittr web app (`ngit` 
 2. **Bug fix:** `createIssue` → branch push → `createPR` or `createPRViaGittrCLI` → `mergePullRequest`.
 3. **Star vs watch:** `starRepo` for appreciation; `watchRepo` for follow list (**10018**).
 4. **Read code:** `bridgeGetFileContent` / `getFile` (bridge first, then GRASP raw URLs).
+5. **Announce Android app:** forge Release with `.apk` → `announceSoftwareFromForgeRelease({ sourceUrl })` (or `fetchForgeReleases` with `hash:true` then `publishSoftwareAnnounce`).
 
 See also: [NIP25_STARS_NIP51_FOLLOWING.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/NIP25_STARS_NIP51_FOLLOWING.md) in the gittr repo (ngit).

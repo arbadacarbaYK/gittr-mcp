@@ -5,6 +5,7 @@ const config = require('./config');
 const { detectGraspFromRepoEvent } = require('./grasp-detection');
 const { normalizeOwnerPubkeyHexSync, privkeyToUint8Array } = require('./gittr-keys');
 const bridgeApi = require('./gittr-bridge-api');
+const nip82 = require('./gittr-nip82-software');
 
 const RELAY_VERIFY_TIMEOUT_MS = Number(process.env.GITTR_RELAY_VERIFY_TIMEOUT_MS || 45000);
 
@@ -1300,6 +1301,154 @@ function getPublicKey(privkey) {
   return Buffer.from(pubKeyBytes.slice(1)).toString('hex');
 }
 
+/**
+ * Sign + publish NIP-82 app/release/asset (Zapstore-compatible).
+ * Asset URL points at the forge download — gittr does not host APKs.
+ */
+async function publishSoftwareAnnounce({
+  forge,
+  appId,
+  appName,
+  summary,
+  license,
+  nip34Address,
+  selectedApkUrl,
+  topics,
+  privkey,
+  relays,
+  ownerPubkey,
+}) {
+  if (!privkey) throw new Error('privkey required to announce software');
+  if (!forge || forge.ok !== true) {
+    throw new Error('forge must be the ok:true payload from fetchForgeReleases (with hash).');
+  }
+  const sk = privkeyToUint8Array(privkey);
+  const signerPubkey = getPublicKey(privkey).toLowerCase();
+  if (ownerPubkey) {
+    const owner = (await resolveRepoOwnerHex(ownerPubkey)).toLowerCase();
+    if (signerPubkey !== owner) {
+      throw new Error(
+        'Only the repository owner can announce this app (signer must match owner).'
+      );
+    }
+  }
+
+  const built = nip82.buildSoftwareAnnounceEvents({
+    forge,
+    appId,
+    appName,
+    summary,
+    license,
+    nip34Address,
+    selectedApkUrl,
+    topics,
+  });
+  const catalogRelays = nip82.relaysForSoftwareCatalog(
+    Array.isArray(relays) ? relays : config.relays
+  );
+
+  const signedAsset = finalizeEvent({ ...built.asset, pubkey: signerPubkey }, sk);
+  await publishEventChecked(catalogRelays, signedAsset);
+
+  const releaseUnsigned = {
+    ...built.release,
+    tags: [
+      ...built.release.tags,
+      ['e', signedAsset.id, nip82.RELAY_ZAPSTORE],
+    ],
+  };
+  const signedRelease = finalizeEvent(
+    { ...releaseUnsigned, pubkey: signerPubkey },
+    sk
+  );
+  await publishEventChecked(catalogRelays, signedRelease);
+
+  const signedApp = finalizeEvent({ ...built.app, pubkey: signerPubkey }, sk);
+  await publishEventChecked(catalogRelays, signedApp);
+
+  const confirmed = [];
+  for (const ev of [signedAsset, signedRelease, signedApp]) {
+    try {
+      const visibility = await verifyEventOnRelays(
+        catalogRelays,
+        ev.id,
+        ev.kind,
+        Math.min(RELAY_VERIFY_TIMEOUT_MS, 20000)
+      );
+      if (visibility.confirmed) {
+        for (const r of visibility.confirmedOnRelays || []) {
+          if (r && !confirmed.includes(r)) confirmed.push(r);
+        }
+      }
+    } catch (_) {
+      /* best-effort verify */
+    }
+  }
+
+  const zapstoreOk = confirmed.some((r) => String(r).includes('zapstore'));
+  return {
+    ok: true,
+    appId: built.appId,
+    version: built.version,
+    apkName: built.apk.name,
+    apkUrl: built.apk.downloadUrl,
+    appEventId: signedApp.id,
+    releaseEventId: signedRelease.id,
+    assetEventId: signedAsset.id,
+    confirmedRelays: confirmed,
+    catalogRelays,
+    whitelistHint: zapstoreOk
+      ? undefined
+      : 'If Zapstore’s relay rejected the events, commit a zapstore.yaml in the forge repo root with repository + your pubkey (npub), then publish again — see https://zapstore.dev/docs/publish',
+  };
+}
+
+/** NIP-09 kind 5 for previously published app/release/asset event ids. */
+async function deleteSoftwareAnnounce({
+  eventIds,
+  privkey,
+  relays,
+  ownerPubkey,
+}) {
+  if (!privkey) throw new Error('privkey required');
+  const ids = [
+    ...new Set(
+      (eventIds || []).filter((id) => typeof id === 'string' && /^[0-9a-f]{64}$/i.test(id))
+    ),
+  ];
+  if (ids.length === 0) throw new Error('eventIds required (app/release/asset hex ids)');
+
+  const sk = privkeyToUint8Array(privkey);
+  const signerPubkey = getPublicKey(privkey).toLowerCase();
+  if (ownerPubkey) {
+    const owner = (await resolveRepoOwnerHex(ownerPubkey)).toLowerCase();
+    if (signerPubkey !== owner) {
+      throw new Error('Only the original publisher can delete these app events.');
+    }
+  }
+
+  const tags = ids.map((id) => ['e', id]);
+  tags.push(['k', String(nip82.KIND_SOFTWARE_APPLICATION)]);
+  tags.push(['k', String(nip82.KIND_SOFTWARE_RELEASE)]);
+  tags.push(['k', String(nip82.KIND_SOFTWARE_ASSET)]);
+
+  const event = finalizeEvent(
+    {
+      kind: 5,
+      created_at: Math.floor(Date.now() / 1000),
+      content:
+        'Delete NIP-82 software announce (app/release/asset); repo unchanged.',
+      tags,
+    },
+    sk
+  );
+  const catalogRelays = nip82.relaysForSoftwareCatalog(
+    Array.isArray(relays) ? relays : config.relays
+  );
+  await publishEventChecked(catalogRelays, event);
+  return { ok: true, deletionEventId: event.id, catalogRelays };
+}
+
 module.exports = {
   // Repository operations
   listRepos,
@@ -1307,6 +1456,8 @@ module.exports = {
   publishRepo: publishRepoAnnouncement, // Alias
   publishRepoState,
   pushToBridge,
+  publishSoftwareAnnounce,
+  deleteSoftwareAnnounce,
   
   // Issue operations
   listIssues,

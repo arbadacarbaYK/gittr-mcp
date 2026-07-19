@@ -531,7 +531,7 @@ const tools = [
   {
     name: 'createRelease',
     description:
-      'Not supported on gittr (returns guidance). UI releases are local until next 30617 push; use git tags + publishRepoState instead.',
+      'Not supported for UI release notes. For Zapstore/NIP-82 APK announce use announceSoftwareFromForgeRelease. For git tags use listReleases + publishRepoState.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -548,7 +548,7 @@ const tools = [
   },
   {
     name: 'listReleases',
-    description: 'List releases for a repository',
+    description: 'List git tags from the bridge (refs/tags/*), not Zapstore software releases',
     inputSchema: {
       type: 'object',
       properties: {
@@ -558,6 +558,107 @@ const tools = [
         relays: { type: 'array', items: { type: 'string' } },
       },
       required: ['ownerPubkey', 'repoId'],
+    },
+  },
+  {
+    name: 'fetchForgeReleases',
+    description:
+      'Fetch latest public forge Release (GitHub/Codeberg/GitLab) and APK assets. Set hash:true to compute APK sha256 (slow; required before announce).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sourceUrl: {
+          type: 'string',
+          description: 'Forge repository HTTPS URL (e.g. https://github.com/org/app)',
+        },
+        hash: {
+          type: 'boolean',
+          description: 'If true, stream APK and return sha256 (can take up to ~120s)',
+        },
+      },
+      required: ['sourceUrl'],
+    },
+  },
+  {
+    name: 'announceSoftwareFromForgeRelease',
+    description:
+      'Announce Android app to Zapstore/NIP-82 catalog from a forge Release APK (kinds 32267/30063/3063). Same as gittr Code sidebar Announce app. Auto-loads .nostr-keys.json if privkey omitted.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sourceUrl: {
+          type: 'string',
+          description: 'Forge repository HTTPS URL with a Release that has an .apk',
+        },
+        appId: {
+          type: 'string',
+          description: 'Package id (e.g. com.example.app). Default: space.gittr.<repo>',
+        },
+        appName: { type: 'string', description: 'Display name (default: forge repo name)' },
+        summary: { type: 'string', description: 'Short summary (max ~280 chars)' },
+        license: { type: 'string', description: 'Optional SPDX license id' },
+        nip34Address: {
+          type: 'string',
+          description: 'Optional NIP-34 pointer 30617:<owner-hex>:<repo>',
+        },
+        selectedApkUrl: {
+          type: 'string',
+          description: 'Prefer a specific APK download URL from the release',
+        },
+        topics: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional extra t tags',
+        },
+        ownerPubkey: {
+          type: 'string',
+          description: 'Must match signer (default: derived from privkey)',
+        },
+        privkey: { type: 'string', description: 'nsec or hex (optional if .nostr-keys.json loaded)' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['sourceUrl'],
+    },
+  },
+  {
+    name: 'deleteSoftwareAnnounce',
+    description:
+      'NIP-09 kind 5 deletion for previously published NIP-82 app/release/asset event ids (does not delete the git repo).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        eventIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Hex event ids (app, release, and/or asset)',
+        },
+        privkey: { type: 'string', description: 'nsec or hex (optional if keys loaded)' },
+        ownerPubkey: { type: 'string' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['eventIds'],
+    },
+  },
+  {
+    name: 'publishSoftwareAnnounce',
+    description:
+      'Low-level: publish NIP-82 events from an already-fetched forge payload (ok:true + hashed APK). Prefer announceSoftwareFromForgeRelease.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        forge: { type: 'object', description: 'Payload from fetchForgeReleases with hash:true' },
+        appId: { type: 'string' },
+        appName: { type: 'string' },
+        summary: { type: 'string' },
+        license: { type: 'string' },
+        nip34Address: { type: 'string' },
+        selectedApkUrl: { type: 'string' },
+        topics: { type: 'array', items: { type: 'string' } },
+        privkey: { type: 'string' },
+        ownerPubkey: { type: 'string' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['forge', 'privkey'],
     },
   },
   {
@@ -1061,6 +1162,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case 'listReleases':
         result = await gittr.listReleases(args);
+        break;
+      case 'fetchForgeReleases':
+        result = await gittr.fetchForgeReleases(args);
+        break;
+      case 'announceSoftwareFromForgeRelease':
+        result = await gittr.announceSoftwareFromForgeRelease(args);
+        break;
+      case 'deleteSoftwareAnnounce':
+        result = await gittr.deleteSoftwareAnnounce(args);
+        break;
+      case 'publishSoftwareAnnounce':
+        result = await gittr.publishSoftwareAnnounce(args);
         break;
       case 'exploreRepos':
         result = await gittr.exploreRepos(args);

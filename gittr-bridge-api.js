@@ -45,13 +45,17 @@ async function guardedFetch(url, init = {}) {
   if (waitMs > 0) await sleep(waitMs);
   lastRequestAt = Date.now();
 
+  const { timeoutMs: overrideTimeout, ...fetchInit } = init;
+  const timeoutMs =
+    Number(overrideTimeout) > 0 ? Number(overrideTimeout) : REQUEST_TIMEOUT_MS;
+
   let attempt = 0;
   while (true) {
     attempt += 1;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const res = await fetch(url, { ...init, signal: controller.signal });
+      const res = await fetch(url, { ...fetchInit, signal: controller.signal });
       if (res.status === 429 && attempt <= MAX_RETRIES) {
         const body = await readJson(res);
         const retryAfterS = Number(body.retry_after || body.retryAfter || 1);
@@ -63,6 +67,34 @@ async function guardedFetch(url, init = {}) {
       clearTimeout(timeout);
     }
   }
+}
+
+/**
+ * GET /api/repo/forge-releases — forge Release metadata (+ optional APK sha256).
+ * hash=1 streams the APK (can take up to ~120s for large files).
+ */
+async function fetchForgeReleases(
+  { sourceUrl, hash = false } = {},
+  bridgeUrl = baseUrl()
+) {
+  if (!sourceUrl || typeof sourceUrl !== 'string') {
+    throw new Error('sourceUrl is required (GitHub/Codeberg/GitLab repo URL).');
+  }
+  const q = {
+    sourceUrl: sourceUrl.trim(),
+  };
+  if (hash === true || hash === 1 || hash === '1' || hash === 'true') {
+    q.hash = '1';
+  }
+  const timeoutMs = q.hash
+    ? Number(process.env.GITTR_MCP_FORGE_HASH_TIMEOUT_MS || 120000)
+    : REQUEST_TIMEOUT_MS;
+  const res = await guardedFetch(
+    `${bridgeUrl}/api/repo/forge-releases${toQuery(q)}`,
+    { timeoutMs }
+  );
+  const body = await readJson(res);
+  return { httpOk: res.ok, status: res.status, ...body };
 }
 
 /** Base64(JSON.stringify(event)) — same encoding as gittr UI (UTF-8 → base64). */
@@ -367,4 +399,5 @@ module.exports = {
   bountyCreateWithdraw,
   bountyClaimWithdraw,
   sendEventToBridge,
+  fetchForgeReleases,
 };

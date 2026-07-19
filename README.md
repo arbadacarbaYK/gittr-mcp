@@ -71,7 +71,10 @@ These are the **processes** people actually run; each maps to MCP tools the agen
 
 ### Releases & tags
 - **`listReleases`** — git **tags** from bridge (`refs/tags/*`), not the web UI “Releases” notes.  
-- **`createRelease`** — returns guidance only (gittr stores release notes in the UI until the next **30617** push).
+- **`createRelease`** — returns guidance only (UI release notes until next **30617** push).  
+- **`fetchForgeReleases`** — latest public forge Release + APKs (`hash:true` for sha256).  
+- **`announceSoftwareFromForgeRelease`** — Zapstore/NIP-82 announce (kinds **32267** / **30063** / **3063**) from a forge Release APK (same as Code sidebar **Announce app**).  
+- **`deleteSoftwareAnnounce`** — NIP-09 kind **5** for those app/release/asset event ids.
 
 ### Lightning bounties & pay-to-push
 - Bounties: **`listBounties`**, **`createBountyInvoice`**, **`publishBountyToNostr`**, **`submitBounty`**, **`listBountiesForIssue`**, release/withdraw tools.  

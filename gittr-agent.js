@@ -1600,10 +1600,110 @@ async function createRelease() {
       nextSteps: [
         'Create a git tag on the bridge (git push refs/tags/v1.0.0) then publishRepoState.',
         'Or manage releases in the gittr web UI Releases tab, then Push to Nostr.',
-        'For software APK/catalog listings use NIP-82 kinds 3063/30063 (see gittr /apps), not this tool.',
+        'For Zapstore / NIP-82 APK announce from a forge Release, use announceSoftwareFromForgeRelease (or fetchForgeReleases then publishSoftwareAnnounce).',
       ],
     }
   );
+}
+
+/** Preview forge Release + APKs (optional sha256). Does not publish. */
+async function fetchForgeReleases(options = {}) {
+  const { sourceUrl, hash = false, bridgeUrl } = options;
+  return bridgeApi.fetchForgeReleases({ sourceUrl, hash }, bridgeUrl);
+}
+
+/**
+ * End-to-end: fetch forge Release (with APK hash) → sign NIP-82 app/release/asset → publish.
+ * Same path as gittr Code sidebar “Announce app”.
+ */
+async function announceSoftwareFromForgeRelease(options = {}) {
+  const {
+    sourceUrl,
+    appId,
+    appName,
+    summary,
+    license,
+    nip34Address,
+    selectedApkUrl,
+    topics,
+    ownerPubkey,
+    relays,
+    bridgeUrl,
+  } = options;
+  let { privkey } = options;
+
+  if (!sourceUrl) {
+    throw new Error('sourceUrl required (GitHub/Codeberg/GitLab repository HTTPS URL)');
+  }
+  if (!privkey) {
+    const creds = loadCredentials();
+    if (creds) privkey = creds.nsec || creds.secretKey || creds.private_key;
+  }
+  if (!privkey) {
+    throw new Error(
+      'No signing key. Pass privkey or configure .nostr-keys.json (see describeAgentAuth).'
+    );
+  }
+
+  const forge = await bridgeApi.fetchForgeReleases(
+    { sourceUrl, hash: true },
+    bridgeUrl
+  );
+  if (!forge.ok) {
+    return withAgentHints(
+      { success: false, forge },
+      {
+        reason: forge.message || 'Forge release fetch failed',
+        nextSteps: [
+          'Ensure sourceUrl is a public GitHub/Codeberg/GitLab repo with a non-draft Release that includes an .apk.',
+          'Try fetchForgeReleases({ sourceUrl, hash: false }) to inspect errors without hashing.',
+        ],
+      }
+    );
+  }
+
+  const nip82 = require('./gittr-nip82-software');
+  const result = await gittrNostr.publishSoftwareAnnounce({
+    forge,
+    appId: appId || nip82.suggestAppIdFromRepo(forge.repo),
+    appName: appName || forge.repo,
+    summary,
+    license,
+    nip34Address,
+    selectedApkUrl,
+    topics,
+    privkey,
+    relays,
+    ownerPubkey: ownerPubkey || gittrNostr.getPublicKey(privkey),
+  });
+
+  return withAgentHints(
+    { success: true, ...result, forgeTag: forge.release?.tag, repositoryUrl: forge.repositoryUrl },
+    {
+      nextSteps: [
+        'Open https://gittr.space/apps to confirm the listing.',
+        result.whitelistHint ||
+          'If Zapstore is slow to index, wait or check zapstore.yaml on the forge repo.',
+      ].filter(Boolean),
+    }
+  );
+}
+
+async function deleteSoftwareAnnounce(options = {}) {
+  let { privkey, eventIds, relays, ownerPubkey } = options;
+  if (!privkey) {
+    const creds = loadCredentials();
+    if (creds) privkey = creds.nsec || creds.secretKey || creds.private_key;
+  }
+  if (!privkey) {
+    throw new Error('No signing key. Pass privkey or configure .nostr-keys.json.');
+  }
+  return gittrNostr.deleteSoftwareAnnounce({
+    eventIds,
+    privkey,
+    relays,
+    ownerPubkey: ownerPubkey || gittrNostr.getPublicKey(privkey),
+  });
 }
 
 /**
@@ -2488,6 +2588,10 @@ module.exports = {
   createRelease,
   listReleases,
   exploreRepos,
+  fetchForgeReleases,
+  announceSoftwareFromForgeRelease,
+  deleteSoftwareAnnounce,
+  publishSoftwareAnnounce: (a) => gittrNostr.publishSoftwareAnnounce(a),
   // Bridge HTTP (gittr/ngit API routes)
   bridgeRepoExists: (a) => bridgeApi.bridgeRepoExists(a.ownerPubkey, a.repo, a.bridgeUrl),
   bridgeListFiles: (a) => bridgeApi.bridgeListFiles(a, a.bridgeUrl),
