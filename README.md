@@ -18,6 +18,48 @@ Works with **Cursor**, **Claude Desktop**, **VS Code / Copilot MCP**, **Windsurf
 
 **End result:** one MCP server connects your agent to **decentralized git on Nostr** — same account as on gittr.space (`nsec` / keys file), no separate vendor account for the agent.
 
+## Where this sits (platform map)
+
+gittr-mcp is the **agent door** into the same platform humans use in the browser. **You are here = gittr-mcp** (this repo). Amber boxes = public hostnames (`git.` / `pages.` / `relay.gittr.space`).
+
+```mermaid
+flowchart TB
+  Agent["AI host<br/>Cursor / Claude / …"]
+  MCP["★ YOU ARE HERE · gittr-mcp<br/>this repo · agent tools"]
+  UI["gittr Client<br/>gittr.space"]
+  Bridge["gitnostr Bridge<br/>git.gittr.space<br/>SSH / HTTPS git"]
+  RelayGittr["gittr Pyramid relay<br/>relay.gittr.space<br/>wss · open forge + GRASP"]
+  Relays["Other Nostr relays"]
+  Pages["Pages / nsite<br/>pages.gittr.space"]
+  Remote["git remote nostr<br/>optional"]
+
+  Agent -->|MCP tools| MCP
+  MCP -->|HTTPS + Nostr auth| Bridge
+  MCP -->|sign NIP-34 events| RelayGittr
+  MCP -->|sign NIP-34 events| Relays
+  UI --> RelayGittr
+  UI --> Relays
+  UI --> Bridge
+  Pages --> Relays
+  Remote -.-> Relays
+
+  classDef youAreHere fill:#0f766e,stroke:#134e4a,stroke-width:3px,color:#ecfdf5
+  classDef hostUrl fill:#fef3c7,stroke:#b45309,stroke-width:2px,color:#1c1917
+  class MCP youAreHere
+  class Bridge,Pages,RelayGittr hostUrl
+```
+
+| Piece | Host / link | How MCP uses it |
+| --- | --- | --- |
+| **gittr Client** | [gittr on gittr.space](https://gittr.space/npub1n2ph08n4pqz4d3jk6n2p35p2f4ldhc5g5tu7dhftfpueajf4rpxqfjhzmc/gittr?branch=main) · `gittr.space` | Same product; MCP mirrors forge actions (repos, issues, PRs, bounties) |
+| **gitnostr Bridge** | [gitnostr on gittr.space](https://gittr.space/npub1n2ph08n4pqz4d3jk6n2p35p2f4ldhc5g5tu7dhftfpueajf4rpxqfjhzmc/gitnostr?branch=main) · **`git.gittr.space`** | `pushToBridge`, file list, merge clones over HTTPS |
+| **Pages / nsite** | [nsite-gateway](https://gittr.space/npub1n2ph08n4pqz4d3jk6n2p35p2f4ldhc5g5tu7dhftfpueajf4rpxqfjhzmc/nsite-gateway) · **`pages.gittr.space`** | Out of band for most MCP git tools |
+| **gittr Pyramid relay** | [pyramid](https://github.com/arbadacarbaYK/pyramid) · **`relay.gittr.space`** | Prefer in relay lists when publishing NIP-34 |
+| **★ gittr-mcp (this README)** | [this repo](https://github.com/arbadacarbaYK/gittr-mcp) | **You are here** |
+| **git remote nostr** | [ngit-cli](https://github.com/DanConwayDev/ngit-cli) | Not required for MCP; agents usually use bridge HTTPS + events |
+
+**Addressing for agents:** `resolveRepoByNostrId(npub|hex, repo)` → `cloneUrl` + relays. Prefer announced **npub**-path HTTPS on **`git.gittr.space`** (NIP-34); hex path is a disk fallback if a symlink is missing. Include **`wss://relay.gittr.space`** when publishing.
+
 ---
 
 ## What you can do (workflows)
