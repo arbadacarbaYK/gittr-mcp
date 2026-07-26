@@ -245,7 +245,8 @@ const tools = [
   },
   {
     name: 'getFile',
-    description: 'Get file content from a repository without cloning',
+    description:
+      'Get file content without a full local clone. Tries gittr bridge file-content, then a few hardcoded GRASP /raw/ hosts. Not full Code-tab parity (no 30617 clone[] / repo-files for home remotes) — prefer bridgeListFiles after importRemoteToBridge/mirrorRepo.',
     inputSchema: {
       type: 'object',
       properties: {

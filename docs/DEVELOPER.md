@@ -81,7 +81,7 @@ Prefer **`https://git.gittr.space/<hex-pubkey>/<repo>.git`** for HTTPS git when 
 
 ### `getFile()`
 
-Needs GRASP/Nostr visibility — not for files that exist only on the bridge before publish.
+Bridge `file-content` first, then a few hardcoded GRASP `/raw/` hosts. **Not** full gittr Code-tab parity: does not walk **30617 `clone[]`**, does not call **`/api/git/repo-files`** for home Freebox/NAS remotes, and does not prefer non-GRASP over inferred GRASP. For reliable reads: mirror onto the bridge (`importRemoteToBridge` / `mirrorRepo`) then `bridgeGetFileContent`, or follow [FILE_FETCHING_INSIGHTS.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/FILE_FETCHING_INSIGHTS.md).
 
 ### PRs (kind 1618)
 

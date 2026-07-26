@@ -791,7 +791,8 @@ async function addCollaborator(options) {
 }
 
 /**
- * Get file content from a repo (via git server API)
+ * Get file content from a repo (via bridge, then hardcoded GRASP raw URLs).
+ * Not full gittr Code-tab parity — see docs/MCP-GITTR-PARITY.md / FILE_FETCHING_INSIGHTS.md.
  */
 async function getFile(options) {
   const {

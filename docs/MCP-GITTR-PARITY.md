@@ -37,6 +37,7 @@ This document tracks how MCP tools map to the **current** gittr web app (`ngit` 
 | MCP tool | Reality on gittr.space |
 |----------|------------------------|
 | `createRelease` | **Unsupported** for UI release notes — use `announceSoftwareFromForgeRelease` for Zapstore/NIP-82, or git tags + `publishRepoState` |
+| `getFile` | Bridge first, then **hardcoded** GRASP `/raw/` hosts — **not** full Code-tab parity (no 30617 `clone[]` order, no `/api/git/repo-files` for home Freebox/NAS). Prefer `bridgeListFiles` / `bridgeGetFileContent` after `importRemoteToBridge` / `mirrorRepo`, or resolve clone URLs from **30617** and call gittr HTTP APIs. See [FILE_FETCHING_INSIGHTS.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/FILE_FETCHING_INSIGHTS.md). |
 | `listReleases` | Returns **git tags** from bridge `refs`, not UI release notes and not Zapstore releases |
 | `getTrendingRepos` | Heuristic only |
 
@@ -45,7 +46,7 @@ This document tracks how MCP tools map to the **current** gittr web app (`ngit` 
 1. **New repo:** `createRepo` (or push + publish + state).
 2. **Bug fix:** `createIssue` → branch push → `createPR` or `createPRViaGittrCLI` → `mergePullRequest`.
 3. **Star vs watch:** `starRepo` for appreciation; `watchRepo` for follow list (**10018**).
-4. **Read code:** `bridgeGetFileContent` / `getFile` (bridge first, then GRASP raw URLs).
+4. **Read code:** Prefer `bridgeGetFileContent` / `bridgeListFiles` after the repo is on the bridge (`importRemoteToBridge` / `mirrorRepo` / push). `getFile` is a convenience (bridge, then a few hardcoded GRASP raw URLs) — it does **not** follow the web Code tab’s `clone[]` / `repo-files` rules (self-hosted Freebox, non-GRASP before GRASP, EOSE inference). See gittr [FILE_FETCHING_INSIGHTS.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/FILE_FETCHING_INSIGHTS.md).
 5. **Announce Android app:** forge Release with `.apk` → `announceSoftwareFromForgeRelease({ sourceUrl })` (or `fetchForgeReleases` with `hash:true` then `publishSoftwareAnnounce`).
 
 See also: [NIP25_STARS_NIP51_FOLLOWING.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/NIP25_STARS_NIP51_FOLLOWING.md) in the gittr repo (ngit).
