@@ -54,8 +54,8 @@ flowchart TB
 | **gittr Client** | [gittr on gittr.space](https://gittr.space/npub1n2ph08n4pqz4d3jk6n2p35p2f4ldhc5g5tu7dhftfpueajf4rpxqfjhzmc/gittr?branch=main) · `gittr.space` | Same product; MCP mirrors forge actions (repos, issues, PRs, bounties) |
 | **gitnostr Bridge** | [gitnostr on gittr.space](https://gittr.space/npub1n2ph08n4pqz4d3jk6n2p35p2f4ldhc5g5tu7dhftfpueajf4rpxqfjhzmc/gitnostr?branch=main) · **`git.gittr.space`** | `pushToBridge`, file list, merge clones over HTTPS |
 | **Pages / nsite** | [nsite-gateway](https://gittr.space/npub1n2ph08n4pqz4d3jk6n2p35p2f4ldhc5g5tu7dhftfpueajf4rpxqfjhzmc/nsite-gateway) · **`pages.gittr.space`** | Out of band for most MCP git tools |
-| **gittr Pyramid relay** | [pyramid](https://github.com/arbadacarbaYK/pyramid) · **`relay.gittr.space`** | Prefer in relay lists when publishing NIP-34 |
-| **★ gittr-mcp (this README)** | [this repo](https://github.com/arbadacarbaYK/gittr-mcp) | **You are here** |
+| **gittr Pyramid relay** | [pyramid](https://gittr.space/npub1n2ph08n4pqz4d3jk6n2p35p2f4ldhc5g5tu7dhftfpueajf4rpxqfjhzmc/pyramid) · **`relay.gittr.space`** | Prefer in relay lists when publishing NIP-34 |
+| **★ gittr-mcp (this README)** | [gittr-mcp on gittr.space](https://gittr.space/npub1n2ph08n4pqz4d3jk6n2p35p2f4ldhc5g5tu7dhftfpueajf4rpxqfjhzmc/gittr-mcp) | **You are here** |
 | **git remote nostr** | [ngit-cli](https://github.com/DanConwayDev/ngit-cli) | Not required for MCP; agents usually use bridge HTTPS + events |
 
 **Addressing for agents:** `resolveRepoByNostrId(npub|hex, repo)` → `cloneUrl` + relays. Prefer announced **npub**-path HTTPS on **`git.gittr.space`** (NIP-34); hex path is a disk fallback if a symlink is missing. Include **`wss://relay.gittr.space`** when publishing.
