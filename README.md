@@ -20,7 +20,7 @@ Works with **Cursor**, **Claude Desktop**, **VS Code / Copilot MCP**, **Windsurf
 
 ## Where this sits (platform map)
 
-gittr-mcp is the **agent door** into the same platform humans use in the browser. **You are here = gittr-mcp** (this repo, teal). Brown boxes with gold outline = public hostnames (`git.` / `pages.` / `relay.gittr.space`) — readable in dark UI.
+gittr-mcp is the **agent door** into the same platform humans use in the browser. **You are here = gittr-mcp** (this repo, teal). Cyan-outlined host boxes = public hostnames (`git.` / `pages.` / `relay.gittr.space`) (teal = this repo; cyan outline = host URLs).
 
 ```mermaid
 flowchart TB
@@ -44,7 +44,7 @@ flowchart TB
   Remote -.-> Relays
 
   classDef youAreHere fill:#0f766e,stroke:#5eead4,stroke-width:3px,color:#ecfdf5
-  classDef hostUrl fill:#78350f,stroke:#fbbf24,stroke-width:2px,color:#fffbeb
+  classDef hostUrl fill:#164e63,stroke:#22d3ee,stroke-width:2px,color:#ecfeff
   class MCP youAreHere
   class Bridge,Pages,RelayGittr hostUrl
 ```
