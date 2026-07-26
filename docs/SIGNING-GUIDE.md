@@ -131,12 +131,14 @@ Contributors who are **not** on `maintainers` / `merge_maintainers` can still op
 
 ---
 
-## SSH Key Support (Future)
+## SSH Keys (gittr bridge — live)
 
-Users can set SSH keys in gittr.space settings. Future enhancement:
-- Bridge could accept SSH key verification
-- Allows git CLI pushes with SSH keys
-- Would query Nostr for SSH key events (kind 52)
+SSH keys for **git clone/push** to `git.gittr.space` are **Nostr kind 52** events (gitnostr). The bridge writes `authorized_keys` for matching pubkeys (owners and permission targets).
+
+- **UI:** Settings → SSH Keys → paste `~/.ssh/id_ed25519.pub` (browser keygen is not OpenSSH-format).
+- **CLI:** `gn ssh-key add ~/.ssh/id_ed25519.pub`
+- **Not** the same as GitHub OAuth on that page (import/API only).
+- **MCP** uses HTTPS + Nostr auth headers, not SSH. Prefer `https://git.gittr.space/<hex>/<repo>.git`.
 
 ---
 
