@@ -255,7 +255,8 @@ async function createRepo(options) {
     });
   }
   
-  // Step 2: Build user-facing URLs (npub-first) + announcement clone URLs aligned to relay domains.
+  // Step 2: Build user-facing URLs. Publish **npub** paths (NIP-34); keep hex as
+  // a working fallback probe (on-disk layout) when the npub symlink is missing.
   const ownerNpub = nip19.npubEncode(pubkey);
   const userCloneUrls = [
     `https://git.gittr.space/${ownerNpub}/${name}.git`,
@@ -571,7 +572,15 @@ async function resolveRepoByNostrId(ownerNpubOrHex, repoId, options = {}) {
   const repo = await getRepo({ ownerPubkey, repoId, relays });
   if (repo.error) return repo;
   const cloneUrls = repo.clone && repo.clone.length ? repo.clone : [];
-  const cloneUrl = cloneUrls.find(u => u.includes('git.gittr.space')) || cloneUrls[0] || null;
+  // Prefer git.gittr.space; npub path is canonical in announces (hex also works on disk)
+  const gittrNpub = cloneUrls.find(
+    (u) =>
+      typeof u === 'string' &&
+      u.includes('git.gittr.space') &&
+      /\/npub1[a-z0-9]+\//i.test(u)
+  );
+  const gittrAny = cloneUrls.find((u) => typeof u === 'string' && u.includes('git.gittr.space'));
+  const cloneUrl = gittrNpub || gittrAny || cloneUrls[0] || null;
   return {
     ...repo,
     cloneUrl,
