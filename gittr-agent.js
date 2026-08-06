@@ -599,6 +599,28 @@ async function searchRepos(query, options = {}) {
 }
 
 /**
+ * Exact reverse lookup: forge URL(s) → Nostr announces (returns npub for DMs when forge is unreachable).
+ * GitHub / GitLab / Codeberg / Gitea / … — exact host/path only.
+ */
+async function findReposBySource(sourceOrOptions, maybeOptions) {
+  if (
+    typeof sourceOrOptions === 'string' ||
+    Array.isArray(sourceOrOptions)
+  ) {
+    return gittrNostr.findReposBySource({
+      source: sourceOrOptions,
+      ...(maybeOptions || {}),
+    });
+  }
+  return gittrNostr.findReposBySource(sourceOrOptions || {});
+}
+
+/** @deprecated alias for findReposBySource */
+async function findReposByGithub(githubOrOptions, maybeOptions) {
+  return findReposBySource(githubOrOptions, maybeOptions);
+}
+
+/**
  * List open bounties (issues with bounty labels or funding)
  * Note: This is a best-effort search - actual bounty discovery may vary
  */
@@ -893,13 +915,15 @@ async function mirrorRepo(options) {
   const graspCloneUrl = `https://${graspServer}/${pubkey}/${repoName}.git`;
   const cloneUrls = [graspCloneUrl, sourceUrl];
   
-  // Publish announcement with source reference
+  // Publish announcement with source reference (needed for reverse GitHub lookup)
   const result = await gittrNostr.publishRepoAnnouncement({
     repoId: repoName,
     name: repoName,
     description: description || `Mirrored from ${sourceUrl}`,
     web: webUrl ? [webUrl] : [],
     clone: cloneUrls,
+    source: webUrl || undefined,
+    forkedFrom: webUrl || undefined,
     privkey,
     relays,
     publicRead: options.publicRead,
@@ -2570,6 +2594,8 @@ module.exports = {
   getRepo,
   resolveRepoByNostrId,
   searchRepos,
+  findReposBySource,
+  findReposByGithub,
   listBounties,
   forkRepo,
   myRepos,

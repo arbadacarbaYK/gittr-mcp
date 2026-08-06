@@ -53,6 +53,35 @@ issues.forEach(issue => {
 });
 ```
 
+### 1b. Find Nostr mirrors of a forge repo (exact) — then DM the npub
+
+When a forge is down / owners unreachable (GitHub, GitLab, Codeberg, Gitea, …), look up whether someone already **Push to Nostr**'d that repo. Matching is **exact** forge `host/path` on kind 30617 `source` / `forkedFrom` (not fuzzy name/slug). Result includes **npub** so you can open their gittr profile and DM on Nostr.
+
+```javascript
+const hit = await gittr.findReposBySource({
+  source: [
+    'https://github.com/Coldcard/firmware',
+    'https://gitlab.com/group/project',
+    'https://codeberg.org/org/repo',
+  ],
+});
+for (const row of hit.results) {
+  for (const m of row.matches) {
+    console.log({
+      sourceUrl: m.sourceUrl,
+      npub: m.npub,
+      gittrRepoUrl: m.gittrRepoUrl,
+      gittrProfileUrl: m.gittrProfileUrl, // their other repos / DM from here
+    });
+  }
+}
+```
+
+HTTP: `GET https://gittr.space/api/nostr/repos-by-github?source=https://gitlab.com/…`  
+(`findReposByGithub` / `?github=` remain aliases.)
+
+---
+
 ### 2. Create an Issue
 
 ```javascript

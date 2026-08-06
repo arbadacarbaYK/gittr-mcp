@@ -18,6 +18,7 @@ This document tracks how MCP tools map to the **current** gittr web app (`ngit` 
 | Bounties | `createBountyInvoice`, `publishBountyToNostr`, `listBountiesForIssue`, … | kind **9806** + `/api/bounty/*` |
 | Bridge reads | `bridgeListFiles`, `bridgeGetFileContent`, `bridgeListRefs`, `bridgeListCommits` | same HTTP API as the site |
 | Import / mirror | `importRemoteToBridge`, `mirrorRepo` | `/api/nostr/repo/clone`, GitHub import patterns |
+| Reverse forge → Nostr | `findReposBySource` (alias `findReposByGithub`) — exact forge URL on `source`/`forkedFrom`, returns npub | `GET/POST /api/nostr/repos-by-github?source=` |
 | Maintainers | `addCollaborator` | republish **30617** with `maintainers` tag (owner must sign) |
 | App announce (Zapstore) | `announceSoftwareFromForgeRelease`, `fetchForgeReleases`, `deleteSoftwareAnnounce` | NIP-82 kinds **32267** / **30063** / **3063** from forge Release APK (Code sidebar **Announce app**) |
 

@@ -17,8 +17,9 @@
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node tests/smoke.js && node tests/setup-test-keypair.test.js && node tests/public-read-tags.test.js && node scripts/agent-happy-path.js",
+    "test": "node tests/smoke.js && node tests/setup-test-keypair.test.js && node tests/public-read-tags.test.js && node tests/find-repos-by-github.test.js && node scripts/agent-happy-path.js",
     "test:smoke": "node tests/smoke.js",
+    "test:mcp-stdio": "node scripts/mcp-stdio-live.js",
     "test:happy-path": "node scripts/agent-happy-path.js",
     "test:happy-path:live": "HAPPY_PATH_LIVE=1 node scripts/agent-happy-path.js",
     "test:live:matrix": "node scripts/agent-live-matrix.js",
@@ -53,6 +54,7 @@
     "@noble/secp256k1": "^3.0.0",
     "node-fetch": "^3.3.2",
     "nostr-tools": "^2.23.1",
+    "ws": "^8.21.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {

@@ -1,11 +1,29 @@
 // gittr-nostr.js - Nostr operations for gittr (NIP-34 compliant)
 // Use native fetch (Node 18+)
 const { SimplePool, nip19, nip05, finalizeEvent, verifyEvent } = require('nostr-tools');
+
+// Node <22 has no global WebSocket; nostr-tools SimplePool needs one.
+if (typeof globalThis.WebSocket === 'undefined') {
+  try {
+    // eslint-disable-next-line global-require
+    globalThis.WebSocket = require('ws');
+  } catch (_) {
+    /* optional until ws is installed; MCP hosts on Node 22+ are fine */
+  }
+}
+
 const config = require('./config');
 const { detectGraspFromRepoEvent } = require('./grasp-detection');
 const { normalizeOwnerPubkeyHexSync, privkeyToUint8Array } = require('./gittr-keys');
 const bridgeApi = require('./gittr-bridge-api');
 const nip82 = require('./gittr-nip82-software');
+const {
+  normalizeForgeSourceKey,
+  normalizeGithubOwnerRepo,
+  forgeKeysFrom30617Tags,
+  githubKeysFrom30617Tags,
+  matchedViaTags,
+} = require('./github-source-match');
 
 const RELAY_VERIFY_TIMEOUT_MS = Number(process.env.GITTR_RELAY_VERIFY_TIMEOUT_MS || 45000);
 
@@ -344,6 +362,177 @@ async function listRepos(options = {}) {
       event: event
     };
   });
+}
+
+/**
+ * Exact reverse lookup: upstream forge URL(s) → Nostr 30617 announces (+ npub for DMs).
+ * GitHub / GitLab / Codeberg / Gitea / any https forge with source/forkedFrom tags.
+ * Does NOT fuzzy-match repo `d` / display names.
+ *
+ * @param {object} options
+ * @param {string|string[]} [options.source] - forge URL(s) or github owner/repo shorthand
+ * @param {string|string[]} [options.sources]
+ * @param {string|string[]} [options.github] - alias (same exact matcher)
+ * @param {string|string[]} [options.githubs]
+ * @param {string|string[]} [options.url]
+ * @param {string|string[]} [options.urls]
+ * @param {number} [options.limit=2500]
+ * @param {string[]} [options.relays]
+ */
+async function findReposBySource(options = {}) {
+  const {
+    source = null,
+    sources = null,
+    github = null,
+    githubs = null,
+    url = null,
+    urls = null,
+    limit = 2500,
+    relays = null,
+  } = options;
+
+  const rawInputs = []
+    .concat(source != null ? source : [])
+    .concat(sources != null ? sources : [])
+    .concat(github != null ? github : [])
+    .concat(githubs != null ? githubs : [])
+    .concat(url != null ? url : [])
+    .concat(urls != null ? urls : [])
+    .flat()
+    .map((x) => String(x).trim())
+    .filter(Boolean);
+
+  if (rawInputs.length === 0) {
+    throw new Error(
+      'Provide source/sources (or github/url aliases): forge URL or owner/repo. Exact match only — no name fuzzy search.'
+    );
+  }
+
+  const relayList = Array.isArray(relays) && relays.length > 0
+    ? relays
+    : [...new Set(['wss://relay.gittr.space', ...config.relays])];
+
+  /** @type {{ input: string, key: string|null, error?: string }[]} */
+  const wants = rawInputs.map((input) => {
+    const key = normalizeForgeSourceKey(input);
+    if (!key) {
+      return {
+        input,
+        key: null,
+        error: 'not a forge repo URL (need host/owner/repo; GRASP/gittr clones are skipped)',
+      };
+    }
+    return { input, key };
+  });
+
+  const wantKeys = new Set(wants.map((w) => w.key).filter(Boolean));
+  const pool = getPool();
+  let events = [];
+  try {
+    events = await pool.querySync(relayList, {
+      kinds: [KIND_REPOSITORY],
+      limit: Math.min(Math.max(Number(limit) || 2500, 50), 5000),
+    });
+  } finally {
+    try {
+      if (relayList.length) pool.close(relayList);
+    } catch (_) { /* ignore */ }
+  }
+
+  /** @type {Map<string, any>} */
+  const latestByCoord = new Map();
+  for (const event of events) {
+    if (!event || event.kind !== KIND_REPOSITORY) continue;
+    const d = (event.tags || []).find((t) => t[0] === 'd')?.[1];
+    if (!d) continue;
+    const coord = `${event.pubkey}:${d}`;
+    const prev = latestByCoord.get(coord);
+    if (!prev || (event.created_at || 0) > (prev.created_at || 0)) {
+      latestByCoord.set(coord, event);
+    }
+  }
+
+  /** @type {Map<string, object[]>} */
+  const matchesByKey = new Map();
+  for (const key of wantKeys) matchesByKey.set(key, []);
+
+  for (const event of latestByCoord.values()) {
+    const keys = forgeKeysFrom30617Tags(event.tags || []);
+    const hitKeys = [...keys].filter((k) => wantKeys.has(k));
+    if (hitKeys.length === 0) continue;
+
+    const parsed = parse30617Announcement(event);
+    if (!parsed || parsed.publicRead === false) continue;
+
+    let npub = event.pubkey;
+    try {
+      npub = nip19.npubEncode(event.pubkey);
+    } catch (_) { /* keep hex */ }
+
+    const { cloneUrls } = detectGraspFromRepoEvent(event.tags || []);
+    const sourceUrl = parsed.source || parsed.forkedFrom || null;
+    const gittrRepoUrl = `https://gittr.space/${npub}/${parsed.repoId}`;
+    const gittrProfileUrl = `https://gittr.space/${npub}`;
+    const base = {
+      npub,
+      pubkey: event.pubkey,
+      repoId: parsed.repoId,
+      name: parsed.name,
+      /** Upstream forge URL from the announce (prefer source, else forkedFrom). */
+      sourceUrl,
+      source: sourceUrl,
+      forkedFrom: parsed.forkedFrom || null,
+      cloneUrls: cloneUrls.length ? cloneUrls : parsed.clone || [],
+      /** gittr repo page for this announce */
+      gittrRepoUrl,
+      /** Owner profile on gittr — other repos / contact / DM */
+      gittrProfileUrl,
+      /** @deprecated alias of gittrRepoUrl */
+      gittrUrl: gittrRepoUrl,
+      eventId: event.id,
+      created_at: event.created_at,
+    };
+
+    for (const key of hitKeys) {
+      matchesByKey.get(key).push({
+        ...base,
+        matchedKey: key,
+        matchedVia: matchedViaTags(event.tags || [], key),
+      });
+    }
+  }
+
+  const results = wants.map((w) => {
+    if (!w.key) {
+      return { input: w.input, key: null, ok: false, error: w.error, matches: [] };
+    }
+    const matches = matchesByKey.get(w.key) || [];
+    return {
+      input: w.input,
+      key: w.key,
+      ok: true,
+      found: matches.length > 0,
+      matches,
+    };
+  });
+
+  return {
+    matchMode: 'exact-forge-source-url',
+    note:
+      'Matches kind 30617 source/forkedFrom (and non-GRASP forge URLs on clone/web/link). ' +
+      'GitHub, GitLab, Codeberg, Gitea, … — exact host/path only, no fuzzy names. ' +
+      'Returns npub so you can open the profile / DM on Nostr when the forge is unreachable. ' +
+      'Empty usually means never Push to Nostr or missing source tag.',
+    relays: relayList,
+    scannedEvents: events.length,
+    uniqueAnnouncements: latestByCoord.size,
+    results,
+  };
+}
+
+/** @deprecated alias — same as findReposBySource */
+async function findReposByGithub(options = {}) {
+  return findReposBySource(options);
 }
 
 // Query issues for a repo
@@ -1452,6 +1641,8 @@ async function deleteSoftwareAnnounce({
 module.exports = {
   // Repository operations
   listRepos,
+  findReposBySource,
+  findReposByGithub,
   publishRepoAnnouncement,
   publishRepo: publishRepoAnnouncement, // Alias
   publishRepoState,
@@ -1487,6 +1678,10 @@ module.exports = {
   requireRepoActingAuthority,
   fetchLatestRepo30617,
   parse30617Announcement,
+  normalizeForgeSourceKey,
+  normalizeGithubOwnerRepo,
+  forgeKeysFrom30617Tags,
+  githubKeysFrom30617Tags,
 
   // Event kinds
   KIND_GIT_REPOSITORIES_LIST: 10018,

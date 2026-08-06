@@ -79,6 +79,75 @@ const tools = [
     },
   },
   {
+    name: 'findReposBySource',
+    description:
+      'Exact reverse lookup: given one or more forge URLs (GitHub, GitLab, Codeberg, Gitea, …) or github owner/repo shorthand, find Nostr kind-30617 announces with that source/forkedFrom. Returns npub + gittr URL so you can DM owners when the forge is unreachable. Does NOT fuzzy-match renamed slugs.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        source: {
+          oneOf: [
+            { type: 'string' },
+            { type: 'array', items: { type: 'string' } },
+          ],
+          description: 'Forge URL(s) or github owner/repo shorthand',
+        },
+        sources: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Batch of forge URLs / owner/repo',
+        },
+        github: {
+          oneOf: [
+            { type: 'string' },
+            { type: 'array', items: { type: 'string' } },
+          ],
+          description: 'Alias for source (same exact matcher)',
+        },
+        githubs: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Alias for sources',
+        },
+        limit: {
+          type: 'number',
+          description: 'Max kind 30617 events to scan (default 2500, max 5000)',
+        },
+        relays: { type: 'array', items: { type: 'string' }, description: 'Custom relay URLs' },
+      },
+    },
+  },
+  {
+    name: 'findReposByGithub',
+    description:
+      'Alias for findReposBySource (exact forge URL → npub). Prefer findReposBySource for non-GitHub forges.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        github: {
+          oneOf: [
+            { type: 'string' },
+            { type: 'array', items: { type: 'string' } },
+          ],
+          description: 'Forge URL(s) or owner/repo',
+        },
+        githubs: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+        source: {
+          oneOf: [
+            { type: 'string' },
+            { type: 'array', items: { type: 'string' } },
+          ],
+        },
+        sources: { type: 'array', items: { type: 'string' } },
+        limit: { type: 'number' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+    },
+  },
+  {
     name: 'myRepos',
     description: 'List repositories owned by the current user (from .nostr-keys.json)',
     inputSchema: {
@@ -1068,6 +1137,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case 'searchRepos':
         result = await gittr.searchRepos(args.query, args);
+        break;
+      case 'findReposBySource':
+        result = await gittr.findReposBySource(args);
+        break;
+      case 'findReposByGithub':
+        result = await gittr.findReposByGithub(args);
         break;
       case 'myRepos':
         result = await gittr.myRepos(args);

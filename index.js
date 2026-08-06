@@ -47,6 +47,8 @@ module.exports = {
   getRepo: gittrAgent.getRepo,
   resolveRepoByNostrId: gittrAgent.resolveRepoByNostrId,
   searchRepos: gittrAgent.searchRepos,
+  findReposBySource: gittrAgent.findReposBySource,
+  findReposByGithub: gittrAgent.findReposByGithub,
   listBounties: gittrAgent.listBounties,
   forkRepo: gittrAgent.forkRepo,
   myRepos: gittrAgent.myRepos,
