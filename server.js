@@ -710,6 +710,37 @@ const tools = [
     },
   },
   {
+    name: 'softDeleteRepo',
+    description:
+      'Owner soft-delete for a NIP-34 repo: publish replaceable 30617 with deleted markers + NIP-09 kind 5 on a=30617:owner:repo (same as gittr Settings → Delete). Alias: deleteRepo.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        repoId: { type: 'string', description: 'Repository d-tag / slug' },
+        name: { type: 'string' },
+        description: { type: 'string' },
+        privkey: { type: 'string', description: 'Owner nsec or hex (optional if keys loaded)' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['repoId'],
+    },
+  },
+  {
+    name: 'deleteRepo',
+    description: 'Alias for softDeleteRepo — soft-delete a NIP-34 repository (owner only).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        repoId: { type: 'string' },
+        name: { type: 'string' },
+        description: { type: 'string' },
+        privkey: { type: 'string' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['repoId'],
+    },
+  },
+  {
     name: 'publishSoftwareAnnounce',
     description:
       'Low-level: publish NIP-82 events from an already-fetched forge payload (ok:true + hashed APK). Prefer announceSoftwareFromForgeRelease.',
@@ -1247,6 +1278,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case 'deleteSoftwareAnnounce':
         result = await gittr.deleteSoftwareAnnounce(args);
+        break;
+      case 'softDeleteRepo':
+      case 'deleteRepo':
+        result = await gittr.softDeleteRepo(args);
         break;
       case 'publishSoftwareAnnounce':
         result = await gittr.publishSoftwareAnnounce(args);

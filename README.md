@@ -209,8 +209,12 @@ Entry point: `index.js`. MCP process: `server.js` (npm bin **`gittr-mcp`**).
 In chat, ask the agent to call **`describeAgentAuth`**, or from the repo:
 
 ```bash
-npm test
+npm test                 # full package (includes clone-set + forge-match regressions)
+npm run test:regressions # fast: grasp clone URLs + findReposBySource matchers
+npm run test:mcp-stdio   # optional live stdio CallTool matrix
 ```
+
+UI / file-fetch tip fidelity regressions live in the gittr monorepo: `cd ../gittr/ui && npm run test:regressions` (see gittr `docs/FILE_FETCHING_INSIGHTS.md`).
 
 ---
 

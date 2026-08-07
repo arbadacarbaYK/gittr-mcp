@@ -190,6 +190,9 @@ function relayToHttpsDomain(relayUrl) {
 
 function buildRelayPublishSet(requestedRelays = []) {
   const safeFallbacks = [
+    'wss://nos.lol',
+    'wss://relay.damus.io',
+    'wss://purplepag.es',
     'wss://ngit-relay.nostrver.se',
     'wss://relay.ngit.dev',
     'wss://git.shakespeare.diy',
@@ -200,7 +203,7 @@ function buildRelayPublishSet(requestedRelays = []) {
   ]));
   return merged
     .filter((r) => !String(r).includes('noderunners.network'))
-    .slice(0, 4); // cap to avoid broad relay fan-out
+    .slice(0, 6);
 }
 
 /**
@@ -1719,6 +1722,33 @@ async function announceSoftwareFromForgeRelease(options = {}) {
   );
 }
 
+async function softDeleteRepo(options = {}) {
+  let { privkey, repoId, relays, name, description } = options;
+  if (!privkey) {
+    const creds = loadCredentials();
+    if (creds) privkey = creds.nsec || creds.secretKey || creds.private_key;
+  }
+  if (!privkey) {
+    throw new Error('No signing key. Pass privkey or configure .nostr-keys.json.');
+  }
+  if (!repoId) throw new Error('repoId required');
+  return withAgentHints(
+    await gittrNostr.softDeleteRepo({
+      repoId,
+      privkey,
+      relays,
+      name,
+      description,
+    }),
+    {
+      nextSteps: [
+        'Clients that honor deleted tags / NIP-09 should hide the repo after relay propagation.',
+        'Bridge bare objects may remain on disk; soft-delete is the Nostr-side tombstone.',
+      ],
+    }
+  );
+}
+
 async function deleteSoftwareAnnounce(options = {}) {
   let { privkey, eventIds, relays, ownerPubkey } = options;
   if (!privkey) {
@@ -2354,17 +2384,31 @@ async function mergePullRequest(options) {
           await gitTry('git', ['-C', workDir, 'checkout', 'master']);
           resolvedBase = 'master';
         } catch (e3) {
-          return {
-            success: false,
-            error: `Could not checkout base branch ${baseBranch}: ${e2?.message || e3?.message}`,
-            reason: 'The cloned repo has no branch matching baseBranch/main/master.',
-            nextSteps: [
-              'Pass baseBranch that exists on the remote (see bridgeListRefs).',
-              'Ensure the default branch on the bridge matches what you expect.',
-            ],
-            prId,
-            repoId,
-          };
+          // Shallow clones sometimes only have detached HEAD — synthesize main from HEAD.
+          try {
+            await gitTry('git', ['-C', workDir, 'checkout', '-B', 'main']);
+            resolvedBase = 'main';
+          } catch (e4) {
+            let showRef = '';
+            try {
+              const r = await gitTry('git', ['-C', workDir, 'show-ref']);
+              showRef = String(r.stdout || '').slice(0, 500);
+            } catch (_) {
+              /* ignore */
+            }
+            return {
+              success: false,
+              error: `Could not checkout base branch ${baseBranch}: ${e2?.message || e3?.message}`,
+              reason: 'The cloned repo has no branch matching baseBranch/main/master.',
+              nextSteps: [
+                'Pass baseBranch that exists on the remote (see bridgeListRefs).',
+                'Ensure the default branch on the bridge matches what you expect.',
+                showRef ? `Local refs: ${showRef}` : 'git show-ref was empty after clone.',
+              ],
+              prId,
+              repoId,
+            };
+          }
         }
       }
     }
@@ -2623,6 +2667,8 @@ module.exports = {
   fetchForgeReleases,
   announceSoftwareFromForgeRelease,
   deleteSoftwareAnnounce,
+  softDeleteRepo,
+  deleteRepo: softDeleteRepo,
   publishSoftwareAnnounce: (a) => gittrNostr.publishSoftwareAnnounce(a),
   // Bridge HTTP (gittr/ngit API routes)
   bridgeRepoExists: (a) => bridgeApi.bridgeRepoExists(a.ownerPubkey, a.repo, a.bridgeUrl),

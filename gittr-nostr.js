@@ -195,6 +195,9 @@ function getPool() {
 
 function buildReliabilityRelaySet(relays = []) {
   const preferred = [
+    'wss://nos.lol',
+    'wss://relay.damus.io',
+    'wss://purplepag.es',
     'wss://relay.ngit.dev',
     'wss://ngit-relay.nostrver.se',
     'wss://git.shakespeare.diy',
@@ -1638,6 +1641,85 @@ async function deleteSoftwareAnnounce({
   return { ok: true, deletionEventId: event.id, catalogRelays };
 }
 
+/**
+ * Soft-delete a NIP-34 repo (owner only): replaceable 30617 with deleted markers
+ * + NIP-09 kind 5 on `a=30617:owner:repo`. Matches gittr Settings → Delete.
+ */
+async function softDeleteRepo({
+  repoId,
+  privkey,
+  relays = config.relays,
+  name,
+  description,
+}) {
+  if (!privkey) throw new Error('privkey required');
+  if (!repoId || typeof repoId !== 'string') throw new Error('repoId required');
+  const sk = privkeyToUint8Array(privkey);
+  const ownerHex = getPublicKey(privkey);
+  const relaySet = Array.isArray(relays) && relays.length ? relays : config.relays;
+  const relayValues = relaySet
+    .map((r) => {
+      if (!r) return null;
+      return r.startsWith('wss://') || r.startsWith('ws://') ? r : `wss://${r}`;
+    })
+    .filter(Boolean);
+
+  const tags = [
+    ['d', repoId],
+    ['name', name || repoId],
+    ['description', description || 'deleted'],
+    ['deleted', 'true'],
+    ['status', 'deleted'],
+    ['public-read', 'false'],
+    ['public-write', 'false'],
+  ];
+  if (relayValues.length > 0) tags.push(['relays', ...relayValues]);
+
+  const announce = finalizeEvent(
+    {
+      kind: KIND_REPOSITORY,
+      created_at: Math.floor(Date.now() / 1000),
+      tags,
+      content: JSON.stringify({
+        deleted: true,
+        archived: false,
+        publicRead: false,
+        publicWrite: false,
+      }),
+    },
+    sk
+  );
+  await publishEventChecked(relaySet, announce);
+  try {
+    await bridgeApi.sendEventToBridge(announce, config.bridgeUrl);
+  } catch (_) {
+    /* best-effort */
+  }
+
+  const nip09 = finalizeEvent(
+    {
+      kind: 5,
+      created_at: Math.floor(Date.now() / 1000),
+      content: `Delete repository ${repoId}`,
+      tags: [
+        ['a', `${KIND_REPOSITORY}:${ownerHex}:${repoId}`],
+        ['e', announce.id],
+        ['k', String(KIND_REPOSITORY)],
+      ],
+    },
+    sk
+  );
+  await publishEventChecked(relaySet, nip09);
+
+  return {
+    ok: true,
+    repoId,
+    ownerHex,
+    announcementEventId: announce.id,
+    deletionEventId: nip09.id,
+  };
+}
+
 module.exports = {
   // Repository operations
   listRepos,
@@ -1649,6 +1731,8 @@ module.exports = {
   pushToBridge,
   publishSoftwareAnnounce,
   deleteSoftwareAnnounce,
+  softDeleteRepo,
+  deleteRepo: softDeleteRepo,
   
   // Issue operations
   listIssues,

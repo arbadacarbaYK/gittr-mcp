@@ -81,6 +81,8 @@ module.exports = {
   fetchForgeReleases: gittrAgent.fetchForgeReleases,
   announceSoftwareFromForgeRelease: gittrAgent.announceSoftwareFromForgeRelease,
   deleteSoftwareAnnounce: gittrAgent.deleteSoftwareAnnounce,
+  softDeleteRepo: gittrAgent.softDeleteRepo,
+  deleteRepo: gittrAgent.softDeleteRepo,
   publishSoftwareAnnounce: gittrAgent.publishSoftwareAnnounce,
 
   // gittr/ngit HTTP bridge (same origin as BRIDGE_URL / gittr.space)
