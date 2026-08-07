@@ -60,7 +60,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@anthropic-ai/mcpb": "^1.0.0",
+    "@anthropic-ai/mcpb": "^2.1.2",
     "nodemon": "^3.1.0"
   },
   "engines": {
