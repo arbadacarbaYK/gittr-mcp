@@ -126,7 +126,7 @@ These are the **processes** people actually run; each maps to MCP tools the agen
 ### Session / keys
 - **`describeAgentAuth`** — run once: confirms keys load (never returns `nsec`); if unconfigured it tells the agent to ask you about a test keypair.  
 - **`setupTestKeypair`** — after your explicit OK, writes a disposable test identity to `.nostr-keys.json` (replace with your real `nsec` anytime).  
-- **`loadCredentials`**, **`getPublicKey`** — debugging helpers.
+- **`loadCredentials`**, **`getPublicKey`** — debugging helpers. MCP `loadCredentials` masks `nsec` (prefix only), `secretKey`, and `private_key`.
 
 **Full tool list:** 50+ tools in `server.js` (search for `name:`). Library API: [docs/DEVELOPER.md](docs/DEVELOPER.md).
 
