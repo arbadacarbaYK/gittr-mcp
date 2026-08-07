@@ -1225,9 +1225,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case 'loadCredentials':
         result = gittr.loadCredentials();
-        // Mask private data
-        if (result && result.nsec) {
-          result = { ...result, nsec: result.nsec?.substring(0, 8) + '...', secretKey: '[MASKED]' };
+        // Mask private material before returning over MCP (any known secret field name)
+        if (result && typeof result === 'object') {
+          result = {
+            ...result,
+            nsec: result.nsec
+              ? String(result.nsec).substring(0, 8) + '...'
+              : result.nsec,
+            secretKey: result.secretKey ? '[MASKED]' : result.secretKey,
+            private_key: result.private_key ? '[MASKED]' : result.private_key,
+          };
         }
         break;
       // NEW: gittr.space feature parity
