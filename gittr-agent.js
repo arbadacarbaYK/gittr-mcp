@@ -6,6 +6,7 @@ const bridgeApi = require('./gittr-bridge-api.js');
 const { probeGitSmartHttp } = require('./gittr-verify.js');
 const { withAgentHints, suggestNextStepsForTool } = require('./gittr-agent-outcomes.js');
 const { privkeyToUint8Array } = require('./gittr-keys.js');
+const { buildFullGraspCloneUrls } = require('./grasp-detection.js');
 const { nip19 } = require('nostr-tools');
 const fs = require('fs');
 const fsPromises = require('fs/promises');
@@ -258,19 +259,10 @@ async function createRepo(options) {
   // Step 2: Build user-facing URLs. Publish **npub** paths (NIP-34); keep hex as
   // a working fallback probe (on-disk layout) when the npub symlink is missing.
   const ownerNpub = nip19.npubEncode(pubkey);
-  const userCloneUrls = [
-    `https://git.gittr.space/${ownerNpub}/${name}.git`,
-    `https://git.gittr.space/${pubkey}/${name}.git`,
-    `https://relay.ngit.dev/${pubkey}/${name}.git`
-  ];
+  const announcementCloneUrls = buildFullGraspCloneUrls(ownerNpub, name);
   // Keep relay targeting deterministic: publish only to explicitly provided relays.
   // Cross-relay policy differences can reject announcements when clone/relay tags do not align.
   const announceRelays = buildRelayPublishSet(relays);
-  // Publish clone tags that match listed relay domains, otherwise many relays reject 30617.
-  const relayDomains = (Array.isArray(announceRelays) ? announceRelays : [])
-    .map(relayToHttpsDomain)
-    .filter(Boolean);
-  const announcementCloneUrls = Array.from(new Set(relayDomains.map((d) => `https://${d}/${pubkey}/${name}.git`)));
 
   // Include web URLs in announcement; npub-first matches gittr UI convention.
   const webUrls = [
@@ -288,7 +280,9 @@ async function createRepo(options) {
       name,
       description,
       web: webUrls,
-      clone: announcementCloneUrls.length > 0 ? announcementCloneUrls : [`https://relay.ngit.dev/${pubkey}/${name}.git`],
+      clone: announcementCloneUrls.length > 0
+        ? announcementCloneUrls
+        : [`https://git.gittr.space/${ownerNpub}/${name}.git`],
       privkey,
       relays: announceRelays.length > 0 ? announceRelays : ['wss://relay.ngit.dev'],
       pushCostSats,
@@ -383,7 +377,7 @@ async function createRepo(options) {
   }
 
   if (requireDiscoverable && !discoverable) {
-    const gitSmartHttpCheck = await probeGitSmartHttp(userCloneUrls[0]);
+    const gitSmartHttpCheck = await probeGitSmartHttp(announcementCloneUrls[0]);
     const effectiveAnnouncementError = announceError || 'Announcement not queryable on target relays after publish';
     return withAgentHints(
       {
@@ -393,7 +387,7 @@ async function createRepo(options) {
         repoId: name,
         name,
         description,
-        cloneUrl: userCloneUrls[0],
+        cloneUrl: announcementCloneUrls[0],
         webUrl: webUrls[0],
         pushedFiles: pushResult?.pushedFiles || 0,
         commit: pushResult?.refs?.[0]?.commit,
@@ -429,7 +423,7 @@ async function createRepo(options) {
   }
 
   if (!announceResult?.event) {
-    const gitSmartHttpCheck = await probeGitSmartHttp(userCloneUrls[0]);
+    const gitSmartHttpCheck = await probeGitSmartHttp(announcementCloneUrls[0]);
     return withAgentHints(
       {
         success: false,
@@ -440,7 +434,7 @@ async function createRepo(options) {
         repoId: name,
         name,
         description,
-        cloneUrl: userCloneUrls[0],
+        cloneUrl: announcementCloneUrls[0],
         webUrl: webUrls[0],
         pushedFiles: pushResult?.pushedFiles || 0,
         commit: pushResult?.refs?.[0]?.commit,
@@ -467,7 +461,7 @@ async function createRepo(options) {
     );
   }
 
-  const gitSmartHttpCheck = await probeGitSmartHttp(userCloneUrls[0]);
+  const gitSmartHttpCheck = await probeGitSmartHttp(announcementCloneUrls[0]);
   const relayListingOk = discoverable === true;
   const gitHttpOk = gitSmartHttpCheck.cloneHttpVerified === true;
 
@@ -477,7 +471,7 @@ async function createRepo(options) {
       repoId: name,
       name,
       description,
-      cloneUrl: userCloneUrls[0],
+      cloneUrl: announcementCloneUrls[0],
       webUrl: webUrls[0],
       pushedFiles: pushResult?.pushedFiles || 0,
       commit: pushResult?.refs?.[0]?.commit,
@@ -911,9 +905,10 @@ async function mirrorRepo(options) {
     }
   }
   
-  // Create clone URLs including source
-  const graspCloneUrl = `https://${graspServer}/${pubkey}/${repoName}.git`;
-  const cloneUrls = [graspCloneUrl, sourceUrl];
+  // Create clone URLs: full GRASP push set (npub). Forge URL stays in source/forkedFrom only.
+  const ownerNpub = nip19.npubEncode(pubkey);
+  const graspCloneUrl = `https://git.gittr.space/${ownerNpub}/${repoName}.git`;
+  const cloneUrls = buildFullGraspCloneUrls(ownerNpub, repoName);
   
   // Publish announcement with source reference (needed for reverse GitHub lookup)
   const result = await gittrNostr.publishRepoAnnouncement({
@@ -921,7 +916,7 @@ async function mirrorRepo(options) {
     name: repoName,
     description: description || `Mirrored from ${sourceUrl}`,
     web: webUrl ? [webUrl] : [],
-    clone: cloneUrls,
+    clone: cloneUrls.length > 0 ? cloneUrls : [graspCloneUrl],
     source: webUrl || undefined,
     forkedFrom: webUrl || undefined,
     privkey,
@@ -934,6 +929,7 @@ async function mirrorRepo(options) {
     success: true,
     repoId: repoName,
     cloneUrl: graspCloneUrl,
+    cloneUrls,
     sourceUrl,
     webUrl,
     announcementEvent: result.event

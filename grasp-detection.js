@@ -5,8 +5,35 @@
 const KNOWN_GRASP_DOMAINS = [
   'relay.ngit.dev',
   'gittr.space',
-  'git.gittr.space'
+  'git.gittr.space',
+  'relay.gittr.space',
+  'gitnostr.com',
+  'ngit.danconwaydev.com',
+  'git.shakespeare.diy',
 ];
+
+/** Hosts we advertise on clone[] when creating/mirroring (matches gittr UI Push). */
+const GRASP_CLONE_HOSTS_FOR_PUSH = [
+  'git.gittr.space',
+  'relay.gittr.space',
+  'relay.ngit.dev',
+  'gitnostr.com',
+  'ngit.danconwaydev.com',
+  'git.shakespeare.diy',
+];
+
+/**
+ * Full NIP-34 clone set (npub paths) — do not derive from capped relay publish list.
+ * Forge URLs belong in `source`/`forkedFrom`, not here.
+ */
+function buildFullGraspCloneUrls(ownerNpubOrHex, repoName) {
+  const owner = String(ownerNpubOrHex || '').trim();
+  const repo = String(repoName || '').trim().replace(/\.git$/i, '');
+  if (!owner || !repo) return [];
+  return GRASP_CLONE_HOSTS_FOR_PUSH.map(
+    (host) => `https://${host}/${owner}/${repo}.git`
+  );
+}
 
 /**
  * Check if a URL is a GRASP server
@@ -109,6 +136,8 @@ async function detectGRASPServers(relays) {
 
 module.exports = {
   KNOWN_GRASP_DOMAINS,
+  GRASP_CLONE_HOSTS_FOR_PUSH,
+  buildFullGraspCloneUrls,
   isGraspServer,
   getGraspServers,
   getRegularRelays,
