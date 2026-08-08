@@ -19,14 +19,16 @@ MCP tool errors from `publishRepoAnnouncement` / `createIssue` / `createPR` incl
 
 #### `pushToBridge(options)`
 
-Push files to the gittr bridge. **Requires `privkey`** for NIP-98 (challenge signed automatically; cached briefly).
+Push files (and optional deletes) to the gittr bridge. **Requires `privkey`** for NIP-98 (challenge signed automatically; cached briefly).
 
 - `ownerPubkey` — 64-char hex  
 - `repo`, `branch` (default `main`)  
-- `files` — `{ path, content }[]`; optional `isBinary` (base64)  
+- `files` — `{ path, content }[]`; optional `isBinary` (base64). May be `[]` when only deleting.  
+- `deletedPaths` — optional string[] of file or folder paths to remove on the tip before commit (same semantics as the gittr Code tab)  
+- `allowTreeShrink` — optional boolean; defaults **true** when `deletedPaths` is non-empty so the bridge accepts intentional shrinks  
 - `privkey` — hex or `nsec` (same as other tools)
 
-Returns `{ success, pushedFiles, refs: [{ ref, commit }] }`.
+Returns `{ success, pushedFiles, refs: [{ ref, commit }], deletedPathsApplied, allowTreeShrink }`.
 
 #### `publishRepoAnnouncement(options)`
 

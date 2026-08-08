@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "gittr-mcp",
   "display_name": "gittr — Git on Nostr",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Use gittr.space from Claude: repos, push, issues, PRs, stars, bounties, private repos. Nostr identity (NIP-34).",
   "long_description": "Connect your AI to [gittr.space](https://gittr.space) — decentralized git on Nostr. Create repos, push code, manage issues and pull requests, stars, Lightning bounties, and private repositories using your Nostr keys (not a GitHub login).",
   "author": {
