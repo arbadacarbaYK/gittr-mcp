@@ -247,15 +247,18 @@ async function createRepo(options) {
   }
   pubkey = pubkeyHex;
   
-  // Step 1: Push files to bridge (requires authentication)
+  // Step 1: Push files / deletes to bridge (requires authentication)
+  const deletedPaths = Array.isArray(options.deletedPaths) ? options.deletedPaths : [];
   let pushResult = null;
-  if (files.length > 0) {
+  if (files.length > 0 || deletedPaths.length > 0) {
     pushResult = await gittrNostr.pushToBridge({
       ownerPubkey: pubkey,
       repo: name,
       branch,
       files,
-      privkey  // Pass privkey for authenticated push
+      deletedPaths,
+      allowTreeShrink: options.allowTreeShrink,
+      privkey, // Pass privkey for authenticated push
     });
   }
   

@@ -91,6 +91,17 @@ const result = await gittr.pushToBridge({
   files: [{ path: 'README.md', content: '# Hello' }],
   privkey: '64-char-hex-privkey'  // ← Required!
 });
+
+// Delete a file or whole folder on the tip (parity with gittr UI)
+await gittr.pushToBridge({
+  ownerPubkey: '64-char-hex-pubkey',
+  repo: 'my-repo',
+  branch: 'main',
+  files: [],
+  deletedPaths: ['docs/old-folder', 'tmp/scratch.txt'],
+  commitMessage: 'chore: remove obsolete paths',
+  privkey: '64-char-hex-privkey',
+});
 ```
 
 Or use `createRepo()` which handles auth automatically:

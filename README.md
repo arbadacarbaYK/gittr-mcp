@@ -79,7 +79,7 @@ These are the **processes** people actually run; each maps to MCP tools the agen
 - **SSH key registration** is unchanged — keys identify *you*; private repos only check whether *your pubkey* has read permission.
 
 ### Day-to-day development
-- **`pushToBridge`** — update files on a branch (NIP-98 auth to gittr bridge).  
+- **`pushToBridge`** — update files on a branch (NIP-98 auth to gittr bridge); optional **`deletedPaths`** / **`allowTreeShrink`** for file or folder deletes (parity with Code-tab trash).  
 - **`getFile`**, **`bridgeListFiles`**, **`bridgeGetFileContent`**, **`getBranches`**, **`getCommitHistory`** — read repo state without cloning. (`getFile` ≈ bridge + a few GRASP raw URLs; for Code-tab parity see [MCP-GITTR-PARITY.md](docs/MCP-GITTR-PARITY.md) and gittr FILE_FETCHING_INSIGHTS.)
 - **`resolveRepoByNostrId`** — find clone URLs and relays from npub + repo name.
 

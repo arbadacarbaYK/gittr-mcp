@@ -6,7 +6,7 @@ This document tracks how MCP tools map to the **current** gittr web app (`ngit` 
 
 | Workflow | MCP tools | gittr today |
 |----------|-----------|-------------|
-| Push files | `pushToBridge` | NIP-98 challenge + `POST /api/nostr/repo/push` |
+| Push files / folder delete | `pushToBridge` (`files`, optional `deletedPaths`, `allowTreeShrink`) | NIP-98 challenge + `POST /api/nostr/repo/push` (UI sends `deletedPaths` + `allowTreeShrink` on final chunk) |
 | Publish repo | `createRepo`, `publishRepoAnnouncement`, `publishRepoState` | kinds **30617** + **30618**; **`clone[]` = full GRASP push set** (`buildFullGraspCloneUrls` — not capped relay hosts); forge URL in `source` only |
 | Issues | `createIssue`, `listIssues`, `getIssueById` | kind **1621** |
 | Close/reopen issue (Nostr) | `closeIssue`, `reopenIssue` | kinds **1632** / **1630** — **MCP publishes; web issue detail often only updates localStorage** |

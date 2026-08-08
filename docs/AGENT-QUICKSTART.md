@@ -115,7 +115,19 @@ const result = await gittr.pushToBridge({
       content: '// Fixed code here\nfunction widget() { ... }'
     }
   ],
-  commitMessage: 'fix: prevent widget crash on button click'
+  commitMessage: 'fix: prevent widget crash on button click',
+  privkey: 'your-nsec-or-hex', // required for bridge auth
+});
+
+// Remove a folder (or file) on the tip — same as Code-tab trash + Push to Nostr
+await gittr.pushToBridge({
+  ownerPubkey: 'owner-pubkey-hex',
+  repo: 'repo-name',
+  branch: 'main',
+  files: [],
+  deletedPaths: ['lab-kit'],
+  commitMessage: 'chore: remove lab-kit',
+  privkey: 'your-nsec-or-hex',
 });
 
 console.log('Code pushed:', result);

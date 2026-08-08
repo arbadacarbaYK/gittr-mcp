@@ -1288,8 +1288,19 @@ async function buildGitHttpsAuthGitConfigArgs({ httpsGitUrl, privkey, bridgeUrl 
   return ['-c', `${key}=${authorization}`, '-c', `${key}=X-Nostr-Auth-Event: ${xNostr}`];
 }
 
-// Push files to bridge - REQUIRES privkey for authentication
-async function pushToBridge({ ownerPubkey, repo, branch, files, commitMessage, privkey }) {
+// Push files to bridge - REQUIRES privkey for authentication.
+// Optional deletedPaths: file or folder paths to remove on the bare tip (same as gittr UI).
+// When deletedPaths is non-empty, allowTreeShrink defaults true so the bridge accepts intentional shrinks.
+async function pushToBridge({
+  ownerPubkey,
+  repo,
+  branch,
+  files,
+  commitMessage,
+  privkey,
+  deletedPaths,
+  allowTreeShrink,
+}) {
   if (!privkey) {
     throw new Error('Authentication required: privkey must be provided. The bridge now requires Nostr authentication.');
   }
@@ -1331,17 +1342,34 @@ async function pushToBridge({ ownerPubkey, repo, branch, files, commitMessage, p
     Authorization: `Nostr ${authHeader}`,
   };
 
-  const doPush = () => fetch(`${config.bridgeUrl}/api/nostr/repo/push`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      ownerPubkey,
-      repo,
-      branch,
-      files,
-      commitMessage
-    })
-  });
+  const normalizedDeleted = Array.isArray(deletedPaths)
+    ? [
+        ...new Set(
+          deletedPaths
+            .filter((p) => typeof p === 'string')
+            .map((p) => p.trim().replace(/^\/+|\/+$/g, ''))
+            .filter(Boolean)
+        ),
+      ]
+    : [];
+  const shrink =
+    allowTreeShrink === true ||
+    (allowTreeShrink !== false && normalizedDeleted.length > 0);
+
+  const doPush = () =>
+    fetch(`${config.bridgeUrl}/api/nostr/repo/push`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        ownerPubkey,
+        repo,
+        branch,
+        files: Array.isArray(files) ? files : [],
+        commitMessage,
+        deletedPaths: normalizedDeleted,
+        allowTreeShrink: shrink,
+      }),
+    });
 
   let response = await doPush();
   let result = await response.json().catch(() => ({}));
@@ -1380,8 +1408,12 @@ async function pushToBridge({ ownerPubkey, repo, branch, files, commitMessage, p
   } else if (!shouldPublishPostPush) {
     result.postPushNostrEvents = { skipped: true, reason: 'Set GITTR_PUBLISH_POST_PUSH_EVENTS=1 to enable' };
   }
-  
-  return result;
+
+  return {
+    ...result,
+    deletedPathsApplied: normalizedDeleted,
+    allowTreeShrink: shrink,
+  };
 }
 
 // Publish commit (30620) and state (30618) events after bridge push

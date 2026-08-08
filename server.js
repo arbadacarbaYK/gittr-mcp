@@ -159,7 +159,8 @@ const tools = [
   },
   {
     name: 'pushToBridge',
-    description: 'Push files to git server (REQUIRES signing with privkey for authenticated push). Bridge API now requires Nostr authentication.',
+    description:
+      'Push files to git server (REQUIRES signing with privkey). Optional deletedPaths removes files or whole folders on the bare tip (same as gittr UI folder delete); allowTreeShrink defaults true when deletes are present.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -176,12 +177,23 @@ const tools = [
               isBinary: { type: 'boolean' },
             },
           },
-          description: 'Array of { path, content } objects',
+          description: 'Array of { path, content } objects (may be empty when only deleting)',
+        },
+        deletedPaths: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'File or folder paths to remove from the tip before commit (prefix match for folders, same as gittr UI)',
+        },
+        allowTreeShrink: {
+          type: 'boolean',
+          description:
+            'Allow tip to shrink vs previous tree. Defaults true when deletedPaths is non-empty; set false to refuse shrinks.',
         },
         commitMessage: { type: 'string', description: 'Commit message' },
         privkey: { type: 'string', description: 'Private key for authentication (auto-loaded from .nostr-keys.json if not provided)' },
       },
-      required: ['ownerPubkey', 'repo', 'files'],
+      required: ['ownerPubkey', 'repo'],
     },
   },
   {

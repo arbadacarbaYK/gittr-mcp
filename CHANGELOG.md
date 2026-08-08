@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.4 (2026-08-09)
+
+### Features
+- `pushToBridge` accepts optional `deletedPaths` (file or folder) and `allowTreeShrink`, matching gittr UI folder delete + bridge push. Empty `files` is allowed when only deleting. MCP tool schema updated; `createRepo` forwards deletes.
+
+### Documentation
+- Updated MCP-GITTR-PARITY, DEVELOPER, SIGNING-GUIDE, and AGENT-QUICKSTART for delete parity.
+
 ## 1.0.2 (2026-07-12)
 
 ### Features
