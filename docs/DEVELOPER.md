@@ -24,11 +24,14 @@ Push files (and optional deletes) to the gittr bridge. **Requires `privkey`** fo
 - `ownerPubkey` — 64-char hex  
 - `repo`, `branch` (default `main`)  
 - `files` — `{ path, content }[]`; optional `isBinary` (base64). May be `[]` when only deleting.  
+- `commitMessage` — optional; defaults on the bridge/MCP to `Push from gittr (yy-mm-dd hh:mm)` UTC when omitted  
 - `deletedPaths` — optional string[] of file or folder paths to remove on the tip before commit (same semantics as the gittr Code tab)  
 - `allowTreeShrink` — optional boolean; defaults **true** when `deletedPaths` is non-empty so the bridge accepts intentional shrinks  
 - `privkey` — hex or `nsec` (same as other tools)
 
 Returns `{ success, pushedFiles, refs: [{ ref, commit }], deletedPathsApplied, allowTreeShrink }`.
+
+SSH `git push` is separate: those commits keep **your** `git commit -m` text (no auto “Push from gittr” rewrite).
 
 #### `publishRepoAnnouncement(options)`
 

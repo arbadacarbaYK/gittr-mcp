@@ -1288,6 +1288,14 @@ async function buildGitHttpsAuthGitConfigArgs({ httpsGitUrl, privkey, bridgeUrl 
   return ['-c', `${key}=${authorization}`, '-c', `${key}=X-Nostr-Auth-Event: ${xNostr}`];
 }
 
+
+function formatPushFromGittrStamp(unixSeconds = Math.floor(Date.now() / 1000)) {
+  const d = new Date((unixSeconds > 0 ? unixSeconds : Math.floor(Date.now() / 1000)) * 1000);
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const short = `${String(d.getUTCFullYear()).slice(-2)}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())} ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`;
+  return `Push from gittr (${short})`;
+}
+
 // Push files to bridge - REQUIRES privkey for authentication.
 // Optional deletedPaths: file or folder paths to remove on the bare tip (same as gittr UI).
 // When deletedPaths is non-empty, allowTreeShrink defaults true so the bridge accepts intentional shrinks.
@@ -1365,7 +1373,10 @@ async function pushToBridge({
         repo,
         branch,
         files: Array.isArray(files) ? files : [],
-        commitMessage,
+        commitMessage:
+          typeof commitMessage === 'string' && commitMessage.trim()
+            ? commitMessage.trim()
+            : formatPushFromGittrStamp(),
         deletedPaths: normalizedDeleted,
         allowTreeShrink: shrink,
       }),

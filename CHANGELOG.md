@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.5 (2026-08-09)
+
+### Fixes
+- `pushToBridge` defaults `commitMessage` to `Push from gittr (yy-mm-dd hh:mm)` UTC when omitted (matches gittr bridge). Custom messages still pass through.
+
 ## 1.0.4 (2026-08-09)
 
 ### Features
