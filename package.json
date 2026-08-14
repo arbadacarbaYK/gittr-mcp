@@ -55,12 +55,12 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@noble/secp256k1": "^3.1.0",
     "node-fetch": "^3.3.2",
-    "nostr-tools": "^2.23.1",
+    "nostr-tools": "^2.24.1",
     "ws": "^8.21.3",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@anthropic-ai/mcpb": "^1.0.0",
+    "@anthropic-ai/mcpb": "^2.1.2",
     "nodemon": "^3.1.0"
   },
   "engines": {
