@@ -39,6 +39,7 @@ const KIND_STATUS_APPLIED = 1631;        // Status: Applied/Merged
 const KIND_STATUS_CLOSED = 1632;         // Status: Closed
 const KIND_STATUS_DRAFT = 1633;          // Status: Draft
 const KIND_BOUNTY = 9806;                // gittr bounty metadata (see ngit events.ts)
+const KIND_COMMENT = 1111;               // NIP-22 comments (issues / PRs — not bounties)
 
 /** Resolve npub / hex / NIP-05 to lowercase hex for filters and tags. */
 async function resolveRepoOwnerHex(ownerPubkey) {
@@ -625,6 +626,268 @@ async function createIssue(privkeyOrOptions, repoIdArg, ownerPubkeyArg, subjectA
   }
 
   return { event, success: true };
+}
+
+/**
+ * Build NIP-22 comment tags (kind 1111), matching gittr UI `buildUnsignedCommentEvent`.
+ * Root scope: E / K / P. Parent scope: e / k / p. Optional gittr `repo` extension.
+ * Exported for unit tests — does not touch bounty (9806) tags.
+ */
+function buildCommentTags({
+  rootId,
+  rootKind,
+  rootPubkey,
+  replyTo,
+  parentPubkey,
+  repoEntity,
+  repoName,
+}) {
+  if (!rootId || typeof rootId !== 'string') {
+    throw new Error('buildCommentTags requires rootId');
+  }
+  const tags = [];
+  if (repoEntity && repoName) {
+    tags.push(['repo', String(repoEntity), String(repoName)]);
+  }
+  tags.push(['E', rootId]);
+  if (rootKind != null && rootKind !== undefined) {
+    tags.push(['K', String(rootKind)]);
+  }
+  if (rootPubkey && /^[0-9a-f]{64}$/i.test(rootPubkey)) {
+    tags.push(['P', rootPubkey.toLowerCase()]);
+  }
+
+  const isReply = Boolean(replyTo && replyTo !== rootId);
+  const parentEventId = isReply ? replyTo : rootId;
+  const parentKind = isReply ? KIND_COMMENT : rootKind;
+  let pPubkey;
+  if (isReply) {
+    pPubkey =
+      parentPubkey && /^[0-9a-f]{64}$/i.test(parentPubkey)
+        ? parentPubkey.toLowerCase()
+        : undefined;
+  } else if (rootPubkey && /^[0-9a-f]{64}$/i.test(rootPubkey)) {
+    pPubkey = rootPubkey.toLowerCase();
+  }
+
+  tags.push(['e', parentEventId]);
+  if (parentKind != null && parentKind !== undefined) {
+    tags.push(['k', String(parentKind)]);
+  }
+  if (pPubkey) {
+    tags.push(['p', pPubkey]);
+  }
+  return tags;
+}
+
+function parseRepoFromRootATag(rootEvent) {
+  const a = (rootEvent?.tags || []).find(
+    (t) => t[0] === 'a' && typeof t[1] === 'string' && t[1].startsWith(`${KIND_REPOSITORY}:`)
+  );
+  if (!a) return { ownerHex: undefined, repoId: undefined };
+  const parts = a[1].split(':');
+  if (parts.length < 3) return { ownerHex: undefined, repoId: undefined };
+  return { ownerHex: parts[1], repoId: parts.slice(2).join(':') };
+}
+
+async function fetchIssueOrPrRoot({ rootId, rootKind, relays }) {
+  const pool = getPool();
+  const kinds =
+    rootKind === KIND_ISSUE || rootKind === KIND_PULL_REQUEST
+      ? [rootKind]
+      : [KIND_ISSUE, KIND_PULL_REQUEST];
+  const events = await pool.querySync(relays, {
+    kinds,
+    ids: [rootId],
+    limit: 1,
+  });
+  return events[0] || null;
+}
+
+/** List NIP-22 comments (kind 1111) whose uppercase E tag points at the root issue/PR id. */
+async function listComments({ rootId, relays = config.relays, limit = 100 }) {
+  if (!rootId) throw new Error('listComments({ rootId }) requires rootId');
+  const pool = getPool();
+  const events = await pool.querySync(relays, {
+    kinds: [KIND_COMMENT],
+    '#E': [rootId],
+    limit,
+  });
+  return events
+    .slice()
+    .sort((a, b) => (a.created_at || 0) - (b.created_at || 0))
+    .map((event) => {
+      const tags = Object.fromEntries(event.tags.filter((t) => t.length >= 2));
+      const parentId = tags.e || null;
+      return {
+        id: event.id,
+        author: event.pubkey,
+        created_at: event.created_at,
+        content: event.content,
+        rootId: tags.E || rootId,
+        parentId,
+        rootKind: tags.K ? Number(tags.K) : undefined,
+        event,
+      };
+    });
+}
+
+async function listIssueComments({ issueId, relays, limit }) {
+  return listComments({ rootId: issueId, relays, limit });
+}
+
+async function listPRComments({ prId, relays, limit }) {
+  return listComments({ rootId: prId, relays, limit });
+}
+
+/**
+ * Publish a NIP-22 comment on an issue (1621) or PR (1618).
+ * Does not create or modify bounty events (9806).
+ */
+async function createComment(options = {}) {
+  const {
+    rootId,
+    content,
+    privkey,
+    replyTo,
+    parentPubkey,
+    rootKind: rootKindHint,
+    ownerPubkey,
+    repoId,
+    repoEntity,
+    repoName,
+    relays = config.relays,
+  } = options;
+
+  if (!rootId || typeof rootId !== 'string') {
+    throw new Error('createComment({ rootId, content, privkey }) requires rootId');
+  }
+  if (!content || typeof content !== 'string' || !content.trim()) {
+    throw new Error('createComment requires non-empty content');
+  }
+  if (!privkey) {
+    throw new Error('createComment requires privkey (nsec or hex)');
+  }
+
+  const relaySet = buildReliabilityRelaySet(relays);
+  const root = await fetchIssueOrPrRoot({
+    rootId,
+    rootKind: rootKindHint,
+    relays: relaySet,
+  });
+  if (!root) {
+    throw new Error(
+      `Root event ${rootId} not found as issue (1621) or PR (1618) on queried relays`
+    );
+  }
+  if (root.kind === KIND_BOUNTY) {
+    throw new Error('Cannot comment on bounty events; use issue/PR root ids only');
+  }
+  if (root.kind !== KIND_ISSUE && root.kind !== KIND_PULL_REQUEST) {
+    throw new Error(
+      `Root must be issue (1621) or PR (1618); got kind ${root.kind}`
+    );
+  }
+  if (
+    rootKindHint != null &&
+    rootKindHint !== root.kind &&
+    (rootKindHint === KIND_ISSUE || rootKindHint === KIND_PULL_REQUEST)
+  ) {
+    throw new Error(
+      `Root kind mismatch: expected ${rootKindHint}, found ${root.kind}`
+    );
+  }
+
+  const fromA = parseRepoFromRootATag(root);
+  let entity = repoEntity || ownerPubkey || fromA.ownerHex;
+  let name = repoName || repoId || fromA.repoId;
+  if (entity) {
+    try {
+      entity = await resolveRepoOwnerHex(entity);
+    } catch (_) {
+      /* keep as provided */
+    }
+  }
+
+  let resolvedParentPubkey = parentPubkey;
+  if (replyTo && replyTo !== rootId && !resolvedParentPubkey) {
+    try {
+      const pool = getPool();
+      const parentEvs = await pool.querySync(relaySet, {
+        kinds: [KIND_COMMENT],
+        ids: [replyTo],
+        limit: 1,
+      });
+      if (parentEvs[0]?.pubkey) resolvedParentPubkey = parentEvs[0].pubkey;
+    } catch (_) {
+      /* optional */
+    }
+  }
+
+  const sk = privkeyToUint8Array(privkey);
+  const tags = buildCommentTags({
+    rootId,
+    rootKind: root.kind,
+    rootPubkey: root.pubkey,
+    replyTo,
+    parentPubkey: resolvedParentPubkey,
+    repoEntity: entity,
+    repoName: name,
+  });
+
+  const unsignedEvent = {
+    kind: KIND_COMMENT,
+    created_at: Math.floor(Date.now() / 1000),
+    tags,
+    content: content.trim(),
+  };
+  const event = finalizeEvent(unsignedEvent, sk);
+
+  await publishEventChecked(relaySet, event);
+  try {
+    await bridgeApi.sendEventToBridge(event, config.bridgeUrl);
+  } catch (_) {
+    // best-effort bridge ingest
+  }
+  const visibility = await verifyEventOnRelays(
+    relaySet,
+    event.id,
+    KIND_COMMENT,
+    RELAY_VERIFY_TIMEOUT_MS
+  );
+  if (!visibility.confirmed) {
+    const err = new Error(
+      `VERIFICATION_FAILED: kind ${KIND_COMMENT} event ${event.id} not readable on relays after ${visibility.elapsedMs}ms (${visibility.attempts} poll rounds).`
+    );
+    err.verification = visibility;
+    err.relayVerification = visibility;
+    throw err;
+  }
+
+  return {
+    event,
+    success: true,
+    rootId,
+    rootKind: root.kind,
+  };
+}
+
+async function createIssueComment(options = {}) {
+  const rootId = options.issueId || options.rootId;
+  return createComment({
+    ...options,
+    rootId,
+    rootKind: KIND_ISSUE,
+  });
+}
+
+async function createPRComment(options = {}) {
+  const rootId = options.prId || options.rootId;
+  return createComment({
+    ...options,
+    rootId,
+    rootKind: KIND_PULL_REQUEST,
+  });
 }
 
 // Query PRs for a repo
@@ -1780,6 +2043,13 @@ module.exports = {
   // Issue operations
   listIssues,
   createIssue,
+  listComments,
+  listIssueComments,
+  listPRComments,
+  createComment,
+  createIssueComment,
+  createPRComment,
+  buildCommentTags,
   
   // Pull Request operations
   listPRs,
@@ -1823,6 +2093,7 @@ module.exports = {
   KIND_STATUS_DRAFT,
   KIND_BOUNTY,
   KIND_PR_UPDATE,
+  KIND_COMMENT,
   
   // Export config for agent functions
   config

@@ -9,13 +9,14 @@ This document tracks how MCP tools map to the **current** gittr web app (`ngit` 
 | Push files / folder delete | `pushToBridge` (`files`, optional `deletedPaths`, `allowTreeShrink`) | NIP-98 challenge + `POST /api/nostr/repo/push` (UI sends `deletedPaths` + `allowTreeShrink` on final chunk) |
 | Publish repo | `createRepo`, `publishRepoAnnouncement`, `publishRepoState` | kinds **30617** + **30618**; **`clone[]` = full GRASP push set** (`buildFullGraspCloneUrls` — not capped relay hosts); forge URL in `source` only |
 | Issues | `createIssue`, `listIssues`, `getIssueById` | kind **1621** |
+| Issue/PR comments | `listIssueComments`, `createIssueComment`, `listPRComments`, `createPRComment` | NIP-22 kind **1111** (`E`/`K`/`P` + `e`/`k`/`p`, optional `repo`) — same shape as gittr issue detail |
 | Close/reopen issue (Nostr) | `closeIssue`, `reopenIssue` | kinds **1632** / **1630** — **MCP publishes; web issue detail often only updates localStorage** |
 | PRs | `createPR`, `listPRs`, `updatePullRequest`, `getPullRequestById` | kinds **1618** / **1619** |
 | Merge PR (git + bridge) | `mergePullRequest` | git merge + bridge push + **30618** + **1631** |
 | Star | `starRepo`, `unstarRepo`, `listStars` | NIP-25 kind **7** on **30617** event id (`e`, `k`, `+`/`-`) |
 | Watch | `watchRepo`, `unwatchRepo`, `listWatchedRepos` | NIP-51 kind **10018** full `a` list |
 | Pay-to-push | `getPushPaywallStatus`, `createPushPaywallIntent`, `syncRepoPushPolicy` | `push_cost_sats` on **30617** + bridge SQLite |
-| Bounties | `createBountyInvoice`, `publishBountyToNostr`, `listBountiesForIssue`, … | kind **9806** + `/api/bounty/*` |
+| Bounties | `createBountyInvoice`, `publishBountyToNostr`, `listBountiesForIssue`, … | kind **9806** + `/api/bounty/*` (unchanged by comment tools) |
 | Bridge reads | `bridgeListFiles`, `bridgeGetFileContent`, `bridgeListRefs`, `bridgeListCommits` | same HTTP API as the site |
 | Import / mirror | `importRemoteToBridge`, `mirrorRepo` | `/api/nostr/repo/clone`, GitHub import patterns |
 | Reverse forge → Nostr | `findReposBySource` (alias `findReposByGithub`) — exact forge URL on `source`/`forkedFrom`, returns npub | `GET/POST /api/nostr/repos-by-github?source=` |

@@ -387,6 +387,76 @@ const tools = [
       required: ['ownerPubkey', 'repoId', 'subject', 'privkey', 'relays'],
     },
   },
+  {
+    name: 'listIssueComments',
+    description:
+      'List NIP-22 comments (kind 1111) on a Nostr issue (root E tag = issue id). Does not list or change bounties.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueId: { type: 'string', description: 'Issue event id (kind 1621)' },
+        limit: { type: 'number' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['issueId'],
+    },
+  },
+  {
+    name: 'createIssueComment',
+    description:
+      'Publish a NIP-22 comment (kind 1111) on an issue. Optional replyTo for threaded replies. Does not create/modify bounty (9806) events.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueId: { type: 'string', description: 'Root issue event id (kind 1621)' },
+        content: { type: 'string' },
+        replyTo: {
+          type: 'string',
+          description: 'Parent comment event id for a reply (omit to reply to the issue)',
+        },
+        ownerPubkey: { type: 'string', description: 'Optional; taken from issue a-tag when omitted' },
+        repoId: { type: 'string', description: 'Optional; taken from issue a-tag when omitted' },
+        privkey: { type: 'string', description: 'nsec or hex' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['issueId', 'content', 'privkey'],
+    },
+  },
+  {
+    name: 'listPRComments',
+    description:
+      'List NIP-22 comments (kind 1111) on a Nostr pull request (root E tag = PR id).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prId: { type: 'string', description: 'PR event id (kind 1618)' },
+        limit: { type: 'number' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['prId'],
+    },
+  },
+  {
+    name: 'createPRComment',
+    description:
+      'Publish a NIP-22 comment (kind 1111) on a pull request. Optional replyTo for threaded replies.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prId: { type: 'string', description: 'Root PR event id (kind 1618)' },
+        content: { type: 'string' },
+        replyTo: {
+          type: 'string',
+          description: 'Parent comment event id for a reply (omit to reply to the PR)',
+        },
+        ownerPubkey: { type: 'string' },
+        repoId: { type: 'string' },
+        privkey: { type: 'string', description: 'nsec or hex' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['prId', 'content', 'privkey'],
+    },
+  },
   // PR operations
   {
     name: 'listPRs',
@@ -1207,6 +1277,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case 'createIssue':
         result = await gittr.createIssue(args);
+        break;
+      case 'listIssueComments':
+        result = await gittr.listIssueComments(args);
+        break;
+      case 'createIssueComment':
+        result = await gittr.createIssueComment(args);
+        break;
+      case 'listPRComments':
+        result = await gittr.listPRComments(args);
+        break;
+      case 'createPRComment':
+        result = await gittr.createPRComment(args);
         break;
       case 'createPR':
         result = await gittr.createPR(args);

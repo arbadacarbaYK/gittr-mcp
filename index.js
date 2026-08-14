@@ -16,6 +16,13 @@ module.exports = {
   // Issue operations
   listIssues: gittrNostr.listIssues,
   createIssue: gittrNostr.createIssue,
+  listComments: gittrNostr.listComments,
+  listIssueComments: gittrNostr.listIssueComments,
+  listPRComments: gittrNostr.listPRComments,
+  createComment: gittrNostr.createComment,
+  createIssueComment: gittrNostr.createIssueComment,
+  createPRComment: gittrNostr.createPRComment,
+  buildCommentTags: gittrNostr.buildCommentTags,
 
   // Pull Request operations
   listPRs: gittrNostr.listPRs,
@@ -105,6 +112,7 @@ module.exports = {
   KIND_PULL_REQUEST: gittrNostr.KIND_PULL_REQUEST,
   KIND_PR_UPDATE: gittrNostr.KIND_PR_UPDATE,
   KIND_BOUNTY: gittrNostr.KIND_BOUNTY,
+  KIND_COMMENT: gittrNostr.KIND_COMMENT,
   KIND_STATUS_OPEN: gittrNostr.KIND_STATUS_OPEN,
   KIND_STATUS_APPLIED: gittrNostr.KIND_STATUS_APPLIED,
   KIND_STATUS_CLOSED: gittrNostr.KIND_STATUS_CLOSED,

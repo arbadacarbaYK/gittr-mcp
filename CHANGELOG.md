@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Features
+- **NIP-22 comments on issues/PRs:** `listIssueComments`, `createIssueComment`, `listPRComments`, `createPRComment` (kind **1111**). Additive only — bounty tools (kind **9806**) and create/list/close issue & PR flows are unchanged.
+
 ### Security
 - Documented false-positive triage for inbound MCP SDK advisories **CVE-2026-25536** / **GHSA-345p-7cg4-v4c7** and **CVE-2026-0621** / **GHSA-8r9q-7v3j-jr4g**: gittr-mcp is stdio + tools only on `@modelcontextprotocol/sdk@^1.30.0` (see `docs/SECURITY-ADVISORIES.md`).
 - Added `tests/mcp-sdk-reachability.test.js` so CI fails if Streamable HTTP / resource templates appear or the SDK drops below the patched floor.
