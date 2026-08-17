@@ -895,28 +895,28 @@ async function mirrorRepo(options) {
   
   const pubkey = gittrNostr.getPublicKey(privkey);
   
-  // Determine if GitHub or GitLab
+  // Forge web URL for `source` (GitHub, GitLab, Codeberg, Forgejo, any https owner/repo).
   let webUrl = '';
   let cloneUrl = sourceUrl;
-  
-  if (sourceUrl.includes('github.com')) {
-    const match = sourceUrl.match(/github\.com[/:]([^/]+)\/([^/.]+)/);
-    if (match) {
-      webUrl = `https://github.com/${match[1]}/${match[2]}`;
-    }
-  } else if (sourceUrl.includes('gitlab.com')) {
-    const match = sourceUrl.match(/gitlab\.com[/:]([^/]+)\/([^/.]+)/);
-    if (match) {
-      webUrl = `https://gitlab.com/${match[1]}/${match[2]}`;
-    }
+  const httpsMatch = String(sourceUrl || '').match(
+    /^https?:\/\/([^/]+)\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/i
+  );
+  const scpMatch = String(sourceUrl || '').match(
+    /^git@([^:]+):([^/]+)\/([^/]+?)(?:\.git)?$/
+  );
+  if (httpsMatch) {
+    webUrl = `https://${httpsMatch[1]}/${httpsMatch[2]}/${httpsMatch[3]}`;
+  } else if (scpMatch) {
+    webUrl = `https://${scpMatch[1]}/${scpMatch[2]}/${scpMatch[3]}`;
   }
   
-  // Create clone URLs: full GRASP push set (npub). Forge URL stays in source/forkedFrom only.
+  // Create clone URLs: full GRASP push set (npub). Forge URL stays in source only.
   const ownerNpub = nip19.npubEncode(pubkey);
   const graspCloneUrl = `https://git.gittr.space/${ownerNpub}/${repoName}.git`;
   const cloneUrls = buildFullGraspCloneUrls(ownerNpub, repoName);
   
-  // Publish announcement with source reference (needed for reverse GitHub lookup)
+  // Publish announcement with source reference (needed for reverse GitHub lookup).
+  // forkedFrom is only a real parent (GitHub fork / gittr Fork), not this repo's own URL.
   const result = await gittrNostr.publishRepoAnnouncement({
     repoId: repoName,
     name: repoName,
@@ -924,7 +924,6 @@ async function mirrorRepo(options) {
     web: webUrl ? [webUrl] : [],
     clone: cloneUrls.length > 0 ? cloneUrls : [graspCloneUrl],
     source: webUrl || undefined,
-    forkedFrom: webUrl || undefined,
     privkey,
     relays,
     publicRead: options.publicRead,
