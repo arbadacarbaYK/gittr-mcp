@@ -158,9 +158,9 @@ console.log('PR created:', pr.event.id);
 - Just generate a Nostr keypair
 - No registration, no email, no API keys
 
-### ✅ Code Push Without Private Keys
-- Use `pushToBridge()` with only the owner's PUBLIC key
-- No need to manage sensitive credentials
+### ✅ Code Push Uses Your Nostr Key
+- `pushToBridge()` needs the owner's **privkey** (NIP-98 challenge). Pubkey alone is rejected.
+- Load it from env / `.nostr-keys.json` — never commit it.
 
 ### ✅ Issue & PR Management
 - Create issues on any repository

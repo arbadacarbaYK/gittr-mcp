@@ -38,8 +38,13 @@ const repos = await gittr.listRepos({ search: 'bitcoin' });
 // Find bounties
 const bounties = await gittr.listBounties({ minAmount: 1000 });
 
-// Push code (no privkey needed!)
-await gittr.pushToBridge(ownerPubkey, repoName, files);
+// Push code (privkey required — NIP-98 to the bridge)
+await gittr.pushToBridge({
+  ownerPubkey,
+  repo: repoName,
+  files,
+  privkey,
+});
 ```
 
 Full documentation: https://github.com/arbadacarbaYK/gittr-mcp
@@ -69,7 +74,7 @@ Agent → gittr-mcp → Nostr Relays (discover/publish)
                   → Bridge API (push code, create bounties)
 ```
 
-No private key needed for code push! Agents work with owner's public key only.
+Bridge push and Nostr publish both need the agent's Nostr private key. Discovery/list tools do not.
 
 ## Example Use Cases
 

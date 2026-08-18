@@ -28,6 +28,7 @@ const pushResult = await gittr.pushToBridge({
   ownerPubkey: '<your-pubkey-hex>',  // 64-char hex pubkey
   repo: 'my-repo',
   branch: 'main',
+  privkey: '<your-private-key-hex>', // required — NIP-98 auth to the bridge
   files: [
     {
       path: 'README.md',
@@ -46,7 +47,7 @@ console.log('Commit:', pushResult.refs[0].commit);
 
 ### 3. Publish to Nostr (Requires Private Key)
 
-**Important:** Steps 2 and 3 require your Nostr private key for signing events.
+**Important:** Steps 2 and 3 require your Nostr private key. `pushToBridge` signs a bridge challenge (NIP-98). Publish signs kinds 30617 / 30618. MCP has no Amber / NIP-46 path.
 
 ```javascript
 const { nip19 } = require('nostr-tools');
@@ -147,10 +148,10 @@ relays: ['wss://relay.noderunners.network'] // Different domain!
 ## Security Notes
 
 - **Never commit your private key to git**
-- Store it in environment variables or secure storage
-- Consider using NIP-07 (browser extension) for key management
-- The bridge API (step 1) does NOT require your private key
-- Only Nostr publishing (steps 2-3) requires signing
+- Store it in environment variables or a keys file (see [SIGNING-GUIDE.md](SIGNING-GUIDE.md))
+- MCP uses a local **nsec**, not a NIP-07 extension and not Amber (NIP-46)
+- `pushToBridge` (step 2) **does** require your private key (bridge NIP-98)
+- Nostr publishing (step 3) also requires signing
 
 ## Complete Example
 
