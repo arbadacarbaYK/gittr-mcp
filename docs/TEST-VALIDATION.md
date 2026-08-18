@@ -58,7 +58,7 @@ Tested complete agent workflow following AGENT-QUICKSTART.md:
 
 ## Testing the MCP
 
-**Default CI / `npm test`:** smoke exports + happy-path **dry-run only** (no relays mutations, no merge, no close).
+**Default CI / `npm test`:** smoke exports, MCP SDK reachability, stdio `tools/list` introspect (no nsec), plus happy-path **dry-run only** (no relays mutations, no merge, no close).
 
 **Prove issue close + PR merge (`mergePullRequest`)** with your test key and `git` on PATH:
 

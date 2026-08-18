@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Documentation
+- Added MIT `LICENSE` (package.json already declared MIT; Glama could not detect it), `Dockerfile` + `.dockerignore` for registry introspection, and `glama.json` so the [Glama listing](https://glama.ai/mcp/servers/arbadacarbaYK/gittr-mcp) can be claimed.
+
 ### Features
 - **NIP-22 comments on issues/PRs:** `listIssueComments`, `createIssueComment`, `listPRComments`, `createPRComment` (kind **1111**). Additive only — bounty tools (kind **9806**) and create/list/close issue & PR flows are unchanged.
 

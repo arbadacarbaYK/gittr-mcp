@@ -287,6 +287,8 @@ GITTR_TEST_NSEC=nsec1... npm run test:live:matrix
 
 - **This repo:** https://github.com/arbadacarbaYK/gittr-mcp  
 - **gittr.space:** https://gittr.space  
+- **Glama:** https://glama.ai/mcp/servers/arbadacarbaYK/gittr-mcp  
+- **Awesome MCP Servers:** https://github.com/punkpeye/awesome-mcp-servers (Version Control)  
 - **NIP-34 (git on Nostr):** https://github.com/nostr-protocol/nips/blob/master/34.md  
 
-MIT License.
+See [LICENSE](LICENSE) (MIT).
