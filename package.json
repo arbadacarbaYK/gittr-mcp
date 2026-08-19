@@ -55,7 +55,7 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@noble/secp256k1": "^3.1.0",
     "node-fetch": "^3.3.2",
-    "nostr-tools": "^2.24.1",
+    "nostr-tools": "^2.24.2",
     "ws": "^8.21.3",
     "zod": "^4.4.3"
   },
