@@ -18,6 +18,8 @@ Works with **Cursor**, **Claude Desktop**, **VS Code / Copilot MCP**, **Windsurf
 
 **End result:** one MCP server connects your agent to **decentralized git on Nostr** — same account as on gittr.space (`nsec` / keys file), no separate vendor account for the agent.
 
+**Hosting note:** The website Create/Import flow stays **browser-local** until announce/Push. MCP `createRepo` / `mirrorRepo` / `pushToBridge` **do** write the bridge when you want hosted git — put `https://git.gittr.space/…` in `clone[]`. Soft-delete POSTs the tombstone to the bridge so disk is wiped.
+
 ## Where this sits (platform map)
 
 gittr-mcp is the **agent door** into the same platform humans use in the browser. **You are here = gittr-mcp** (this repo, teal). Cyan-outlined host boxes = public hostnames (`git.` / `pages.` / `relay.gittr.space`) (teal = this repo; cyan outline = host URLs).

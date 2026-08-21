@@ -111,7 +111,7 @@ These servers accept repositories from any user:
 - `git-01.uid.ovh`
 - `git-02.uid.ovh`
 - `ngit.danconwaydev.com`
-- `git.gittr.space` (gittr's own server)
+- `git.gittr.space` (gittr's own server) — **include this in `clone[]`** when you want the bridge to keep a bare repo. Foreign GRASP-only announces are not mirrored onto gittr disk.
 
 ### Example
 

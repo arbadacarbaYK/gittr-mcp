@@ -126,7 +126,7 @@ GITTR_TEST_NSEC=nsec1… npm run test:live:acl
 | Smo opens PR on owner tip; **owner** `mergePullRequest` | success |
 | Second PR; **smo** `mergePullRequest` | permission denied (not “PR not found”) |
 | HTTPS smart-HTTP probe | ok while live |
-| `softDeleteRepo` | 30617 deleted markers + NIP-09 kind 5 |
+| `softDeleteRepo` | 30617 deleted markers + NIP-09 kind 5 **and** POST announce to bridge `/api/nostr/repo/event` (wipes bare disk) |
 
 Prefer social relays (`nos.lol`, damus, purplepag.es) for write verification — git-only relays often never echo 30617/1618.
 

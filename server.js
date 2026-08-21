@@ -794,7 +794,7 @@ const tools = [
   {
     name: 'softDeleteRepo',
     description:
-      'Owner soft-delete for a NIP-34 repo: publish replaceable 30617 with deleted markers + NIP-09 kind 5 on a=30617:owner:repo (same as gittr Settings → Delete). Alias: deleteRepo.',
+      'Owner soft-delete for a NIP-34 repo: publish replaceable 30617 with deleted markers + NIP-09 kind 5, and POST the signed 30617 to the bridge /api/nostr/repo/event (same as gittr Settings → Delete). Alias: deleteRepo.',
     inputSchema: {
       type: 'object',
       properties: {
