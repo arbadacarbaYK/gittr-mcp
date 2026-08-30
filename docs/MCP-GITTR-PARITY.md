@@ -40,7 +40,7 @@ This document tracks how MCP tools map to the **current** gittr web app (`ngit` 
 | MCP tool | Reality on gittr.space |
 |----------|------------------------|
 | `createRelease` | **Unsupported** for UI release notes — use `announceSoftwareFromForgeRelease` for Zapstore/NIP-82, or git tags + `publishRepoState` |
-| `getFile` | Bridge first, then **hardcoded** GRASP `/raw/` hosts — **not** full Code-tab parity (no 30617 `clone[]` order, no `/api/git/repo-files` for home Freebox/NAS). Prefer `bridgeListFiles` / `bridgeGetFileContent` after `importRemoteToBridge` / `mirrorRepo`, or resolve clone URLs from **30617** and call gittr HTTP APIs. See [FILE_FETCHING_INSIGHTS.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/FILE_FETCHING_INSIGHTS.md). |
+| `getFile` | Bridge first, then **hardcoded** GRASP `/raw/` hosts — **not** full Code-tab parity (no 30617 `clone[]` order, no `/api/git/repo-files` for home Freebox/NAS). Prefer `bridgeListFiles` / `bridgeGetFileContent` after `importRemoteToBridge` / `mirrorRepo`, or resolve clone URLs from **30617** and call gittr HTTP APIs. See [FILE_FETCHING_INSIGHTS.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/FILE_FETCHING_INSIGHTS.md) and the race map [file-fetch.netdraw.json](file-fetch.netdraw.json) ([GIF](file-fetch.gif)). |
 | `listReleases` | Returns **git tags** from bridge `refs` only — **not** the website Releases tab (forge notes + NIP-82/Blossom `30063`/`3063`) and **not** Zapstore. For NIP-82 announce use `announceSoftwareFromForgeRelease` / `fetchForgeReleases`. |
 | `getTrendingRepos` | Heuristic only |
 

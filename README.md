@@ -82,7 +82,7 @@ These are the **processes** people actually run; each maps to MCP tools the agen
 
 ### Day-to-day development
 - **`pushToBridge`** — update files on a branch (NIP-98 auth to gittr bridge); optional **`deletedPaths`** / **`allowTreeShrink`** for file or folder deletes (parity with Code-tab trash).  
-- **`getFile`**, **`bridgeListFiles`**, **`bridgeGetFileContent`**, **`getBranches`**, **`getCommitHistory`** — read repo state without cloning. (`getFile` ≈ bridge + a few GRASP raw URLs; for Code-tab parity see [MCP-GITTR-PARITY.md](docs/MCP-GITTR-PARITY.md) and gittr FILE_FETCHING_INSIGHTS.)
+- **`getFile`**, **`bridgeListFiles`**, **`bridgeGetFileContent`**, **`getBranches`**, **`getCommitHistory`** — read repo state without cloning. (`getFile` ≈ bridge + a few GRASP raw URLs; for Code-tab parity see [MCP-GITTR-PARITY.md](docs/MCP-GITTR-PARITY.md) and gittr FILE_FETCHING_INSIGHTS.) Picture of the race vs this shortcut: [docs/file-fetch.gif](docs/file-fetch.gif) · [file-fetch.netdraw.json](docs/file-fetch.netdraw.json).
 - **`resolveRepoByNostrId`** — find clone URLs and relays from npub + repo name.
 
 ### Issues (bug reports, tasks)

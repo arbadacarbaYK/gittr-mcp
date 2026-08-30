@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixes
+- `createRepo` / `mirrorRepo` clone set no longer advertises `relay.gittr.space` (Pyramid is wss only; git bytes live on `git.gittr.space`), matching gittr UI Push.
+
 ### Documentation
 - Added MIT `LICENSE` (package.json already declared MIT; Glama could not detect it), `Dockerfile` + `.dockerignore` for registry introspection, and `glama.json` so the [Glama listing](https://glama.ai/mcp/servers/arbadacarbaYK/gittr-mcp) can be claimed.
 

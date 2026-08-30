@@ -27,6 +27,15 @@ for (const host of GRASP_CLONE_HOSTS_FOR_PUSH) {
   assert(!hit.includes('github.com'), 'forge must not be in clone set');
 }
 
+assert(
+  !urls.some((u) => u.includes('relay.gittr.space')),
+  'relay.gittr.space is wss only — must not be advertised as a clone host'
+);
+assert(
+  GRASP_CLONE_HOSTS_FOR_PUSH.includes('git.gittr.space'),
+  'push set must include the gittr bridge'
+);
+
 // Capped relay publish set must NOT shrink the advertise list
 const cappedRelays = ['wss://relay.ngit.dev', 'wss://relay.gittr.space'];
 const again = buildFullGraspCloneUrls(npub, repo);

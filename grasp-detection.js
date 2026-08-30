@@ -12,10 +12,11 @@ const KNOWN_GRASP_DOMAINS = [
   'git.shakespeare.diy',
 ];
 
-/** Hosts we advertise on clone[] when creating/mirroring (matches gittr UI Push). */
+/** Hosts we advertise on clone[] when creating/mirroring (matches gittr UI Push).
+ * Do NOT list relay.gittr.space — that is the Pyramid wss relay; git bytes live on git.gittr.space.
+ */
 const GRASP_CLONE_HOSTS_FOR_PUSH = [
   'git.gittr.space',
-  'relay.gittr.space',
   'relay.ngit.dev',
   'gitnostr.com',
   'ngit.danconwaydev.com',
