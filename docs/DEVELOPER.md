@@ -86,7 +86,7 @@ Prefer **`https://git.gittr.space/<hex-pubkey>/<repo>.git`** for HTTPS git when 
 
 ### `getFile()`
 
-Bridge `file-content` first, then a few hardcoded GRASP `/raw/` hosts. **Not** full gittr Code-tab parity: does not walk **30617 `clone[]`**, does not call **`/api/git/repo-files`** for home Freebox/NAS remotes, and does not prefer non-GRASP over inferred GRASP. For reliable reads: mirror onto the bridge (`importRemoteToBridge` / `mirrorRepo`) then `bridgeGetFileContent`, or follow [FILE_FETCHING_INSIGHTS.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/FILE_FETCHING_INSIGHTS.md).
+Bridge `file-content` first, then a few hardcoded GRASP `/raw/` hosts. That is **not** the website Code tab: latest live **30617**; forge **`source`** is the tree when present (stale bridge listing is replaced); otherwise first non-empty `clone[]` listing. For reliable reads: `importRemoteToBridge` / `mirrorRepo` then `bridgeGetFileContent`, or [FILE_FETCHING_INSIGHTS.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/FILE_FETCHING_INSIGHTS.md).
 
 ### PRs (kind 1618)
 

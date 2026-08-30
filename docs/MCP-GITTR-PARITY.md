@@ -40,7 +40,7 @@ This document tracks how MCP tools map to the **current** gittr web app (`ngit` 
 | MCP tool | Reality on gittr.space |
 |----------|------------------------|
 | `createRelease` | **Unsupported** for UI release notes — use `announceSoftwareFromForgeRelease` for Zapstore/NIP-82, or git tags + `publishRepoState` |
-| `getFile` | Bridge first, then a short GRASP `/raw/` list — not the full Code-tab race (no 30617 `clone[]` order, no `/api/git/repo-files` for home NAS). Prefer `bridgeListFiles` / `bridgeGetFileContent` after `importRemoteToBridge` / `mirrorRepo`, or resolve clone URLs from **30617** and call gittr HTTP APIs. Timeline: [FILE_FETCHING_INSIGHTS.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/FILE_FETCHING_INSIGHTS.md). |
+| `getFile` | Bridge first, then a short GRASP `/raw/` list. **Not** the Code tab: latest live **30617**; forge **`source`** is the tree when present (stale bridge listing is replaced); otherwise first non-empty `clone[]` listing. Prefer `bridgeListFiles` / `bridgeGetFileContent` after `importRemoteToBridge` / `mirrorRepo`, or resolve **30617** clone URLs and call gittr HTTP APIs. [FILE_FETCHING_INSIGHTS.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/FILE_FETCHING_INSIGHTS.md). |
 | `listReleases` | Returns **git tags** from bridge `refs` only — **not** the website Releases tab (forge notes + NIP-82/Blossom `30063`/`3063`) and **not** Zapstore. For NIP-82 announce use `announceSoftwareFromForgeRelease` / `fetchForgeReleases`. |
 | `getTrendingRepos` | Heuristic only |
 
@@ -49,7 +49,7 @@ This document tracks how MCP tools map to the **current** gittr web app (`ngit` 
 1. **New repo:** `createRepo` (or push + publish + state).
 2. **Bug fix:** `createIssue` → branch push → `createPR` or `createPRViaGittrCLI` → `mergePullRequest`.
 3. **Star vs watch:** `starRepo` for appreciation; `watchRepo` for follow list (**10018**).
-4. **Read code:** Prefer `bridgeGetFileContent` / `bridgeListFiles` after the repo is on the bridge (`importRemoteToBridge` / `mirrorRepo` / push). `getFile` is a convenience (bridge, then a few hardcoded GRASP raw URLs) — it does **not** follow the web Code tab’s `clone[]` / `repo-files` rules (self-hosted Freebox, non-GRASP before GRASP, EOSE inference). See gittr [FILE_FETCHING_INSIGHTS.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/FILE_FETCHING_INSIGHTS.md).
+4. **Read code:** Prefer `bridgeGetFileContent` / `bridgeListFiles` after the repo is on the bridge. `getFile` is bridge-then-GRASP-raw — not the Code tab (live 30617, forge `source` tip, then first clone listing). See gittr [FILE_FETCHING_INSIGHTS.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/FILE_FETCHING_INSIGHTS.md).
 5. **Announce Android app:** forge Release with `.apk` → `announceSoftwareFromForgeRelease({ sourceUrl })` (or `fetchForgeReleases` with `hash:true` then `publishSoftwareAnnounce`).
 
 See also: [NIP25_STARS_NIP51_FOLLOWING.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/NIP25_STARS_NIP51_FOLLOWING.md) in the gittr repo (ngit).
