@@ -57,7 +57,7 @@
     "node-fetch": "^3.3.2",
     "nostr-tools": "^2.24.1",
     "ws": "^8.21.3",
-    "zod": "^4.4.3"
+    "zod": "^4.5.2"
   },
   "devDependencies": {
     "@anthropic-ai/mcpb": "^2.1.2",
