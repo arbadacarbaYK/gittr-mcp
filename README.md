@@ -116,11 +116,16 @@ These are the **processes** people actually run; each maps to MCP tools the agen
 **Parity details:** [docs/MCP-GITTR-PARITY.md](docs/MCP-GITTR-PARITY.md) — what matches gittr.space vs caveats.
 
 ### Releases & tags
-- **`listReleases`** — git **tags** from bridge (`refs/tags/*`), not the web UI Releases tab (forge + NIP-82/Blossom) and not Zapstore.  
+- **`listReleases`** — git **tags** from bridge (`refs/tags/*`), not the web UI Releases tab and not Zapstore.  
+- **`listForgeReleases`** — forge Releases tab listing (all assets; no NIP-82 MIME gate).  
 - **`createRelease`** — returns guidance only (UI release notes until next **30617** push).  
-- **`fetchForgeReleases`** — latest public forge Release + APKs (`hash:true` for sha256).  
-- **`announceSoftwareFromForgeRelease`** — Zapstore/NIP-82 announce (kinds **32267** / **30063** / **3063**) from a forge Release APK (same as Code sidebar **Announce app**).  
+- **`fetchForgeReleases`** — one forge Release + announceable binaries. Omit `tag` for latest; `hash:true` for sha256 (required before announce).  
+- **`announceSoftwareFromForgeRelease`** — Zapstore/NIP-82 (kinds **32267** / **30063** / **3063**) from a tagged forge Release. APK preferred; AppImage/DMG/linux `tar.gz`/MSI/EXE/IPA also. Extra binaries on the same tag are sibling assets. Optional `pinToBlossom` (public Blossom only — never `blossom.gittr.space`). Same as gittr **Nostr Apps** (latest) or Releases **Announce on Nostr** (`tag=`). Never a tagless app.  
 - **`deleteSoftwareAnnounce`** — NIP-09 kind **5** for those app/release/asset event ids.
+
+### Pages & security
+- **`publishNostrPages`** — NIP-5A kind **35128** + Blossom upload through gittr (`index.html` required).  
+- **`auditRepoDependencies`** — parse lockfiles on the bridge and query OSV via gittr `/api/security/audit`.
 
 ### Lightning bounties & pay-to-push
 - Bounties: **`listBounties`**, **`createBountyInvoice`**, **`publishBountyToNostr`**, **`submitBounty`**, **`listBountiesForIssue`**, release/withdraw tools.  

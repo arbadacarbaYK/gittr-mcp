@@ -66,6 +66,14 @@ Returns `cloneUrl` (prefers `git.gittr.space`), `cloneUrls`, `relays`, etc.
 
 Optional LNbits: `GITTR_LNBITS_URL`, `GITTR_LNBITS_ADMIN_KEY` (or per-call args). Tools include `createBountyInvoice`, `publishBountyToNostr`, `listBountiesForIssue`, release/withdraw helpers.
 
+### Releases / NIP-82 / Pages / audit
+
+- **`fetchForgeReleases({ sourceUrl, hash, tag })`** — one forge Release. Omit `tag` for latest. `hash:true` required before announce.
+- **`listForgeReleases({ sourceUrl })`** — all forge Releases + assets (website Releases tab). Distinct from **`listReleases`** (git tags).
+- **`announceSoftwareFromForgeRelease({ sourceUrl, tag?, pinToBlossom?, selectedAssetUrl? })`** — kinds **32267** / **30063** / **3063**. Announceable MIME: APK, IPA, DMG, AppImage, MSI/EXE, deb, linux tar.gz (not source). Sibling hashed files on the same tag are extra assets. Pin uses public Blossom only (never `blossom.gittr.space`); pin failure still publishes forge URLs.
+- **`publishNostrPages({ files, dTag, fromBridge?, ownerPubkey, repoId })`** — kind **35128**. Requires `index.html`. Uploads via `/api/gittr-pages/blossom-proxy-upload`.
+- **`auditRepoDependencies({ ownerPubkey, repoId })`** — parse manifests, `POST /api/security/audit`.
+
 ## Known GRASP-style hosts (examples)
 
 Used in the wild for git + Nostr; availability changes over time:

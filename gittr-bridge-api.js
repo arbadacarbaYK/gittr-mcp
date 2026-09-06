@@ -70,11 +70,11 @@ async function guardedFetch(url, init = {}) {
 }
 
 /**
- * GET /api/repo/forge-releases — forge Release metadata (+ optional APK sha256).
- * hash=1 streams the APK (can take up to ~120s for large files).
+ * GET /api/repo/forge-releases — forge Release + announceable binaries (+ optional sha256).
+ * hash=1 streams announceable files (can take up to ~120s). Omit tag → latest; tag= → that Release.
  */
 async function fetchForgeReleases(
-  { sourceUrl, hash = false } = {},
+  { sourceUrl, hash = false, tag } = {},
   bridgeUrl = baseUrl()
 ) {
   if (!sourceUrl || typeof sourceUrl !== 'string') {
@@ -86,6 +86,8 @@ async function fetchForgeReleases(
   if (hash === true || hash === 1 || hash === '1' || hash === 'true') {
     q.hash = '1';
   }
+  const tagTrim = tag != null ? String(tag).trim() : '';
+  if (tagTrim) q.tag = tagTrim;
   const timeoutMs = q.hash
     ? Number(process.env.GITTR_MCP_FORGE_HASH_TIMEOUT_MS || 120000)
     : REQUEST_TIMEOUT_MS;
@@ -95,6 +97,76 @@ async function fetchForgeReleases(
   );
   const body = await readJson(res);
   return { httpOk: res.ok, status: res.status, ...body };
+}
+
+/** GET /api/repo/forge-release-list — full Releases-tab listing (no MIME gate). */
+async function fetchForgeReleaseList({ sourceUrl } = {}, bridgeUrl = baseUrl()) {
+  if (!sourceUrl || typeof sourceUrl !== 'string') {
+    throw new Error('sourceUrl is required (GitHub/Codeberg/GitLab repo URL).');
+  }
+  const res = await guardedFetch(
+    `${bridgeUrl}/api/repo/forge-release-list${toQuery({ sourceUrl: sourceUrl.trim() })}`
+  );
+  return { httpOk: res.ok, status: res.status, ...(await readJson(res)) };
+}
+
+/**
+ * POST /api/repo/forge-release-blossom-pin — stream a hashed forge asset to public Blossom
+ * (primal / ditto / haven). Never blossom.gittr.space. Pin failure must not block announce.
+ */
+async function pinForgeReleaseToBlossom(
+  { sourceUrl, tag, downloadUrl, sha256, authEvent } = {},
+  bridgeUrl = baseUrl()
+) {
+  if (!sourceUrl || !downloadUrl) {
+    throw new Error('sourceUrl and downloadUrl required to pin a forge Release asset.');
+  }
+  const timeoutMs = Number(process.env.GITTR_MCP_BLOSSOM_PIN_TIMEOUT_MS || 180000);
+  const res = await guardedFetch(`${bridgeUrl}/api/repo/forge-release-blossom-pin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sourceUrl,
+      tag: tag || undefined,
+      downloadUrl,
+      sha256,
+      authEvent,
+    }),
+    timeoutMs,
+  });
+  return { httpOk: res.ok, status: res.status, ...(await readJson(res)) };
+}
+
+/** POST /api/gittr-pages/blossom-proxy-upload */
+async function postGittrPagesBlossomUpload(
+  { authEvent, contentBase64, sha256, contentType } = {},
+  bridgeUrl = baseUrl()
+) {
+  const timeoutMs = Number(process.env.GITTR_MCP_PAGES_UPLOAD_TIMEOUT_MS || 120000);
+  const res = await guardedFetch(`${bridgeUrl}/api/gittr-pages/blossom-proxy-upload`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      authEvent,
+      contentBase64,
+      sha256,
+      contentType,
+    }),
+    timeoutMs,
+  });
+  return { httpOk: res.ok, status: res.status, ...(await readJson(res)) };
+}
+
+/** POST /api/security/audit — OSV.dev via gittr (packages already parsed). */
+async function postSecurityAudit({ packages } = {}, bridgeUrl = baseUrl()) {
+  const timeoutMs = Number(process.env.GITTR_MCP_AUDIT_TIMEOUT_MS || 60000);
+  const res = await guardedFetch(`${bridgeUrl}/api/security/audit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ packages: packages || [] }),
+    timeoutMs,
+  });
+  return { httpOk: res.ok, status: res.status, ...(await readJson(res)) };
 }
 
 /** Base64(JSON.stringify(event)) — same encoding as gittr UI (UTF-8 → base64). */
@@ -400,4 +472,8 @@ module.exports = {
   bountyClaimWithdraw,
   sendEventToBridge,
   fetchForgeReleases,
+  fetchForgeReleaseList,
+  pinForgeReleaseToBlossom,
+  postGittrPagesBlossomUpload,
+  postSecurityAudit,
 };

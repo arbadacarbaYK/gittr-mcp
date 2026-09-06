@@ -17,6 +17,7 @@ const { detectGraspFromRepoEvent } = require('./grasp-detection');
 const { normalizeOwnerPubkeyHexSync, privkeyToUint8Array } = require('./gittr-keys');
 const bridgeApi = require('./gittr-bridge-api');
 const nip82 = require('./gittr-nip82-software');
+const gittrPages = require('./gittr-pages');
 const {
   normalizeForgeSourceKey,
   normalizeGithubOwnerRepo,
@@ -1800,8 +1801,8 @@ function getPublicKey(privkey) {
 }
 
 /**
- * Sign + publish NIP-82 app/release/asset (Zapstore-compatible).
- * Asset URL points at the forge download — gittr does not host APKs.
+ * Sign + publish NIP-82 app/release/asset(s) (Zapstore-compatible).
+ * Default kind 3063 url is the forge download; optional assetUrlOverrides rewrite to public Blossom.
  */
 async function publishSoftwareAnnounce({
   forge,
@@ -1811,6 +1812,9 @@ async function publishSoftwareAnnounce({
   license,
   nip34Address,
   selectedApkUrl,
+  selectedAssetUrl,
+  includeSiblingAssets,
+  assetUrlOverrides,
   topics,
   privkey,
   relays,
@@ -1839,6 +1843,9 @@ async function publishSoftwareAnnounce({
     license,
     nip34Address,
     selectedApkUrl,
+    selectedAssetUrl,
+    includeSiblingAssets,
+    assetUrlOverrides,
     topics,
   });
   const catalogRelays = nip82.relaysForSoftwareCatalog(
@@ -1848,11 +1855,20 @@ async function publishSoftwareAnnounce({
   const signedAsset = finalizeEvent({ ...built.asset, pubkey: signerPubkey }, sk);
   await publishEventChecked(catalogRelays, signedAsset);
 
+  const signedExtras = [];
+  for (const extra of built.extraAssets || []) {
+    const signed = finalizeEvent({ ...extra, pubkey: signerPubkey }, sk);
+    await publishEventChecked(catalogRelays, signed);
+    signedExtras.push(signed);
+  }
+
+  const extraETags = signedExtras.map((ev) => ['e', ev.id, nip82.RELAY_ZAPSTORE]);
   const releaseUnsigned = {
     ...built.release,
     tags: [
       ...built.release.tags,
       ['e', signedAsset.id, nip82.RELAY_ZAPSTORE],
+      ...extraETags,
     ],
   };
   const signedRelease = finalizeEvent(
@@ -1865,7 +1881,7 @@ async function publishSoftwareAnnounce({
   await publishEventChecked(catalogRelays, signedApp);
 
   const confirmed = [];
-  for (const ev of [signedAsset, signedRelease, signedApp]) {
+  for (const ev of [signedAsset, ...signedExtras, signedRelease, signedApp]) {
     try {
       const visibility = await verifyEventOnRelays(
         catalogRelays,
@@ -1884,20 +1900,209 @@ async function publishSoftwareAnnounce({
   }
 
   const zapstoreOk = confirmed.some((r) => String(r).includes('zapstore'));
+  const extraAssetEventIds = signedExtras.map((ev) => ev.id);
   return {
     ok: true,
     appId: built.appId,
     version: built.version,
+    primaryName: built.primary.name,
+    primaryUrl: built.primary.downloadUrl,
     apkName: built.apk.name,
     apkUrl: built.apk.downloadUrl,
+    extraAssetNames: (built.extraAssetFiles || []).map((f) => f.name),
     appEventId: signedApp.id,
     releaseEventId: signedRelease.id,
     assetEventId: signedAsset.id,
+    extraAssetEventIds,
     confirmedRelays: confirmed,
     catalogRelays,
     whitelistHint: zapstoreOk
       ? undefined
       : 'If Zapstore’s relay rejected the events, commit a zapstore.yaml in the forge repo root with repository + your pubkey (npub), then publish again — see https://zapstore.dev/docs/publish',
+  };
+}
+
+/**
+ * Optional pin of hashed NIP-82 assets onto public Blossom hosts.
+ * Failures are warnings — announce still uses forge download URLs.
+ */
+async function pinReleaseAssetsToNgitBlossom({
+  sourceUrl,
+  tag,
+  forge,
+  selectedUrl,
+  privkey,
+  bridgeUrl,
+}) {
+  const warnings = [];
+  const overrides = {};
+  if (!privkey) throw new Error('privkey required to pin forge assets to Blossom');
+  const assets = nip82.hashedAssetsForNgitBlossomPin(forge, selectedUrl);
+  if (assets.length === 0) {
+    return {
+      overrides,
+      warnings: ['No hashed installers to pin — using forge download URLs.'],
+    };
+  }
+  const signerPubkey = getPublicKey(privkey).toLowerCase();
+  const sk = privkeyToUint8Array(privkey);
+  const unsigned = nip82.unsignedNgitBlossomUploadAuth({
+    pubkeyHex: signerPubkey,
+    sha256Hex: assets.map((a) => a.sha256),
+    serverHostnames: nip82.ngitBlossomHostnames(),
+  });
+  const authEvent = finalizeEvent({ ...unsigned }, sk);
+
+  for (const asset of assets) {
+    try {
+      const data = await bridgeApi.pinForgeReleaseToBlossom(
+        {
+          sourceUrl,
+          tag: tag || undefined,
+          downloadUrl: asset.downloadUrl,
+          sha256: asset.sha256,
+          authEvent,
+        },
+        bridgeUrl
+      );
+      if (!data.ok || !data.url) {
+        warnings.push(
+          `${asset.name}: ${data.error || data.message || 'pin failed'} — keeping the forge URL.`
+        );
+        continue;
+      }
+      const allowed = nip82.allowedNip82BlossomAssetUrl(data.url);
+      if (!allowed) {
+        warnings.push(
+          `${asset.name}: Blossom returned a URL we will not use — keeping the forge URL.`
+        );
+        continue;
+      }
+      overrides[asset.downloadUrl] = allowed;
+    } catch (e) {
+      warnings.push(
+        `${asset.name}: ${e instanceof Error ? e.message : 'pin failed'} — keeping the forge URL.`
+      );
+    }
+  }
+  return { overrides, warnings };
+}
+
+/**
+ * Upload static files through gittr Pages Blossom proxy, then publish kind 35128.
+ */
+async function publishNostrPages({
+  files,
+  dTag,
+  title,
+  description,
+  sourceUrl,
+  privkey,
+  relays,
+  ownerPubkey,
+  server,
+  bridgeUrl,
+}) {
+  if (!privkey) throw new Error('privkey required to publish Nostr Pages');
+  const slug = String(dTag || '').trim();
+  if (!slug) throw new Error('dTag required (site id / repo slug)');
+  const staged = gittrPages.stagePagesFiles(files);
+  const sk = privkeyToUint8Array(privkey);
+  const signerPubkey = getPublicKey(privkey).toLowerCase();
+  if (ownerPubkey) {
+    const owner = (await resolveRepoOwnerHex(ownerPubkey)).toLowerCase();
+    if (signerPubkey !== owner) {
+      throw new Error('Only the repository owner can publish Pages (signer must match owner).');
+    }
+  }
+
+  const blossomOrigin = server || gittrPages.pagesBlossomOrigin();
+  const unsignedAuth = gittrPages.unsignedPagesBlossomUploadAuth({
+    pubkeyHex: signerPubkey,
+    sha256Hex: staged.map((s) => s.sha256),
+  });
+  const signedAuth = finalizeEvent({ ...unsignedAuth }, sk);
+
+  const uploads = [];
+  for (const item of staged) {
+    const data = await bridgeApi.postGittrPagesBlossomUpload(
+      {
+        authEvent: signedAuth,
+        contentBase64: item.bytes.toString('base64'),
+        sha256: item.sha256,
+        contentType: item.contentType,
+      },
+      bridgeUrl
+    );
+    if (!data.httpOk && !data.ok) {
+      throw new Error(
+        `Blossom upload failed for ${item.webPath}: ${data.error || data.status || 'unknown'}`
+      );
+    }
+    uploads.push({ webPath: item.webPath, sha256: item.sha256 });
+  }
+
+  const relaySet = Array.isArray(relays) && relays.length ? relays : config.relays;
+  const tags = gittrPages.buildNamedSiteManifestTags({
+    dTag: slug,
+    uploads,
+    title: title || slug,
+    description,
+    sourceUrl,
+    server: blossomOrigin,
+    relays: relaySet,
+  });
+  const manifest = finalizeEvent(
+    {
+      kind: gittrPages.KIND_NSITE_NAMED,
+      created_at: Math.floor(Date.now() / 1000),
+      content: '',
+      tags,
+    },
+    sk
+  );
+  await publishEventChecked(relaySet, manifest);
+
+  let serverListEventId;
+  try {
+    const pool = getPool();
+    const existing = await pool.querySync(relaySet, {
+      kinds: [gittrPages.KIND_BLOSSOM_SERVER_LIST],
+      authors: [signerPubkey],
+      limit: 20,
+    });
+    existing.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+    const latest = existing[0];
+    const merged = [
+      blossomOrigin.replace(/\/$/, ''),
+      ...((latest && latest.tags) || [])
+        .filter((t) => Array.isArray(t) && t[0] === 'server' && t[1])
+        .map((t) => String(t[1]).replace(/\/$/, '')),
+    ];
+    const deduped = [...new Set(merged)].slice(0, 20);
+    const listEv = finalizeEvent(
+      {
+        kind: gittrPages.KIND_BLOSSOM_SERVER_LIST,
+        created_at: Math.floor(Date.now() / 1000),
+        content: '',
+        tags: deduped.map((url) => ['server', url]),
+      },
+      sk
+    );
+    await publishEventChecked(relaySet, listEv);
+    serverListEventId = listEv.id;
+  } catch (_) {
+    /* kind 10063 is optional */
+  }
+
+  return {
+    ok: true,
+    dTag: slug,
+    manifestEventId: manifest.id,
+    serverListEventId,
+    uploaded: uploads,
+    blossomOrigin,
+    relays: relaySet,
   };
 }
 
@@ -2036,6 +2241,8 @@ module.exports = {
   publishRepoState,
   pushToBridge,
   publishSoftwareAnnounce,
+  pinReleaseAssetsToNgitBlossom,
+  publishNostrPages,
   deleteSoftwareAnnounce,
   softDeleteRepo,
   deleteRepo: softDeleteRepo,

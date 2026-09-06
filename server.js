@@ -683,7 +683,7 @@ const tools = [
   {
     name: 'createRelease',
     description:
-      'Not supported for UI release notes. For Zapstore/NIP-82 APK announce use announceSoftwareFromForgeRelease. For git tags use listReleases + publishRepoState.',
+      'Not supported for UI release notes. For Zapstore/NIP-82 announce use announceSoftwareFromForgeRelease. For git tags use listReleases + publishRepoState.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -700,7 +700,7 @@ const tools = [
   },
   {
     name: 'listReleases',
-    description: 'List git tags from the bridge (refs/tags/*), not Zapstore software releases',
+    description: 'List git tags from the bridge (refs/tags/*), not Zapstore software releases and not the website Releases tab',
     inputSchema: {
       type: 'object',
       properties: {
@@ -715,7 +715,7 @@ const tools = [
   {
     name: 'fetchForgeReleases',
     description:
-      'Fetch latest public forge Release (GitHub/Codeberg/GitLab) and APK assets. Set hash:true to compute APK sha256 (slow; required before announce).',
+      'Fetch a public forge Release (GitHub/Codeberg/GitLab) with announceable binaries (APK, AppImage, DMG, linux tar.gz, MSI/EXE, IPA). Omit tag for latest. Set hash:true to compute sha256 (slow; required before announce).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -723,9 +723,28 @@ const tools = [
           type: 'string',
           description: 'Forge repository HTTPS URL (e.g. https://github.com/org/app)',
         },
+        tag: {
+          type: 'string',
+          description: 'Specific Release tag (omit = latest non-draft, same as Code sidebar Nostr Apps)',
+        },
         hash: {
           type: 'boolean',
-          description: 'If true, stream APK and return sha256 (can take up to ~120s)',
+          description: 'If true, stream announceable files and return sha256 (can take up to ~120s)',
+        },
+      },
+      required: ['sourceUrl'],
+    },
+  },
+  {
+    name: 'listForgeReleases',
+    description:
+      'List all forge Releases + assets for a source URL (same as gittr Releases tab). No NIP-82 MIME gate. Distinct from listReleases (git tags).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sourceUrl: {
+          type: 'string',
+          description: 'Forge repository HTTPS URL',
         },
       },
       required: ['sourceUrl'],
@@ -734,13 +753,17 @@ const tools = [
   {
     name: 'announceSoftwareFromForgeRelease',
     description:
-      'Announce Android app to Zapstore/NIP-82 catalog from a forge Release APK (kinds 32267/30063/3063). Same as gittr Code sidebar Announce app. Auto-loads .nostr-keys.json if privkey omitted.',
+      'Announce software to Zapstore/NIP-82 (kinds 32267/30063/3063) from a forge Release binary. Same as gittr Nostr Apps (latest tag) or Releases → Announce on Nostr (tag=). Never a tagless app. Optional pinToBlossom streams files to primal/ditto/haven (never blossom.gittr.space). Auto-loads .nostr-keys.json if privkey omitted.',
     inputSchema: {
       type: 'object',
       properties: {
         sourceUrl: {
           type: 'string',
-          description: 'Forge repository HTTPS URL with a Release that has an .apk',
+          description: 'Forge repository HTTPS URL with a Release that has an announceable binary',
+        },
+        tag: {
+          type: 'string',
+          description: 'Release tag to announce (omit = latest, same as Code sidebar)',
         },
         appId: {
           type: 'string',
@@ -753,9 +776,22 @@ const tools = [
           type: 'string',
           description: 'Optional NIP-34 pointer 30617:<owner-hex>:<repo>',
         },
+        selectedAssetUrl: {
+          type: 'string',
+          description: 'Prefer a specific hashed download URL from the release',
+        },
         selectedApkUrl: {
           type: 'string',
-          description: 'Prefer a specific APK download URL from the release',
+          description: 'Alias of selectedAssetUrl (legacy)',
+        },
+        includeSiblingAssets: {
+          type: 'boolean',
+          description: 'Publish extra NIP-82 MIME files on the same tag (default true; skips extra APKs)',
+        },
+        pinToBlossom: {
+          type: 'boolean',
+          description:
+            'Optional: pin hashed files to public Blossom (primal/ditto/haven). Pin failure still announces the forge URL.',
         },
         topics: {
           type: 'array',
@@ -825,7 +861,7 @@ const tools = [
   {
     name: 'publishSoftwareAnnounce',
     description:
-      'Low-level: publish NIP-82 events from an already-fetched forge payload (ok:true + hashed APK). Prefer announceSoftwareFromForgeRelease.',
+      'Low-level: publish NIP-82 events from an already-fetched forge payload (ok:true + hashed announceable binary). Prefer announceSoftwareFromForgeRelease.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -835,13 +871,72 @@ const tools = [
         summary: { type: 'string' },
         license: { type: 'string' },
         nip34Address: { type: 'string' },
+        selectedAssetUrl: { type: 'string' },
         selectedApkUrl: { type: 'string' },
+        includeSiblingAssets: { type: 'boolean' },
+        assetUrlOverrides: { type: 'object', description: 'downloadUrl → public Blossom HTTPS blob URL' },
         topics: { type: 'array', items: { type: 'string' } },
         privkey: { type: 'string' },
         ownerPubkey: { type: 'string' },
         relays: { type: 'array', items: { type: 'string' } },
       },
       required: ['forge', 'privkey'],
+    },
+  },
+  {
+    name: 'publishNostrPages',
+    description:
+      'Publish Nostr Pages (NIP-5A kind 35128): upload static files through gittr’s Blossom proxy (kind 24242), then sign the named-site manifest. Requires index.html. Pass files or fromBridge:true to read the git tree. Default Blossom is blossom.gittr.space (Pages only — never for app installers).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        dTag: { type: 'string', description: 'Replaceable d-tag (default: repoId)' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        sourceUrl: { type: 'string', description: 'Optional https source shown on the site' },
+        files: {
+          type: 'array',
+          description: 'Static files {path, content}. encoding base64 if isBinary.',
+          items: {
+            type: 'object',
+            properties: {
+              path: { type: 'string' },
+              content: { type: 'string' },
+              isBinary: { type: 'boolean' },
+              encoding: { type: 'string', description: 'utf8 (default) or base64' },
+            },
+          },
+        },
+        fromBridge: {
+          type: 'boolean',
+          description: 'If true and files omitted, load static files from the gittr bridge tree',
+        },
+        ownerPubkey: { type: 'string' },
+        repoId: { type: 'string' },
+        branch: { type: 'string', description: 'Bridge branch when fromBridge (default main)' },
+        prefix: { type: 'string', description: 'Optional tree prefix when fromBridge (e.g. docs/)' },
+        server: { type: 'string', description: 'Kind 35128 server tag (default https://blossom.gittr.space)' },
+        privkey: { type: 'string' },
+        relays: { type: 'array', items: { type: 'string' } },
+      },
+    },
+  },
+  {
+    name: 'auditRepoDependencies',
+    description:
+      'Scan a gittr bridge repo’s manifests (package.json, yarn.lock, go.mod, …) and query OSV via POST /api/security/audit. Same data as the gittr Dependencies tab. Does not require the website audit UI flag.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ownerPubkey: { type: 'string' },
+        repoId: { type: 'string' },
+        branch: { type: 'string', description: 'Default main' },
+        packages: {
+          type: 'array',
+          description: 'Optional pre-parsed packages {ecosystem,name,version,direct?,precision?}',
+          items: { type: 'object' },
+        },
+      },
     },
   },
   {
@@ -1374,6 +1469,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'fetchForgeReleases':
         result = await gittr.fetchForgeReleases(args);
         break;
+      case 'listForgeReleases':
+        result = await gittr.listForgeReleases(args);
+        break;
       case 'announceSoftwareFromForgeRelease':
         result = await gittr.announceSoftwareFromForgeRelease(args);
         break;
@@ -1386,6 +1484,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case 'publishSoftwareAnnounce':
         result = await gittr.publishSoftwareAnnounce(args);
+        break;
+      case 'publishNostrPages':
+        result = await gittr.publishNostrPages(args);
+        break;
+      case 'auditRepoDependencies':
+        result = await gittr.auditRepoDependencies(args);
         break;
       case 'exploreRepos':
         result = await gittr.exploreRepos(args);

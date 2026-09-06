@@ -414,6 +414,31 @@ async function main() {
       }
     });
 
+    mark('listForgeReleases');
+    await run('listForgeReleases', async () => {
+      try {
+        const r = await call('listForgeReleases', {
+          sourceUrl: KNOWN.sourceUrl,
+        });
+        return { ok: r?.ok, count: Array.isArray(r?.releases) ? r.releases.length : 0 };
+      } catch (e) {
+        return { soft: true, message: String(e.message || e).slice(0, 160) };
+      }
+    });
+
+    mark('auditRepoDependencies');
+    await run('auditRepoDependencies', async () => {
+      try {
+        const r = await call('auditRepoDependencies', {
+          ownerPubkey: KNOWN.hex,
+          repoId: KNOWN.repoId,
+        });
+        return { scanned: r?.scanned, advisories: Array.isArray(r?.advisories) ? r.advisories.length : 0 };
+      } catch (e) {
+        return { soft: true, message: String(e.message || e).slice(0, 160) };
+      }
+    });
+
     mark('getPushPaywallStatus');
     await run('getPushPaywallStatus', async () => {
       try {
@@ -462,6 +487,7 @@ async function main() {
       'announceSoftwareFromForgeRelease',
       'publishSoftwareAnnounce',
       'deleteSoftwareAnnounce',
+      'publishNostrPages',
     ];
 
     const allowWrites =

@@ -2,14 +2,19 @@
 
 ## Unreleased
 
+## 1.0.6 (2026-09-06)
+
+### Features
+- **NIP-82 announce matches gittr:** any announceable binary (not APK-only), optional `tag`, sibling assets on the same tag, optional `pinToBlossom` (primal/ditto/haven; never `blossom.gittr.space`). New `listForgeReleases` for the website Releases-tab listing.
+- **`publishNostrPages`:** NIP-5A kind **35128** + Blossom proxy upload (kind **24242**), same path as gittr Pages.
+- **`auditRepoDependencies`:** parse manifests from the bridge tree and call `POST /api/security/audit` (OSV.dev).
+- **NIP-22 comments on issues/PRs:** `listIssueComments`, `createIssueComment`, `listPRComments`, `createPRComment` (kind **1111**). Additive only — bounty tools (kind **9806**) and create/list/close issue & PR flows are unchanged.
+
 ### Fixes
 - `createRepo` / `mirrorRepo` clone set no longer advertises `relay.gittr.space` (Pyramid is wss only; git bytes live on `git.gittr.space`), matching gittr UI Push.
 
 ### Documentation
 - Added MIT `LICENSE` (package.json already declared MIT; Glama could not detect it), `Dockerfile` + `.dockerignore` for registry introspection, and `glama.json` so the [Glama listing](https://glama.ai/mcp/servers/arbadacarbaYK/gittr-mcp) can be claimed.
-
-### Features
-- **NIP-22 comments on issues/PRs:** `listIssueComments`, `createIssueComment`, `listPRComments`, `createPRComment` (kind **1111**). Additive only — bounty tools (kind **9806**) and create/list/close issue & PR flows are unchanged.
 
 ### Security
 - Documented false-positive triage for inbound MCP SDK advisories **CVE-2026-25536** / **GHSA-345p-7cg4-v4c7** and **CVE-2026-0621** / **GHSA-8r9q-7v3j-jr4g**: gittr-mcp is stdio + tools only on `@modelcontextprotocol/sdk@^1.30.0` (see `docs/SECURITY-ADVISORIES.md`).

@@ -150,6 +150,25 @@ const pr = await gittr.createPR(
 console.log('PR created:', pr.event.id);
 ```
 
+### 5. Announce a release, publish Pages, or audit deps
+
+```javascript
+// NIP-82: latest tagged forge Release (or pass tag: 'v1.2.3')
+await gittr.announceSoftwareFromForgeRelease({
+  sourceUrl: 'https://github.com/org/app',
+  pinToBlossom: false,
+});
+
+// Nostr Pages (needs index.html)
+await gittr.publishNostrPages({
+  dTag: 'my-site',
+  files: [{ path: 'index.html', content: '<html><body>hi</body></html>' }],
+});
+
+// OSV via gittr
+await gittr.auditRepoDependencies({ ownerPubkey: 'hex', repoId: 'my-repo' });
+```
+
 ---
 
 ## Key Features for Agents

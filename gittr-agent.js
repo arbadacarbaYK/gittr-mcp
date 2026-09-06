@@ -1635,31 +1635,54 @@ async function createRelease() {
       nextSteps: [
         'Create a git tag on the bridge (git push refs/tags/v1.0.0) then publishRepoState.',
         'Or manage releases in the gittr web UI Releases tab, then Push to Nostr.',
-        'For Zapstore / NIP-82 APK announce from a forge Release, use announceSoftwareFromForgeRelease (or fetchForgeReleases then publishSoftwareAnnounce).',
+        'For Zapstore / NIP-82 announce from a forge Release, use announceSoftwareFromForgeRelease (or fetchForgeReleases then publishSoftwareAnnounce). Any announceable binary (APK, AppImage, DMG, linux tar.gz, MSI/EXE, IPA) on a tagged Release works — never a tagless app.',
       ],
     }
   );
 }
 
-/** Preview forge Release + APKs (optional sha256). Does not publish. */
+/** Preview forge Release + announceable binaries (optional sha256). Does not publish. */
 async function fetchForgeReleases(options = {}) {
-  const { sourceUrl, hash = false, bridgeUrl } = options;
-  return bridgeApi.fetchForgeReleases({ sourceUrl, hash }, bridgeUrl);
+  const { sourceUrl, hash = false, tag, bridgeUrl } = options;
+  return bridgeApi.fetchForgeReleases({ sourceUrl, hash, tag }, bridgeUrl);
+}
+
+/** Full forge Releases tab listing (all assets, no NIP-82 MIME gate). */
+async function listForgeReleases(options = {}) {
+  const { sourceUrl, bridgeUrl } = options;
+  if (!sourceUrl) {
+    throw new Error('sourceUrl required (GitHub/Codeberg/GitLab repository HTTPS URL)');
+  }
+  const result = await bridgeApi.fetchForgeReleaseList({ sourceUrl }, bridgeUrl);
+  return withAgentHints(result, {
+    agentSummary: result.ok
+      ? 'Forge Releases tab listing (all assets; not git tags from listReleases).'
+      : result.message || 'Forge release list failed',
+    nextSteps: result.ok
+      ? [
+          'Pick a tag + hashed announceable binary, then announceSoftwareFromForgeRelease({ sourceUrl, tag, hash is automatic }).',
+        ]
+      : ['Link a public GitHub/Codeberg/GitLab source URL with Releases.'],
+  });
 }
 
 /**
- * End-to-end: fetch forge Release (with APK hash) → sign NIP-82 app/release/asset → publish.
- * Same path as gittr Code sidebar “Announce app”.
+ * End-to-end: fetch forge Release (with hashes) → optional public Blossom pin → NIP-82 publish.
+ * Same path as gittr Code sidebar “Nostr Apps” (omit tag = latest) or Releases “Announce on Nostr” (tag=).
  */
 async function announceSoftwareFromForgeRelease(options = {}) {
   const {
     sourceUrl,
+    tag,
     appId,
     appName,
     summary,
     license,
     nip34Address,
     selectedApkUrl,
+    selectedAssetUrl,
+    includeSiblingAssets,
+    pinToBlossom,
     topics,
     ownerPubkey,
     relays,
@@ -1680,8 +1703,9 @@ async function announceSoftwareFromForgeRelease(options = {}) {
     );
   }
 
+  const selectedUrl = selectedAssetUrl || selectedApkUrl;
   const forge = await bridgeApi.fetchForgeReleases(
-    { sourceUrl, hash: true },
+    { sourceUrl, hash: true, tag },
     bridgeUrl
   );
   if (!forge.ok) {
@@ -1690,14 +1714,30 @@ async function announceSoftwareFromForgeRelease(options = {}) {
       {
         reason: forge.message || 'Forge release fetch failed',
         nextSteps: [
-          'Ensure sourceUrl is a public GitHub/Codeberg/GitLab repo with a non-draft Release that includes an .apk.',
-          'Try fetchForgeReleases({ sourceUrl, hash: false }) to inspect errors without hashing.',
+          'Ensure sourceUrl is a public GitHub/Codeberg/GitLab repo with a non-draft Release that includes an announceable binary (APK, AppImage, DMG, linux tar.gz, MSI/EXE, IPA).',
+          'Nostr-only repos (no forge source) cannot announce yet — gittr hashes via forge Releases APIs.',
+          'Try fetchForgeReleases({ sourceUrl, hash: false, tag }) to inspect errors without hashing.',
         ],
       }
     );
   }
 
   const nip82 = require('./gittr-nip82-software');
+  let assetUrlOverrides;
+  let pinWarnings = [];
+  if (pinToBlossom) {
+    const pin = await gittrNostr.pinReleaseAssetsToNgitBlossom({
+      sourceUrl,
+      tag: tag || forge.release?.tag,
+      forge,
+      selectedUrl,
+      privkey,
+      bridgeUrl,
+    });
+    assetUrlOverrides = pin.overrides;
+    pinWarnings = pin.warnings || [];
+  }
+
   const result = await gittrNostr.publishSoftwareAnnounce({
     forge,
     appId: appId || nip82.suggestAppIdFromRepo(forge.repo),
@@ -1705,7 +1745,9 @@ async function announceSoftwareFromForgeRelease(options = {}) {
     summary,
     license,
     nip34Address,
-    selectedApkUrl,
+    selectedAssetUrl: selectedUrl,
+    includeSiblingAssets,
+    assetUrlOverrides,
     topics,
     privkey,
     relays,
@@ -1713,7 +1755,13 @@ async function announceSoftwareFromForgeRelease(options = {}) {
   });
 
   return withAgentHints(
-    { success: true, ...result, forgeTag: forge.release?.tag, repositoryUrl: forge.repositoryUrl },
+    {
+      success: true,
+      ...result,
+      forgeTag: forge.release?.tag,
+      repositoryUrl: forge.repositoryUrl,
+      pinWarnings,
+    },
     {
       nextSteps: [
         'Open https://gittr.space/apps to confirm the listing.',
@@ -1766,6 +1814,169 @@ async function deleteSoftwareAnnounce(options = {}) {
     relays,
     ownerPubkey: ownerPubkey || gittrNostr.getPublicKey(privkey),
   });
+}
+
+function requireSigningKey(privkey) {
+  if (privkey) return privkey;
+  const creds = loadCredentials();
+  const loaded = creds && (creds.nsec || creds.secretKey || creds.private_key);
+  if (!loaded) {
+    throw new Error(
+      'No signing key. Pass privkey or configure .nostr-keys.json (see describeAgentAuth).'
+    );
+  }
+  return loaded;
+}
+
+/**
+ * Publish Nostr Pages (NIP-5A kind 35128): upload static files via gittr Blossom proxy, then sign the manifest.
+ * Pass `files` or set `fromBridge:true` to pull static files from the gittr bridge tree.
+ */
+async function publishNostrPages(options = {}) {
+  const {
+    ownerPubkey,
+    repoId,
+    dTag,
+    title,
+    description,
+    sourceUrl,
+    files,
+    fromBridge,
+    branch = 'main',
+    prefix,
+    relays,
+    server,
+    bridgeUrl,
+  } = options;
+  const privkey = requireSigningKey(options.privkey);
+
+  let uploadFiles = Array.isArray(files) ? files : [];
+  if (uploadFiles.length === 0 && fromBridge) {
+    if (!ownerPubkey || !repoId) {
+      throw new Error('fromBridge requires ownerPubkey and repoId');
+    }
+    const listed = await bridgeApi.bridgeListFiles(
+      { ownerPubkey, repo: repoId, branch },
+      bridgeUrl
+    );
+    const tree = Array.isArray(listed.files) ? listed.files : [];
+    const gittrPages = require('./gittr-pages');
+    const wantPrefix = prefix ? gittrPages.normalizeFilePath(prefix) : '';
+    const candidates = tree
+      .map((f) => (typeof f === 'string' ? f : f.path || f.file || ''))
+      .filter(Boolean)
+      .filter((p) => {
+        const n = gittrPages.normalizeFilePath(p);
+        if (wantPrefix && !n.startsWith(wantPrefix.replace(/\/?$/, '/'))) {
+          if (n !== wantPrefix) return false;
+        }
+        return gittrPages.isGittrPagesManifestPath(n);
+      });
+    uploadFiles = [];
+    for (const path of candidates) {
+      const got = await bridgeApi.bridgeGetFileContent(
+        { ownerPubkey, repo: repoId, path, branch },
+        bridgeUrl
+      );
+      if (!got.ok && got.content == null) continue;
+      uploadFiles.push({
+        path,
+        content: got.content,
+        isBinary: !!got.isBinary,
+        encoding: got.isBinary ? 'base64' : 'utf8',
+      });
+    }
+  }
+  if (uploadFiles.length === 0) {
+    throw new Error(
+      'No Pages files. Pass files:[{path,content}] (include index.html) or fromBridge:true with ownerPubkey+repoId.'
+    );
+  }
+
+  const result = await gittrNostr.publishNostrPages({
+    files: uploadFiles,
+    dTag: dTag || repoId,
+    title: title || repoId || dTag,
+    description,
+    sourceUrl,
+    privkey,
+    relays,
+    ownerPubkey: ownerPubkey || gittrNostr.getPublicKey(privkey),
+    server,
+    bridgeUrl,
+  });
+  return withAgentHints(result, {
+    nextSteps: [
+      'Open the Pages URL for this npub + d-tag on gittr (or nsite gateway) after relays catch up.',
+      'Kind 35128 is replaceable — publishing again with the same dTag updates the site.',
+    ],
+  });
+}
+
+/**
+ * Parse manifests from the bridge tree and POST /api/security/audit (OSV.dev).
+ */
+async function auditRepoDependencies(options = {}) {
+  const { ownerPubkey, repoId, branch = 'main', bridgeUrl, packages } = options;
+  const parser = require('./gittr-security-audit');
+  let parsed = Array.isArray(packages) ? packages : [];
+
+  if (parsed.length === 0) {
+    if (!ownerPubkey || !repoId) {
+      throw new Error('ownerPubkey and repoId required (or pass packages already parsed)');
+    }
+    const listed = await bridgeApi.bridgeListFiles(
+      { ownerPubkey, repo: repoId, branch },
+      bridgeUrl
+    );
+    const tree = Array.isArray(listed.files) ? listed.files : [];
+    const manifestPaths = tree
+      .map((f) => (typeof f === 'string' ? f : f.path || f.file || ''))
+      .filter((p) => parser.isManifestPath(p));
+    const groups = [];
+    for (const path of manifestPaths) {
+      const got = await bridgeApi.bridgeGetFileContent(
+        { ownerPubkey, repo: repoId, path, branch },
+        bridgeUrl
+      );
+      const text = got.isBinary ? null : got.content;
+      if (typeof text !== 'string') continue;
+      groups.push(parser.parseManifest(path, text));
+    }
+    parsed = parser.mergeManifestPackages(groups);
+  }
+
+  if (parsed.length === 0) {
+    return withAgentHints(
+      { ok: true, scanned: 0, advisories: [], affectedPackages: 0, source: 'osv.dev' },
+      {
+        reason: 'No parseable manifests found (package.json, yarn.lock, go.mod, …).',
+        nextSteps: ['Push lockfiles to the bridge, or pass packages:[{ecosystem,name,version}].'],
+      }
+    );
+  }
+
+  const payload = parser.toAuditPayload(parsed);
+  const result = await bridgeApi.postSecurityAudit({ packages: payload }, bridgeUrl);
+  return withAgentHints(
+    {
+      ok: result.httpOk !== false && !result.error,
+      scanned: result.scanned != null ? result.scanned : payload.length,
+      advisories: result.advisories || [],
+      affectedPackages: result.affectedPackages,
+      source: result.source || 'osv.dev',
+      error: result.error,
+      message: result.message,
+    },
+    {
+      agentSummary: result.error
+        ? `Audit failed: ${result.error}`
+        : `Scanned ${payload.length} package(s); ${(result.advisories || []).length} advisory row(s).`,
+      nextSteps: result.error
+        ? ['Retry; OSV.dev must be reachable from gittr.space.']
+        : ['Confirmed = lockfile-pinned version. Range-min from package.json is badge-only.'],
+    }
+  );
 }
 
 /**
@@ -2667,11 +2878,16 @@ module.exports = {
   listReleases,
   exploreRepos,
   fetchForgeReleases,
+  listForgeReleases,
+  listRepoSoftwareReleases: listForgeReleases,
   announceSoftwareFromForgeRelease,
   deleteSoftwareAnnounce,
+  publishNostrPages,
+  auditRepoDependencies,
   softDeleteRepo,
   deleteRepo: softDeleteRepo,
   publishSoftwareAnnounce: (a) => gittrNostr.publishSoftwareAnnounce(a),
+  pinReleaseAssetsToNgitBlossom: (a) => gittrNostr.pinReleaseAssetsToNgitBlossom(a),
   // Bridge HTTP (gittr/ngit API routes)
   bridgeRepoExists: (a) => bridgeApi.bridgeRepoExists(a.ownerPubkey, a.repo, a.bridgeUrl),
   bridgeListFiles: (a) => bridgeApi.bridgeListFiles(a, a.bridgeUrl),
