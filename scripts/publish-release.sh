@@ -72,7 +72,18 @@ git push "$REMOTE" main --tags
 RELEASE_JSON="$(curl -fsS -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
   "https://api.github.com/repos/${REPO}/releases/tags/${TAG}" 2>/dev/null || echo '{"message":"Not Found"}')"
 
-if echo "$RELEASE_JSON" | grep -q '"message": "Not Found"'; then
+release_missing() {
+  echo "$1" | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+except json.JSONDecodeError:
+    sys.exit(0)
+sys.exit(0 if d.get('message') == 'Not Found' or not d.get('id') else 1)
+"
+}
+
+if release_missing "$RELEASE_JSON"; then
   echo "==> creating GitHub release ${TAG}"
   RELEASE_JSON="$(curl -fsS -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
     "https://api.github.com/repos/${REPO}/releases" \
@@ -82,6 +93,11 @@ else
 fi
 
 UPLOAD_URL="$(echo "$RELEASE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('upload_url','').replace('{?name,label}',''))")"
+if [[ -z "$UPLOAD_URL" ]]; then
+  echo "ERROR: GitHub release JSON has no upload_url (tag ${TAG})" >&2
+  echo "$RELEASE_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print('keys:', sorted(d)[:20], 'message:', d.get('message'))" >&2
+  exit 1
+fi
 ASSET_NAME="gittr-mcp-${VERSION}.mcpb"
 
 RELEASE_ID="$(echo "$RELEASE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))")"
