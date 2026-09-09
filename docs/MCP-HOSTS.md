@@ -40,7 +40,9 @@ Reload MCP or restart Cursor.
 
 ## 3. Claude Desktop
 
-Quit the app. Edit `claude_desktop_config.json` (path varies by OS — see Anthropic docs). Same `mcpServers` shape as above: **merge** `gittr` next to existing servers.
+Preferred: install the latest `.mcpb` from [GitHub Releases](https://github.com/arbadacarbaYK/gittr-mcp/releases) (not npm). Reinstall the bundle after each `v*` release.
+
+Alternatively: quit the app, edit `claude_desktop_config.json` (path varies by OS — see Anthropic docs), and use the same `mcpServers` shape as above: **merge** `gittr` next to existing servers (`node` + absolute `server.js`).
 
 ## 4. VS Code / Copilot MCP
 

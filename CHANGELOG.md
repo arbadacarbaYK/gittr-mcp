@@ -2,8 +2,10 @@
 
 ## Unreleased
 
+## 1.0.7 (2026-09-09)
+
 ### Fixes
-- MCP initialize version now comes from `package.json` instead of a hardcoded `1.0.0`, so agents see the same release as npm / `server.json` / the `.mcpb` manifest.
+- MCP initialize version now comes from `package.json` instead of a hardcoded `1.0.0`, so agents see the same release as `server.json` / the `.mcpb` manifest.
 
 ## 1.0.6 (2026-09-06)
 
