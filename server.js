@@ -10,11 +10,12 @@ const {
 
 const gittr = require('./index.js');
 const { suggestNextStepsForTool } = require('./gittr-agent-outcomes.js');
+const packageMetadata = require('./package.json');
 
 const server = new Server(
   {
     name: 'gittr-mcp',
-    version: '1.0.0',
+    version: packageMetadata.version,
   },
   {
     capabilities: {

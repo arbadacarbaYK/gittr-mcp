@@ -1,7 +1,7 @@
 # Test Validation Report
 
-**MCP Version:** 1.0.0  
-**Test Date:** May 2026  
+**MCP Version:** tracks `package.json` (MCP initialize reads the same field)  
+**Test Date:** May 2026 (report); version alignment re-checked 2026-09-09  
 **Status:** ✅ Core flows validated, relay behavior still variable
 
 ---

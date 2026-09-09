@@ -11,7 +11,7 @@ npm version patch   # or minor / major
 That single command:
 
 1. Runs tests
-2. Bumps `package.json` and syncs `server.json` + `mcpb/manifest.json`
+2. Bumps `package.json` and syncs `server.json` + `mcpb/manifest.json`. MCP initialize (`server.js` `Server` constructor) already reads `package.json` — do not hardcode the version there.
 3. Commits and tags `vX.Y.Z`
 4. Builds the `.mcpb`
 5. Pushes `main` + tag to GitHub

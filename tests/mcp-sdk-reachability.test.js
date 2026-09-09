@@ -49,6 +49,36 @@ assert.ok(
   `dependency range ${dep} must keep SDK >= 1.26.0`
 );
 
+const serverJson = JSON.parse(fs.readFileSync(path.join(root, 'server.json'), 'utf8'));
+assert.strictEqual(
+  serverJson.version,
+  pkg.version,
+  'server.json version must match package.json'
+);
+assert.strictEqual(
+  serverJson.packages && serverJson.packages[0] && serverJson.packages[0].version,
+  pkg.version,
+  'server.json package entry version must match package.json'
+);
+const mcpbManifest = JSON.parse(
+  fs.readFileSync(path.join(root, 'mcpb', 'manifest.json'), 'utf8')
+);
+assert.strictEqual(
+  mcpbManifest.version,
+  pkg.version,
+  'mcpb/manifest.json version must match package.json'
+);
+assert.match(
+  serverSrc,
+  /require\(\s*['"]\.\/package\.json['"]\s*\)/,
+  'server.js must load package.json for the MCP Server version'
+);
+assert.match(
+  serverSrc,
+  /version:\s*packageMetadata\.version/,
+  'MCP initialize version must come from package.json, not a hardcoded string'
+);
+
 assert.match(
   serverSrc,
   /StdioServerTransport/,
@@ -71,5 +101,5 @@ assert.match(
 );
 
 console.log(
-  `✓ mcp-sdk-reachability: sdk=${sdkVersion} stdio-only tools server (CVE-2026-25536 / CVE-2026-0621 not reachable)`
+  `✓ mcp-sdk-reachability: sdk=${sdkVersion} pkg=${pkg.version} stdio-only tools server (CVE-2026-25536 / CVE-2026-0621 not reachable)`
 );
