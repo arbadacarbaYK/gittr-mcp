@@ -69,6 +69,9 @@
   "overrides": {
     "express-rate-limit": "8.5.1",
     "ip-address": ">=10.4.0",
-    "tmp": "^0.2.7"
+    "tmp": "^0.2.7",
+    "fast-uri": "3.1.7",
+    "hono": "4.13.7",
+    "qs": "6.16.0"
   }
 }

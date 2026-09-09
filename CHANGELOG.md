@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.0.8 (2026-09-09)
+
+### Security
+- Override MCP SDK transitives that OSV flagged on the gittr Dependencies tab: `fast-uri@3.1.7`, `hono@4.13.7`, `qs@6.16.0`. gittr-mcp is still stdio-only; hono/qs are unused HTTP surfaces, but `fast-uri` is loaded via AJV. See `docs/SECURITY-ADVISORIES.md`.
+
 ## 1.0.7 (2026-09-09)
 
 ### Fixes

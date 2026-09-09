@@ -33,10 +33,25 @@ Hosts (Cursor, Claude Desktop, etc.) spawn one stdio child per session.
 
 **Verdict:** false positive for [[gittr-mcp]].
 
+## SDK lockfile pins (fast-uri / hono / qs)
+
+OSV.dev matches **transitive** copies that ship with `@modelcontextprotocol/sdk`. gittr-mcp does not import these packages itself. The MCP SDK has not bumped them yet, so `package.json` `overrides` force patched versions:
+
+| Package | Locked (vulnerable) | Override | Why it showed up |
+| --- | --- | --- | --- |
+| `fast-uri` | 3.1.5 | **3.1.7** (≥ 3.1.6) | AJV JSON Schema validator on the **stdio** `Server` path — actually loaded at startup |
+| `hono` | 4.13.0 | **4.13.7** (≥ 4.13.5) | SDK Streamable HTTP examples / `@hono/node-server` — **not** used (stdio only) |
+| `qs` | 6.15.3 | **6.16.0** | Express / body-parser under the SDK HTTP helpers — **not** used on stdio |
+
+**CVEs covered:** fast-uri CVE-2026-75931 / 75975 / 75899 / 76172; hono CVE-2026-84363 / 84364 / 84365; qs CVE-2026-82417 / 82562.
+
+A lockfile match is still not proof gittr-mcp is exploitable (especially hono `toSSG` / query-parser paths). Pinning stops the Dependencies tab from flagging known-patched versions inside the `.mcpb`.
+
 ## Regression guard
 
 `tests/mcp-sdk-reachability.test.js` fails the suite if:
 
 - resolved SDK is below `1.26.0`, or
 - `server.js` starts importing Streamable HTTP / SSE MCP transports, or
-- resource-template APIs are wired in without an explicit triage update here.
+- resource-template APIs are wired in without an explicit triage update here, or
+- lockfile `fast-uri` / `hono` / `qs` fall below the override floors.

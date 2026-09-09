@@ -100,6 +100,45 @@ assert.match(
   'server.js must connect exactly the stdio transport'
 );
 
+const lock = JSON.parse(
+  fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8')
+);
+
+function lockfileVersions(packageName) {
+  const found = [];
+  for (const [key, meta] of Object.entries(lock.packages || {})) {
+    if (
+      key === `node_modules/${packageName}` ||
+      key.endsWith(`/node_modules/${packageName}`)
+    ) {
+      found.push(String(meta.version || ''));
+    }
+  }
+  return found;
+}
+
+function assertOverrideFloor(packageName, floor) {
+  const versions = lockfileVersions(packageName);
+  assert.ok(
+    versions.length > 0,
+    `package-lock.json must contain ${packageName} (MCP SDK transitive)`
+  );
+  for (const v of versions) {
+    assert.ok(
+      gte(v, floor),
+      `${packageName}@${v} is below override floor ${floor}`
+    );
+  }
+}
+
+const overrides = pkg.overrides || {};
+assert.strictEqual(overrides['fast-uri'], '3.1.7');
+assert.strictEqual(overrides.hono, '4.13.7');
+assert.strictEqual(overrides.qs, '6.16.0');
+assertOverrideFloor('fast-uri', '3.1.6');
+assertOverrideFloor('hono', '4.13.5');
+assertOverrideFloor('qs', '6.16.0');
+
 console.log(
-  `✓ mcp-sdk-reachability: sdk=${sdkVersion} pkg=${pkg.version} stdio-only tools server (CVE-2026-25536 / CVE-2026-0621 not reachable)`
+  `✓ mcp-sdk-reachability: sdk=${sdkVersion} pkg=${pkg.version} stdio-only tools server (CVE-2026-25536 / CVE-2026-0621 not reachable; fast-uri/hono/qs overrides)`
 );
