@@ -10,7 +10,7 @@ This document tracks how MCP tools map to the **current** gittr web app (`ngit` 
 | Publish repo | `createRepo`, `publishRepoAnnouncement`, `publishRepoState` | kinds **30617** + **30618**; **`clone[]` = full GRASP push set** (`buildFullGraspCloneUrls` — not capped relay hosts); forge URL in `source` only (`forkedFrom` only for a real parent) |
 | Soft-delete repo | `softDeleteRepo` / `deleteRepo` | Soft-deleted **30617** + NIP-09 kind **5**, **and** `POST /api/nostr/repo/event` so the bridge wipes the bare tree (Settings → Delete parity) |
 | Issues | `createIssue`, `listIssues`, `getIssueById` | kind **1621** |
-| Issue/PR comments | `listIssueComments`, `createIssueComment`, `listPRComments`, `createPRComment` | NIP-22 kind **1111** (`E`/`K`/`P` + `e`/`k`/`p`, optional `repo`) — same shape as gittr issue detail |
+| Issue/PR comments | `listIssueComments`, `createIssueComment`, `listPRComments`, `createPRComment` | NIP-22 kind **1111**. Issue **and** PR detail pages subscribe to `#E`/`#e` on the root event. `repo` owner may be npub or hex. |
 | Close/reopen issue (Nostr) | `closeIssue`, `reopenIssue` | kinds **1632** / **1630** — **MCP publishes; web issue detail often only updates localStorage** |
 | PRs | `createPR`, `listPRs`, `updatePullRequest`, `getPullRequestById` | kinds **1618** / **1619** |
 | Merge PR (git + bridge) | `mergePullRequest` | git merge + bridge push + **30618** + **1631** |
