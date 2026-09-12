@@ -8,6 +8,8 @@ Works with **Cursor**, **Claude Desktop**, **VS Code / Copilot MCP**, **Windsurf
 
 **Docs hub:** [gittr-docu](https://3un05jr4dnwh6njreq6uhzgv67st83jxi5lnpsbf8y3dkdq1qkgittr-docu.pages.gittr.space/) — product map and how this MCP sits next to the website.
 
+**This repo’s Page:** root [`index.html`](./index.html). After **Push Manifest**, save site name `gittr-mcp`.
+
 ---
 
 ## Why use this?

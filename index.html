@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>gittr-mcp — agents on gittr</title>
+    <meta
+      name="description"
+      content="gittr-mcp lets Cursor, Claude, and other MCP hosts use gittr like a developer: repos, PRs, issues, bounties, with a Nostr identity."
+    />
+    <link rel="stylesheet" href="./docs-site/hub.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2314b8a6'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='16'%3E★%3C/text%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <a class="skip" href="#jobs">Skip to what this box does</a>
+    <header class="topbar">
+      <div class="wrap topbar-inner">
+        <a class="brand" href="#top">
+          <span class="logo" aria-hidden="true">★</span>
+          gittr-mcp
+        </a>
+        <nav class="topnav" aria-label="On this page">
+          <a href="#jobs">What this is</a>
+          <a href="#map">Platform map</a>
+          <a href="#docs">Docs</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="top">
+      <div class="wrap hero">
+        <div class="hero-copy">
+          <p class="kicker">Nostr Page · agents, not SSH</p>
+          <p class="stamp">We write code</p>
+          <h1 class="glitch" data-text="Same forge. No Amber popup.">
+            Same forge. <em>No Amber popup.</em>
+          </h1>
+          <p class="lede">
+            <strong>gittr-mcp</strong> is the agent door into gittr. Cursor,
+            Claude Desktop, VS Code, Windsurf — any MCP host — create repos,
+            push, open PRs, manage issues and bounties with a Nostr identity
+            (<code>nsec</code>), not a GitHub login. Not SSH. Same events as
+            humans in the browser.
+          </p>
+          <div class="cta-row">
+            <a class="btn btn-primary" href="#jobs">What this box does</a>
+            <a
+              class="btn btn-ghost"
+              href="https://gittr.space/npub1n2ph08n4pqz4d3jk6n2p35p2f4ldhc5g5tu7dhftfpueajf4rpxqfjhzmc/gittr-mcp?branch=main"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Open on gittr</a
+            >
+            <a
+              class="btn btn-ghost"
+              href="https://3un05jr4dnwh6njreq6uhzgv67st83jxi5lnpsbf8y3dkdq1qkgittr-docu.pages.gittr.space/"
+              target="_blank"
+              rel="noopener noreferrer"
+              >gittr docs hub</a
+            >
+          </div>
+          <div class="kinds-row" aria-hidden="true">
+            <span class="kind k30617">30617 announce</span>
+            <span class="kind k1618">1618 PR</span>
+            <span class="kind k1621">1621 issue</span>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <span class="slash a" aria-hidden="true"></span>
+          <span class="slash b" aria-hidden="true"></span>
+          <figure class="polaroid plain">
+            <div class="host-mark">gittr-mcp<br />HTTP + Nostr</div>
+            <figcaption>you are here · agents, not SSH</figcaption>
+          </figure>
+          <svg class="burst" viewBox="0 0 120 120" aria-hidden="true">
+            <polygon
+              fill="#b8ff3c"
+              points="60,4 74,46 118,46 82,72 96,114 60,88 24,114 38,72 2,46 46,46"
+            />
+          </svg>
+        </div>
+      </div>
+
+      <section id="jobs">
+        <div class="wrap">
+          <div class="section-title">
+            <h2>What this box does</h2>
+          </div>
+          <div class="tiles">
+            <a
+              class="tile"
+              href="https://gittr.space/npub1n2ph08n4pqz4d3jk6n2p35p2f4ldhc5g5tu7dhftfpueajf4rpxqfjhzmc/gittr-mcp?file=docs%2FAGENT-QUICKSTART.md&amp;branch=main"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <div class="name">Ship a repo from chat</div>
+              <div class="job">
+                createRepo pushes files to the bridge and publishes 30617 +
+                30618. Same account as gittr.space.
+              </div>
+            </a>
+            <a
+              class="tile"
+              href="https://gittr.space/npub1n2ph08n4pqz4d3jk6n2p35p2f4ldhc5g5tu7dhftfpueajf4rpxqfjhzmc/gittr-mcp?file=docs%2FMCP-HOSTS.md&amp;branch=main"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <div class="name">Install in an MCP host</div>
+              <div class="job">
+                Cursor, Claude, VS Code, Windsurf, OpenClaw. Stdio. Signing is
+                built in.
+              </div>
+            </a>
+            <a
+              class="tile here"
+              href="https://gittr.space/npub1n2ph08n4pqz4d3jk6n2p35p2f4ldhc5g5tu7dhftfpueajf4rpxqfjhzmc/gittr-mcp?branch=main"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <div class="name">Not the git disk</div>
+              <div class="job">
+                Git bytes still live on git.gittr.space. MCP talks HTTPS +
+                signed events. Humans still use the website.
+              </div>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section id="map">
+        <div class="wrap">
+          <div class="section-title">
+            <h2>Click a box. Land on the repo or the host.</h2>
+          </div>
+          <div class="tiles">
+            <a
+              class="tile"
+              href="https://gittr.space"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <div class="name">Human in browser</div>
+              <div class="host">gittr.space</div>
+              <div class="job">NIP-07, Amber, or nsec.</div>
+            </a>
+            <a
+              class="tile here"
+              href="https://gittr.space/npub1n2ph08n4pqz4d3jk6n2p35p2f4ldhc5g5tu7dhftfpueajf4rpxqfjhzmc/gittr-mcp?branch=main"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <div class="name">gittr-mcp ★</div>
+              <div class="host">YOU ARE HERE</div>
+              <div class="job">Agent tools. Same forge.</div>
+            </a>
+            <a
+              class="tile"
+              href="https://gittr.space/npub1n2ph08n4pqz4d3jk6n2p35p2f4ldhc5g5tu7dhftfpueajf4rpxqfjhzmc/gitnostr?branch=main"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <div class="name">gitnostr Bridge</div>
+              <div class="host">git.gittr.space</div>
+              <div class="job">Where MCP actually writes git.</div>
+            </a>
+            <a
+              class="tile"
+              href="https://3un05jr4dnwh6njreq6uhzgv67st83jxi5lnpsbf8y3dkdq1qkgittr-docu.pages.gittr.space/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <div class="name">gittr docs hub</div>
+              <div class="host">Nostr Page · gittr-docu</div>
+              <div class="job">The public map of every box.</div>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section id="docs">
+        <div class="wrap">
+          <div class="section-title">
+            <h2>Docs on gittr</h2>
+          </div>
+          <div class="tiles">
+            <a
+              class="tile"
+              href="https://gittr.space/npub1n2ph08n4pqz4d3jk6n2p35p2f4ldhc5g5tu7dhftfpueajf4rpxqfjhzmc/gittr-mcp?file=README.md&amp;branch=main"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <div class="name">README</div>
+              <div class="job">Why MCP, workflows, private repos.</div>
+            </a>
+            <a
+              class="tile"
+              href="https://gittr.space/npub1n2ph08n4pqz4d3jk6n2p35p2f4ldhc5g5tu7dhftfpueajf4rpxqfjhzmc/gittr-mcp?file=docs%2FAGENT-QUICKSTART.md&amp;branch=main"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <div class="name">Agent quickstart</div>
+              <div class="job">First tools to call.</div>
+            </a>
+            <a
+              class="tile"
+              href="https://gittr.space/npub1n2ph08n4pqz4d3jk6n2p35p2f4ldhc5g5tu7dhftfpueajf4rpxqfjhzmc/gittr-mcp?file=docs%2FSIGNING-GUIDE.md&amp;branch=main"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <div class="name">Signing guide</div>
+              <div class="job">nsec / keys file. Not Amber.</div>
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="wrap">
+        <p>
+          After you edit this repo: <strong>Push to Nostr</strong>, then
+          <strong>Nostr Pages → Push Manifest</strong>. Save site name
+          <code>gittr-mcp</code> (9 characters, under the DNS cap). Sister hub:
+          <a
+            href="https://3un05jr4dnwh6njreq6uhzgv67st83jxi5lnpsbf8y3dkdq1qkgittr-docu.pages.gittr.space/"
+            target="_blank"
+            rel="noopener noreferrer"
+            >gittr-docu</a
+          >.
+        </p>
+      </div>
+    </footer>
+    <script src="./docs-site/hub.js"></script>
+  </body>
+</html>
