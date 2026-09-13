@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Features
+- **NIP-82 announce matches gittr’s zapstore.yaml screenshots:** `announceSoftwareFromForgeRelease` reads `GET /api/repo/zapstore-yaml` and copies `images:` (plus optional extra HTTPS URLs) onto kind **32267**. Official gittr uses `space.gittr.app`, the dark-plate bird icon, gittr.space screenshots, and may pin the APK to `blossom.gittr.space`. Other apps still cannot pin Apps to Pages Blossom.
+- **Pages d-tag length:** `publishNostrPages` clips the site name to **1–13** characters (same DNS-label rule as gittr Pages).
+
 ## 1.0.8 (2026-09-09)
 
 ### Security

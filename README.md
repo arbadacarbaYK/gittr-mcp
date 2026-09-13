@@ -124,7 +124,7 @@ These are the **processes** people actually run; each maps to MCP tools the agen
 - **`listForgeReleases`** — forge Releases tab listing (all assets; no NIP-82 MIME gate).  
 - **`createRelease`** — returns guidance only (UI release notes until next **30617** push).  
 - **`fetchForgeReleases`** — one forge Release + announceable binaries. Omit `tag` for latest; `hash:true` for sha256 (required before announce).  
-- **`announceSoftwareFromForgeRelease`** — Zapstore/NIP-82 (kinds **32267** / **30063** / **3063**) from a tagged forge Release. APK preferred; AppImage/DMG/linux `tar.gz`/MSI/EXE/IPA also. Extra binaries on the same tag are sibling assets. Optional `pinToBlossom` (public Blossom only — never `blossom.gittr.space`). Same as gittr **Nostr Apps** (latest) or Releases **Announce on Nostr** (`tag=`). Never a tagless app.  
+- **`announceSoftwareFromForgeRelease`** — Zapstore/NIP-82 (kinds **32267** / **30063** / **3063**) from a tagged forge Release. APK preferred; AppImage/DMG/linux `tar.gz`/MSI/EXE/IPA also. Extra binaries on the same tag are sibling assets. Copies `images:` from the forge `zapstore.yaml`. Optional `pinToBlossom` (public Blossom; `blossom.gittr.space` only for official `space.gittr.app`). Same as gittr **Nostr Apps** (latest) or Releases **Announce on Nostr** (`tag=`). Never a tagless app.  
 - **`deleteSoftwareAnnounce`** — NIP-09 kind **5** for those app/release/asset event ids.
 
 ### Pages & security

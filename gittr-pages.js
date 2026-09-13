@@ -84,6 +84,20 @@ function extOf(filePath) {
   return i >= 0 ? n.slice(i).toLowerCase() : '';
 }
 
+function slugToNsiteDTag(slug) {
+  let s = String(slug || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (s.length > 13) {
+    s = s.slice(0, 13).replace(/-+$/, '');
+  }
+  if (!s) s = 'site';
+  if (s.endsWith('-')) s = s.replace(/-+$/, '') || 'site';
+  return s;
+}
+
 function normalizeFilePath(filePath) {
   return String(filePath || '')
     .replace(/\\/g, '/')
@@ -259,6 +273,7 @@ module.exports = {
   isGittrPagesManifestPath,
   toWebPath,
   normalizeFilePath,
+  slugToNsiteDTag,
   contentTypeForPath,
   pagesBlossomOrigin,
   pagesBlossomHostname,

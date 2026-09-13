@@ -1674,6 +1674,7 @@ async function announceSoftwareFromForgeRelease(options = {}) {
   const {
     sourceUrl,
     tag,
+    branch,
     appId,
     appName,
     summary,
@@ -1684,6 +1685,9 @@ async function announceSoftwareFromForgeRelease(options = {}) {
     includeSiblingAssets,
     pinToBlossom,
     topics,
+    iconUrl,
+    screenshotUrls,
+    homepageUrl,
     ownerPubkey,
     relays,
     bridgeUrl,
@@ -1723,6 +1727,39 @@ async function announceSoftwareFromForgeRelease(options = {}) {
   }
 
   const nip82 = require('./gittr-nip82-software');
+  const android = require('./gittr-android-app');
+  const ownerHex = (
+    ownerPubkey || gittrNostr.getPublicKey(privkey)
+  ).toLowerCase();
+
+  let yamlScreenshots = [];
+  let yamlIconUrl;
+  try {
+    const yaml = await bridgeApi.fetchZapstoreYaml(
+      { sourceUrl, branch },
+      bridgeUrl
+    );
+    if (yaml && yaml.ok && yaml.found) {
+      yamlScreenshots = Array.isArray(yaml.screenshots) ? yaml.screenshots : [];
+      yamlIconUrl = yaml.icon;
+    }
+  } catch (_) {
+    /* missing yaml is optional */
+  }
+
+  const resolvedShots = android.screenshotUrlsForNip82Announce({
+    repo: forge.repo,
+    ownerPubkeyHex: ownerHex,
+    yamlScreenshots,
+    extraScreenshotUrls: screenshotUrls,
+  });
+  const resolvedIcon = android.iconUrlForNip82Announce({
+    repo: forge.repo,
+    ownerPubkeyHex: ownerHex,
+    iconUrl,
+    yamlIconUrl,
+  });
+
   let assetUrlOverrides;
   let pinWarnings = [];
   if (pinToBlossom) {
@@ -1732,6 +1769,7 @@ async function announceSoftwareFromForgeRelease(options = {}) {
       forge,
       selectedUrl,
       privkey,
+      ownerPubkey: ownerHex,
       bridgeUrl,
     });
     assetUrlOverrides = pin.overrides;
@@ -1740,18 +1778,37 @@ async function announceSoftwareFromForgeRelease(options = {}) {
 
   const result = await gittrNostr.publishSoftwareAnnounce({
     forge,
-    appId: appId || nip82.suggestAppIdFromRepo(forge.repo),
+    appId:
+      appId || nip82.suggestAppIdFromRepo(forge.repo, ownerHex),
     appName: appName || forge.repo,
-    summary,
-    license,
+    summary: android.summaryForNip82Announce({
+      repo: forge.repo,
+      ownerPubkeyHex: ownerHex,
+      repoSummary: summary,
+    }),
+    license:
+      license ||
+      (android.isOfficialGittrAndroidRepo({
+        repo: forge.repo,
+        ownerPubkeyHex: ownerHex,
+      })
+        ? android.GITTR_ANDROID_LICENSE
+        : undefined),
     nip34Address,
     selectedAssetUrl: selectedUrl,
     includeSiblingAssets,
     assetUrlOverrides,
-    topics,
+    topics: android.topicsForNip82Announce({
+      repo: forge.repo,
+      ownerPubkeyHex: ownerHex,
+      topics,
+    }),
+    iconUrl: resolvedIcon,
+    screenshotUrls: resolvedShots,
+    homepageUrl,
     privkey,
     relays,
-    ownerPubkey: ownerPubkey || gittrNostr.getPublicKey(privkey),
+    ownerPubkey: ownerHex,
   });
 
   return withAgentHints(
@@ -1761,12 +1818,13 @@ async function announceSoftwareFromForgeRelease(options = {}) {
       forgeTag: forge.release?.tag,
       repositoryUrl: forge.repositoryUrl,
       pinWarnings,
+      screenshotCount: resolvedShots.length,
     },
     {
       nextSteps: [
         'Open https://gittr.space/apps to confirm the listing.',
         result.whitelistHint ||
-          'If Zapstore is slow to index, wait or check zapstore.yaml on the forge repo.',
+          'If Zapstore is slow to index, wait or check zapstore.yaml on the forge repo (images: for screenshots).',
       ].filter(Boolean),
     }
   );
@@ -1849,6 +1907,7 @@ async function publishNostrPages(options = {}) {
     bridgeUrl,
   } = options;
   const privkey = requireSigningKey(options.privkey);
+  const gittrPages = require('./gittr-pages');
 
   let uploadFiles = Array.isArray(files) ? files : [];
   if (uploadFiles.length === 0 && fromBridge) {
@@ -1860,7 +1919,6 @@ async function publishNostrPages(options = {}) {
       bridgeUrl
     );
     const tree = Array.isArray(listed.files) ? listed.files : [];
-    const gittrPages = require('./gittr-pages');
     const wantPrefix = prefix ? gittrPages.normalizeFilePath(prefix) : '';
     const candidates = tree
       .map((f) => (typeof f === 'string' ? f : f.path || f.file || ''))
@@ -1895,7 +1953,7 @@ async function publishNostrPages(options = {}) {
 
   const result = await gittrNostr.publishNostrPages({
     files: uploadFiles,
-    dTag: dTag || repoId,
+    dTag: gittrPages.slugToNsiteDTag(dTag || repoId || ''),
     title: title || repoId || dTag,
     description,
     sourceUrl,

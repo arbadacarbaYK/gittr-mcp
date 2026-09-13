@@ -754,7 +754,7 @@ const tools = [
   {
     name: 'announceSoftwareFromForgeRelease',
     description:
-      'Announce software to Zapstore/NIP-82 (kinds 32267/30063/3063) from a forge Release binary. Same as gittr Nostr Apps (latest tag) or Releases → Announce on Nostr (tag=). Never a tagless app. Optional pinToBlossom streams files to primal/ditto/haven (never blossom.gittr.space). Auto-loads .nostr-keys.json if privkey omitted.',
+      'Announce software to Zapstore/NIP-82 (kinds 32267/30063/3063) from a forge Release binary. Same as gittr Nostr Apps (latest tag) or Releases → Announce on Nostr (tag=). Never a tagless app. Copies images: from the forge zapstore.yaml onto kind 32267. Optional pinToBlossom uses public Blossom; blossom.gittr.space only for the official gittr APK (space.gittr.app). Auto-loads .nostr-keys.json if privkey omitted.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -768,7 +768,8 @@ const tools = [
         },
         appId: {
           type: 'string',
-          description: 'Package id (e.g. com.example.app). Default: space.gittr.<repo>',
+          description:
+            'Package id (e.g. com.example.app). Default: space.gittr.<repo>, or space.gittr.app for the official gittr Android package',
         },
         appName: { type: 'string', description: 'Display name (default: forge repo name)' },
         summary: { type: 'string', description: 'Short summary (max ~280 chars)' },
@@ -792,7 +793,21 @@ const tools = [
         pinToBlossom: {
           type: 'boolean',
           description:
-            'Optional: pin hashed files to public Blossom (primal/ditto/haven). Pin failure still announces the forge URL.',
+            'Optional: pin hashed files to public Blossom (primal/ditto/haven). Official gittr APK may also pin to blossom.gittr.space. Pin failure still announces the forge URL.',
+        },
+        iconUrl: {
+          type: 'string',
+          description: 'Optional HTTPS icon. Else zapstore.yaml icon:, else official gittr bird.',
+        },
+        screenshotUrls: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Optional extra HTTPS screenshot URLs. Default: zapstore.yaml images: (repo paths rewritten to raw forge URLs).',
+        },
+        homepageUrl: {
+          type: 'string',
+          description: 'Optional HTTPS homepage for kind 32267 url',
         },
         topics: {
           type: 'array',
@@ -877,6 +892,9 @@ const tools = [
         includeSiblingAssets: { type: 'boolean' },
         assetUrlOverrides: { type: 'object', description: 'downloadUrl → public Blossom HTTPS blob URL' },
         topics: { type: 'array', items: { type: 'string' } },
+        iconUrl: { type: 'string' },
+        screenshotUrls: { type: 'array', items: { type: 'string' } },
+        homepageUrl: { type: 'string' },
         privkey: { type: 'string' },
         ownerPubkey: { type: 'string' },
         relays: { type: 'array', items: { type: 'string' } },
@@ -891,7 +909,11 @@ const tools = [
     inputSchema: {
       type: 'object',
       properties: {
-        dTag: { type: 'string', description: 'Replaceable d-tag (default: repoId)' },
+        dTag: {
+          type: 'string',
+          description:
+            'Replaceable d-tag (default: repoId, clipped to 1–13 chars like gittr Pages site names)',
+        },
         title: { type: 'string' },
         description: { type: 'string' },
         sourceUrl: { type: 'string', description: 'Optional https source shown on the site' },

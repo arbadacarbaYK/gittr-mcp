@@ -157,6 +157,7 @@ console.log('PR created:', pr.event.id);
 await gittr.announceSoftwareFromForgeRelease({
   sourceUrl: 'https://github.com/org/app',
   pinToBlossom: false,
+  // screenshots: commit images: in that repo’s zapstore.yaml
 });
 
 // Nostr Pages (needs index.html)

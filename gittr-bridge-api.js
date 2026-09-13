@@ -111,8 +111,28 @@ async function fetchForgeReleaseList({ sourceUrl } = {}, bridgeUrl = baseUrl()) 
 }
 
 /**
+ * GET /api/repo/zapstore-yaml — repo-root zapstore.yaml icon + images (screenshots).
+ * Missing file → { ok:true, found:false }.
+ */
+async function fetchZapstoreYaml(
+  { sourceUrl, branch } = {},
+  bridgeUrl = baseUrl()
+) {
+  if (!sourceUrl || typeof sourceUrl !== 'string') {
+    throw new Error('sourceUrl is required (GitHub/Codeberg/GitLab repo URL).');
+  }
+  const q = { sourceUrl: sourceUrl.trim() };
+  if (branch) q.branch = String(branch).trim();
+  const res = await guardedFetch(
+    `${bridgeUrl}/api/repo/zapstore-yaml${toQuery(q)}`
+  );
+  return { httpOk: res.ok, status: res.status, ...(await readJson(res)) };
+}
+
+/**
  * POST /api/repo/forge-release-blossom-pin — stream a hashed forge asset to public Blossom
- * (primal / ditto / haven). Never blossom.gittr.space. Pin failure must not block announce.
+ * (primal / ditto / haven). blossom.gittr.space only for the official gittr APK.
+ * Pin failure must not block announce.
  */
 async function pinForgeReleaseToBlossom(
   { sourceUrl, tag, downloadUrl, sha256, authEvent } = {},
@@ -473,6 +493,7 @@ module.exports = {
   sendEventToBridge,
   fetchForgeReleases,
   fetchForgeReleaseList,
+  fetchZapstoreYaml,
   pinForgeReleaseToBlossom,
   postGittrPagesBlossomUpload,
   postSecurityAudit,

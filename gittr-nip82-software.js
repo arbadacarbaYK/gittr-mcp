@@ -6,11 +6,14 @@
  * Primary asset can be any hashed NIP-82 MIME file. Prefer APK when present.
  */
 
+const android = require('./gittr-android-app');
+
 const KIND_SOFTWARE_APPLICATION = 32267;
 const KIND_SOFTWARE_RELEASE = 30063;
 const KIND_SOFTWARE_ASSET = 3063;
 const MIME_ANDROID_APK = 'application/vnd.android.package-archive';
 const RELAY_ZAPSTORE = 'wss://relay.zapstore.dev';
+const GITTR_PAGES_BLOSSOM = 'https://blossom.gittr.space';
 const SOFTWARE_CATALOG_RELAYS = [
   RELAY_ZAPSTORE,
   'wss://relay.damus.io',
@@ -23,7 +26,10 @@ const NGIT_BLOSSOM_ORIGINS = [
   'https://haven.danconwaydev.com',
 ];
 
-function suggestAppIdFromRepo(repo) {
+function suggestAppIdFromRepo(repo, ownerPubkeyHex) {
+  if (android.isOfficialGittrAndroidRepo({ repo, ownerPubkeyHex })) {
+    return android.GITTR_ANDROID_APP_ID;
+  }
   const slug = (repo || 'app')
     .replace(/\.git$/i, '')
     .toLowerCase()
@@ -186,6 +192,18 @@ function ngitBlossomHostnames() {
   return NGIT_BLOSSOM_ORIGINS.map((o) => hostnameOf(o)).filter(Boolean);
 }
 
+function gittrPagesBlossomHostname() {
+  return hostnameOf(GITTR_PAGES_BLOSSOM);
+}
+
+/** Origins to try when pinning a NIP-82 installer. gittr Pages first when allowed. */
+function nip82BlossomPinOrigins(opts) {
+  if (opts && opts.allowGittrPagesBlossom) {
+    return [GITTR_PAGES_BLOSSOM, ...NGIT_BLOSSOM_ORIGINS];
+  }
+  return [...NGIT_BLOSSOM_ORIGINS];
+}
+
 function isGittrBlossomHostname(hostname) {
   const h = (hostname || '').toLowerCase();
   if (!h) return false;
@@ -194,8 +212,11 @@ function isGittrBlossomHostname(hostname) {
   return false;
 }
 
-/** Kind 3063 url may only rewrite to allowlisted public Blossom HTTPS blobs. */
-function allowedNip82BlossomAssetUrl(url) {
+/**
+ * Kind 3063 url may only rewrite to allowlisted Blossom HTTPS blobs.
+ * gittr Pages Blossom is rejected unless allowGittrPagesBlossom (official gittr APK).
+ */
+function allowedNip82BlossomAssetUrl(url, opts) {
   const raw = (url || '').trim();
   if (!raw) return null;
   let parsed;
@@ -207,8 +228,11 @@ function allowedNip82BlossomAssetUrl(url) {
   if (parsed.protocol !== 'https:') return null;
   if (parsed.search || parsed.hash) return null;
   const host = parsed.hostname.toLowerCase();
-  if (isGittrBlossomHostname(host)) return null;
-  if (!ngitBlossomHostnames().includes(host)) return null;
+  if (isGittrBlossomHostname(host)) {
+    if (!(opts && opts.allowGittrPagesBlossom)) return null;
+  } else if (!ngitBlossomHostnames().includes(host)) {
+    return null;
+  }
   if (!/^\/[0-9a-f]{64}(?:\.[a-z0-9]{1,12})?$/i.test(parsed.pathname)) {
     return null;
   }
@@ -256,7 +280,7 @@ function buildSoftwareAnnounceEvents(input) {
     throw new Error('forge must be a successful forge-releases payload (ok: true).');
   }
   const appId = assertValidAppId(
-    input.appId || suggestAppIdFromRepo(forge.repo)
+    input.appId || suggestAppIdFromRepo(forge.repo, input.ownerPubkeyHex)
   );
   const version = versionFromTag(forge.release.tag);
   const selectedUrl = input.selectedAssetUrl || input.selectedApkUrl;
@@ -273,8 +297,25 @@ function buildSoftwareAnnounceEvents(input) {
     : [];
 
   const name = (input.appName || forge.repo || '').trim() || forge.repo;
-  const summary = (input.summary || '').trim().slice(0, 280);
+  const officialGittr = android.isOfficialGittrAndroidRepo({
+    repo: forge.repo,
+    ownerPubkeyHex: input.ownerPubkeyHex,
+  });
+  const summary = android.summaryForNip82Announce({
+    repo: forge.repo,
+    ownerPubkeyHex: input.ownerPubkeyHex,
+    repoSummary: input.summary,
+  });
   const now = Math.floor(Date.now() / 1000);
+  const icon =
+    android.normalizeHttpsUrl(input.iconUrl) ||
+    (officialGittr ? android.GITTR_ANDROID_ICON_URL : undefined);
+  const homepage =
+    android.normalizeHttpsUrl(input.homepageUrl) ||
+    (officialGittr ? android.GITTR_ANDROID_HOMEPAGE_URL : undefined);
+  const license =
+    (input.license && String(input.license).trim()) ||
+    (officialGittr ? android.GITTR_ANDROID_LICENSE : '');
 
   const published = [primary, ...extraAssetFiles];
   const hasApk = published.some((f) => isApkFile(f));
@@ -293,15 +334,48 @@ function buildSoftwareAnnounceEvents(input) {
     ['name', name],
     ['repository', forge.repositoryUrl],
   ];
-  if (hasApk) appTags.push(['t', 'android']);
+  if (icon) appTags.push(['icon', icon]);
+  const screenshotRaw =
+    input.screenshotUrls && input.screenshotUrls.length > 0
+      ? input.screenshotUrls
+      : officialGittr
+        ? [...android.GITTR_ANDROID_SCREENSHOT_URLS]
+        : [];
+  const screenshotUrls = [];
+  const seenShot = new Set();
+  for (const raw of screenshotRaw) {
+    const u = android.normalizeHttpsUrl(raw);
+    if (!u || seenShot.has(u)) continue;
+    seenShot.add(u);
+    screenshotUrls.push(u);
+  }
+  for (const u of screenshotUrls) appTags.push(['image', u]);
+  if (screenshotUrls.length === 0 && icon) {
+    appTags.push(['image', icon]);
+  }
+  if (homepage) appTags.push(['url', homepage]);
+  const seenT = new Set();
+  const pushT = (raw) => {
+    const v = String(raw || '').trim();
+    if (!v) return;
+    const key = v.toLowerCase();
+    if (seenT.has(key)) return;
+    seenT.add(key);
+    appTags.push(['t', v]);
+  };
+  if (hasApk) pushT('android');
   for (const f of platformFs) appTags.push(['f', f]);
   if (summary) appTags.push(['summary', summary]);
-  if (input.license?.trim()) appTags.push(['license', input.license.trim()]);
-  for (const t of input.topics || []) {
-    if (t?.trim()) appTags.push(['t', t.trim()]);
+  if (license) appTags.push(['license', license]);
+  for (const t of android.topicsForNip82Announce({
+    repo: forge.repo,
+    ownerPubkeyHex: input.ownerPubkeyHex,
+    topics: input.topics,
+  })) {
+    pushT(t);
   }
-  if (input.nip34Address?.trim()) {
-    appTags.push(['a', input.nip34Address.trim(), RELAY_ZAPSTORE]);
+  if (input.nip34Address && String(input.nip34Address).trim()) {
+    appTags.push(['a', String(input.nip34Address).trim(), RELAY_ZAPSTORE]);
   }
 
   const app = {
@@ -311,10 +385,11 @@ function buildSoftwareAnnounceEvents(input) {
     tags: appTags,
   };
 
+  const allowGittrPagesBlossom = officialGittr;
   const urlFor = (file) => {
-    const raw = input.assetUrlOverrides?.[file.downloadUrl];
+    const raw = input.assetUrlOverrides && input.assetUrlOverrides[file.downloadUrl];
     if (!raw) return undefined;
-    return allowedNip82BlossomAssetUrl(raw) || undefined;
+    return allowedNip82BlossomAssetUrl(raw, { allowGittrPagesBlossom }) || undefined;
   };
 
   const asset = buildAssetEvent(appId, version, primary, now, urlFor(primary));
@@ -414,6 +489,8 @@ module.exports = {
   pickSiblingNip82Assets,
   allowedNip82BlossomAssetUrl,
   ngitBlossomHostnames,
+  gittrPagesBlossomHostname,
+  nip82BlossomPinOrigins,
   relaysForSoftwareCatalog,
   buildSoftwareAnnounceEvents,
   hashedAssetsForNgitBlossomPin,

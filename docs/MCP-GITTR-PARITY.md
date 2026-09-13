@@ -9,10 +9,10 @@ This document tracks how MCP tools map to the **current** gittr web app (`ngit` 
 | Push files / folder delete | `pushToBridge` (`files`, optional `deletedPaths`, `allowTreeShrink`) | NIP-98 challenge + `POST /api/nostr/repo/push` (UI sends `deletedPaths` + `allowTreeShrink` on final chunk) |
 | Publish repo | `createRepo`, `publishRepoAnnouncement`, `publishRepoState` | kinds **30617** + **30618**; **`clone[]` = full GRASP push set** (`buildFullGraspCloneUrls` — not capped relay hosts); forge URL in `source` only (`forkedFrom` only for a real parent) |
 | Soft-delete repo | `softDeleteRepo` / `deleteRepo` | Soft-deleted **30617** + NIP-09 kind **5**, **and** `POST /api/nostr/repo/event` so the bridge wipes the bare tree (Settings → Delete parity) |
-| Issues | `createIssue`, `listIssues`, `getIssueById` | kind **1621** |
+| Issues | `createIssue`, `listIssues`, `getIssueById` | kind **1621**. gittr URLs use the **event id** (`/issues/<64-hex>`), not a local `#2`. MCP already passes that id. |
 | Issue/PR comments | `listIssueComments`, `createIssueComment`, `listPRComments`, `createPRComment` | NIP-22 kind **1111**. Issue **and** PR detail pages subscribe to `#E`/`#e` on the root event. `repo` owner may be npub or hex. |
 | Close/reopen issue (Nostr) | `closeIssue`, `reopenIssue` | kinds **1632** / **1630** — **MCP publishes; web issue detail often only updates localStorage** |
-| PRs | `createPR`, `listPRs`, `updatePullRequest`, `getPullRequestById` | kinds **1618** / **1619** |
+| PRs | `createPR`, `listPRs`, `updatePullRequest`, `getPullRequestById` | kinds **1618** / **1619**. Same URL rule: `/pulls/<event-id>`. |
 | Merge PR (git + bridge) | `mergePullRequest` | git merge + bridge push + **30618** + **1631** |
 | Star | `starRepo`, `unstarRepo`, `listStars` | NIP-25 kind **7** on **30617** event id (`e`, `k`, `+`/`-`) |
 | Watch | `watchRepo`, `unwatchRepo`, `listWatchedRepos` | NIP-51 kind **10018** full `a` list |
@@ -22,8 +22,8 @@ This document tracks how MCP tools map to the **current** gittr web app (`ngit` 
 | Import / mirror | `importRemoteToBridge`, `mirrorRepo` | `/api/nostr/repo/clone`, GitHub import patterns. Mirror sets `source`/`web` from any HTTPS owner/repo URL (GitHub, GitLab, Codeberg, Forgejo). `forkedFrom` only for a real parent. **Foreign GRASP hosts** (ngit/shakespeare/…) are **not** permanently mirrored onto `git.gittr.space` — clone API rejects them; include `git.gittr.space` in `clone[]` to host here. |
 | Reverse forge → Nostr | `findReposBySource` (alias `findReposByGithub`) — exact forge URL on `source`/`forkedFrom`, returns npub | `GET/POST /api/nostr/repos-by-github?source=` |
 | Maintainers | `addCollaborator` | republish **30617** with `maintainers` tag (owner must sign) |
-| App announce (Zapstore / NIP-82) | `announceSoftwareFromForgeRelease`, `fetchForgeReleases`, `listForgeReleases`, `deleteSoftwareAnnounce` | Kinds **32267** / **30063** / **3063** from a forge **Release tag** + hashed announceable binary (APK preferred; AppImage/DMG/linux `tar.gz`/MSI/EXE/IPA also). Omit `tag` = latest (Code sidebar **Nostr Apps**); `tag=` = Releases tab **Announce on Nostr**. Sibling MIME files become extra `e` tags on **30063**. Optional `pinToBlossom` → `POST /api/repo/forge-release-blossom-pin` (primal/ditto/haven, **never** `blossom.gittr.space`). Pin failure still announces the forge URL. |
-| Nostr Pages | `publishNostrPages` | Kind **35128** + Blossom via `POST /api/gittr-pages/blossom-proxy-upload` (signed kind **24242**). Requires `index.html`. Default server `https://blossom.gittr.space`. |
+| App announce (Zapstore / NIP-82) | `announceSoftwareFromForgeRelease`, `fetchForgeReleases`, `listForgeReleases`, `deleteSoftwareAnnounce` | Kinds **32267** / **30063** / **3063** from a forge **Release tag** + hashed announceable binary (APK preferred; AppImage/DMG/linux `tar.gz`/MSI/EXE/IPA also). Omit `tag` = latest (Code sidebar **Nostr Apps**); `tag=` = Releases tab **Announce on Nostr**. Sibling MIME files become extra `e` tags on **30063**. Kind **32267** `image` tags come from the forge `zapstore.yaml` **`images:`** list (`GET /api/repo/zapstore-yaml`) plus optional extra HTTPS URLs. Optional `pinToBlossom` → `POST /api/repo/forge-release-blossom-pin` (primal/ditto/haven; **`blossom.gittr.space` only for the official gittr APK `space.gittr.app`**). Pin failure still announces the forge URL. |
+| Nostr Pages | `publishNostrPages` | Kind **35128** + Blossom via `POST /api/gittr-pages/blossom-proxy-upload` (signed kind **24242**). Requires `index.html`. Default server `https://blossom.gittr.space`. Site `d` tag is **1–13** characters (DNS label), same as gittr Pages. |
 | Security audit | `auditRepoDependencies` | Parses manifests from the bridge tree, then `POST /api/security/audit` (OSV.dev). Same data as the Dependencies tab; does not need the website UI flag. |
 
 ## Partial / caveats
@@ -52,8 +52,8 @@ This document tracks how MCP tools map to the **current** gittr web app (`ngit` 
 2. **Bug fix:** `createIssue` → branch push → `createPR` or `createPRViaGittrCLI` → `mergePullRequest`.
 3. **Star vs watch:** `starRepo` for appreciation; `watchRepo` for follow list (**10018**).
 4. **Read code:** Prefer `bridgeGetFileContent` / `bridgeListFiles` after the repo is on the bridge. `getFile` is bridge-then-GRASP-raw — not the Code tab (live 30617, forge `source` tip, then first clone listing). See gittr [FILE_FETCHING_INSIGHTS.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/FILE_FETCHING_INSIGHTS.md).
-5. **Announce software:** linked forge with a tagged Release + hashed binary → `announceSoftwareFromForgeRelease({ sourceUrl })` (latest) or `{ sourceUrl, tag }` (chosen tag). Optional `pinToBlossom: true`. Preview with `fetchForgeReleases({ sourceUrl, hash:true, tag })` or `listForgeReleases({ sourceUrl })`.
-6. **Publish Pages:** `publishNostrPages({ files:[{path:'index.html', content:'…'}], dTag })` or `{ fromBridge:true, ownerPubkey, repoId }`.
+5. **Announce software:** linked forge with a tagged Release + hashed binary → `announceSoftwareFromForgeRelease({ sourceUrl })` (latest) or `{ sourceUrl, tag }` (chosen tag). Screenshots: commit `images:` in that repo’s `zapstore.yaml`. Optional `pinToBlossom: true`. Preview with `fetchForgeReleases({ sourceUrl, hash:true, tag })` or `listForgeReleases({ sourceUrl })`.
+6. **Publish Pages:** `publishNostrPages({ files:[{path:'index.html', content:'…'}], dTag })` or `{ fromBridge:true, ownerPubkey, repoId }`. `dTag` is clipped to 1–13 characters.
 7. **Audit dependencies:** `auditRepoDependencies({ ownerPubkey, repoId })`.
 
 See also: [NIP25_STARS_NIP51_FOLLOWING.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/NIP25_STARS_NIP51_FOLLOWING.md) in the gittr repo (ngit).

@@ -1816,6 +1816,9 @@ async function publishSoftwareAnnounce({
   includeSiblingAssets,
   assetUrlOverrides,
   topics,
+  iconUrl,
+  screenshotUrls,
+  homepageUrl,
   privkey,
   relays,
   ownerPubkey,
@@ -1847,6 +1850,10 @@ async function publishSoftwareAnnounce({
     includeSiblingAssets,
     assetUrlOverrides,
     topics,
+    iconUrl,
+    screenshotUrls,
+    homepageUrl,
+    ownerPubkeyHex: signerPubkey,
   });
   const catalogRelays = nip82.relaysForSoftwareCatalog(
     Array.isArray(relays) ? relays : config.relays
@@ -1932,6 +1939,7 @@ async function pinReleaseAssetsToNgitBlossom({
   forge,
   selectedUrl,
   privkey,
+  ownerPubkey,
   bridgeUrl,
 }) {
   const warnings = [];
@@ -1945,11 +1953,21 @@ async function pinReleaseAssetsToNgitBlossom({
     };
   }
   const signerPubkey = getPublicKey(privkey).toLowerCase();
+  const android = require('./gittr-android-app');
+  const allowGittrPagesBlossom = android.isOfficialGittrAndroidRepo({
+    repo: forge && forge.repo,
+    ownerPubkeyHex: ownerPubkey || signerPubkey,
+  });
+  const gittrHost = nip82.gittrPagesBlossomHostname();
+  const serverHostnames = [
+    ...(allowGittrPagesBlossom && gittrHost ? [gittrHost] : []),
+    ...nip82.ngitBlossomHostnames(),
+  ];
   const sk = privkeyToUint8Array(privkey);
   const unsigned = nip82.unsignedNgitBlossomUploadAuth({
     pubkeyHex: signerPubkey,
     sha256Hex: assets.map((a) => a.sha256),
-    serverHostnames: nip82.ngitBlossomHostnames(),
+    serverHostnames,
   });
   const authEvent = finalizeEvent({ ...unsigned }, sk);
 
@@ -1971,7 +1989,9 @@ async function pinReleaseAssetsToNgitBlossom({
         );
         continue;
       }
-      const allowed = nip82.allowedNip82BlossomAssetUrl(data.url);
+      const allowed = nip82.allowedNip82BlossomAssetUrl(data.url, {
+        allowGittrPagesBlossom,
+      });
       if (!allowed) {
         warnings.push(
           `${asset.name}: Blossom returned a URL we will not use — keeping the forge URL.`
@@ -2004,8 +2024,8 @@ async function publishNostrPages({
   bridgeUrl,
 }) {
   if (!privkey) throw new Error('privkey required to publish Nostr Pages');
-  const slug = String(dTag || '').trim();
-  if (!slug) throw new Error('dTag required (site id / repo slug)');
+  const slug = gittrPages.slugToNsiteDTag(String(dTag || '').trim());
+  if (!slug) throw new Error('dTag required (site id / repo slug, 1–13 chars)');
   const staged = gittrPages.stagePagesFiles(files);
   const sk = privkeyToUint8Array(privkey);
   const signerPubkey = getPublicKey(privkey).toLowerCase();

@@ -54,4 +54,9 @@ console.log('✓ pages path + MIME helpers');
   console.log('✓ unsigned Pages blossom auth');
 }
 
+assert.strictEqual(pages.slugToNsiteDTag('My Site'), 'my-site');
+assert.strictEqual(pages.slugToNsiteDTag('gittr-helper-tools'), 'gittr-helper');
+assert.strictEqual(pages.slugToNsiteDTag('gittr-mcp'), 'gittr-mcp');
+console.log('✓ slugToNsiteDTag clips to 1–13 chars');
+
 console.log('\n✓ gittr-pages tests passed');

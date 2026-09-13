@@ -70,8 +70,8 @@ Optional LNbits: `GITTR_LNBITS_URL`, `GITTR_LNBITS_ADMIN_KEY` (or per-call args)
 
 - **`fetchForgeReleases({ sourceUrl, hash, tag })`** — one forge Release. Omit `tag` for latest. `hash:true` required before announce.
 - **`listForgeReleases({ sourceUrl })`** — all forge Releases + assets (website Releases tab). Distinct from **`listReleases`** (git tags).
-- **`announceSoftwareFromForgeRelease({ sourceUrl, tag?, pinToBlossom?, selectedAssetUrl? })`** — kinds **32267** / **30063** / **3063**. Announceable MIME: APK, IPA, DMG, AppImage, MSI/EXE, deb, linux tar.gz (not source). Sibling hashed files on the same tag are extra assets. Pin uses public Blossom only (never `blossom.gittr.space`); pin failure still publishes forge URLs.
-- **`publishNostrPages({ files, dTag, fromBridge?, ownerPubkey, repoId })`** — kind **35128**. Requires `index.html`. Uploads via `/api/gittr-pages/blossom-proxy-upload`.
+- **`announceSoftwareFromForgeRelease({ sourceUrl, tag?, pinToBlossom?, selectedAssetUrl?, screenshotUrls? })`** — kinds **32267** / **30063** / **3063**. Announceable MIME: APK, IPA, DMG, AppImage, MSI/EXE, deb, linux tar.gz (not source). Sibling hashed files on the same tag are extra assets. Screenshots from forge `zapstore.yaml` `images:` (`GET /api/repo/zapstore-yaml`). Pin uses public Blossom; `blossom.gittr.space` only for official gittr APK. Pin failure still publishes forge URLs.
+- **`publishNostrPages({ files, dTag, fromBridge?, ownerPubkey, repoId })`** — kind **35128**. Requires `index.html`. Uploads via `/api/gittr-pages/blossom-proxy-upload`. `dTag` clipped to 1–13 chars.
 - **`auditRepoDependencies({ ownerPubkey, repoId })`** — parse manifests, `POST /api/security/audit`.
 
 ## Known GRASP-style hosts (examples)

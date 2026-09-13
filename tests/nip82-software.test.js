@@ -222,6 +222,69 @@ assert.strictEqual(
   nip82.allowedNip82BlossomAssetUrl(`https://blossom.gittr.space/${SHA_TGZ}`),
   null
 );
+assert.strictEqual(
+  nip82.allowedNip82BlossomAssetUrl(`https://blossom.gittr.space/${SHA_TGZ}`, {
+    allowGittrPagesBlossom: true,
+  }),
+  `https://blossom.gittr.space/${SHA_TGZ}`
+);
 console.log('✓ allowedNip82BlossomAssetUrl allowlist');
+
+{
+  const android = require('../gittr-android-app');
+  assert.strictEqual(
+    nip82.suggestAppIdFromRepo('gittr', android.GITTR_OWNER_PUBKEY_HEX),
+    android.GITTR_ANDROID_APP_ID
+  );
+  assert.strictEqual(nip82.suggestAppIdFromRepo('demo'), 'space.gittr.demo');
+  const forge = {
+    ...sampleForge({ includeMsi: false }),
+    repo: 'gittr',
+    repositoryUrl: 'https://github.com/arbadacarbaYK/gittr',
+  };
+  const built = nip82.buildSoftwareAnnounceEvents({
+    forge,
+    appName: 'gittr',
+    ownerPubkeyHex: android.GITTR_OWNER_PUBKEY_HEX,
+  });
+  assert.strictEqual(built.appId, android.GITTR_ANDROID_APP_ID);
+  assert.strictEqual(
+    built.app.tags.find((t) => t[0] === 'icon')?.[1],
+    android.GITTR_ANDROID_ICON_URL
+  );
+  assert.deepStrictEqual(
+    built.app.tags.filter((t) => t[0] === 'image').map((t) => t[1]),
+    [...android.GITTR_ANDROID_SCREENSHOT_URLS]
+  );
+  const apk = forge.release.apkAssets[0];
+  const officialPin = nip82.buildSoftwareAnnounceEvents({
+    forge,
+    appName: 'gittr',
+    ownerPubkeyHex: android.GITTR_OWNER_PUBKEY_HEX,
+    assetUrlOverrides: {
+      [apk.downloadUrl]: `https://blossom.gittr.space/${SHA_APK}`,
+    },
+  });
+  assert.strictEqual(
+    officialPin.asset.tags.find((t) => t[0] === 'url')?.[1],
+    `https://blossom.gittr.space/${SHA_APK}`
+  );
+  const third = nip82.buildSoftwareAnnounceEvents({
+    forge: sampleForge({ includeMsi: false }),
+    appId: 'space.gittr.demo',
+    appName: 'Demo',
+    iconUrl: 'https://cdn.example.com/app.png',
+    screenshotUrls: ['https://cdn.example.com/shot.png'],
+  });
+  assert.strictEqual(
+    third.app.tags.find((t) => t[0] === 'icon')?.[1],
+    'https://cdn.example.com/app.png'
+  );
+  assert.deepStrictEqual(
+    third.app.tags.filter((t) => t[0] === 'image').map((t) => t[1]),
+    ['https://cdn.example.com/shot.png']
+  );
+  console.log('✓ official gittr app id, screenshots, and Pages Blossom pin');
+}
 
 console.log('\n✓ nip82-software tests passed');
