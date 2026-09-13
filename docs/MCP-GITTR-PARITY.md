@@ -11,7 +11,7 @@ This document tracks how MCP tools map to the **current** gittr web app (`ngit` 
 | Soft-delete repo | `softDeleteRepo` / `deleteRepo` | Soft-deleted **30617** + NIP-09 kind **5**, **and** `POST /api/nostr/repo/event` so the bridge wipes the bare tree (Settings → Delete parity) |
 | Issues | `createIssue`, `listIssues`, `getIssueById` | kind **1621**. gittr URLs use the **event id** (`/issues/<64-hex>`), not a local `#2`. MCP already passes that id. |
 | Issue/PR comments | `listIssueComments`, `createIssueComment`, `listPRComments`, `createPRComment` | NIP-22 kind **1111**. Issue **and** PR detail pages subscribe to `#E`/`#e` on the root event. `repo` owner may be npub or hex. |
-| Close/reopen issue (Nostr) | `closeIssue`, `reopenIssue` | kinds **1632** / **1630** — **MCP publishes; web issue detail often only updates localStorage** |
+| Close/reopen issue (Nostr) | `closeIssue`, `reopenIssue` | kinds **1632** / **1630**. Web Close publishes **1632** for hex issues. Forge `issue-N` / `pr-N` is refused. |
 | PRs | `createPR`, `listPRs`, `updatePullRequest`, `getPullRequestById` | kinds **1618** / **1619**. Same URL rule: `/pulls/<event-id>`. |
 | Merge PR (git + bridge) | `mergePullRequest` | git merge + bridge push + **30618** + **1631** |
 | Star | `starRepo`, `unstarRepo`, `listStars` | NIP-25 kind **7** on **30617** event id (`e`, `k`, `+`/`-`) |

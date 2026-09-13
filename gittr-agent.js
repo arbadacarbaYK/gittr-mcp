@@ -2226,9 +2226,41 @@ async function getPullRequestById(options) {
   }
 }
 
+function refuseForgeImportedTicket(id, action) {
+  const raw = String(id || '').trim();
+  if (/^(issue|pr)-\d+$/i.test(raw) || /^\d+$/.test(raw)) {
+    return {
+      success: false,
+      error: `${action} is not supported for GitHub/Gitea imported tickets (${raw}).`,
+      reason:
+        'Forge-imported issues/PRs are a read-only mirror on gittr. Close, merge, or reopen them on the origin so the two sides stay in sync.',
+      nextSteps: [
+        'Open the GitHub/Gitea/GitLab URL and close or merge there.',
+        'For gittr-native work, pass the 64-char Nostr event id (kind 1621 issue or 1618 PR).',
+        'Comments on a Nostr event id still publish; they are not written back to the forge.',
+      ],
+    };
+  }
+  if (raw && !/^[0-9a-f]{64}$/i.test(raw)) {
+    return {
+      success: false,
+      error: `${action} needs a 64-char Nostr event id, not ${raw}.`,
+      reason:
+        'gittr close/merge/reopen only applies to Nostr kind 1621 issues or 1618 PRs.',
+      nextSteps: [
+        'Pass the event id from the gittr URL (/issues/<hex> or /pulls/<hex>).',
+        'Forge numbers belong on GitHub/Gitea/GitLab.',
+      ],
+    };
+  }
+  return null;
+}
+
 /** Convenience wrapper: publish status 1632 (closed) for issue. */
 async function closeIssue(options) {
   const { issueId, ownerPubkey, repoId, content = 'Closed via MCP', privkey, relays = gittrNostr.config.relays } = options;
+  const forgeRefuse = refuseForgeImportedTicket(issueId, 'closeIssue');
+  if (forgeRefuse) return forgeRefuse;
   if (!issueId || !ownerPubkey || !repoId) {
     return {
       success: false,
@@ -2282,6 +2314,8 @@ async function closeIssue(options) {
 /** Convenience wrapper: publish status 1630 (open) for issue. */
 async function reopenIssue(options) {
   const { issueId, ownerPubkey, repoId, content = 'Reopened via MCP', privkey, relays = gittrNostr.config.relays } = options;
+  const forgeRefuse = refuseForgeImportedTicket(issueId, 'reopenIssue');
+  if (forgeRefuse) return forgeRefuse;
   if (!issueId || !ownerPubkey || !repoId) {
     return {
       success: false,
@@ -2340,6 +2374,8 @@ async function markPullRequestMerged(options) {
     privkey,
     relays = gittrNostr.config.relays,
   } = options;
+  const forgeRefuse = refuseForgeImportedTicket(prId, 'markPullRequestMerged');
+  if (forgeRefuse) return forgeRefuse;
   if (!prId || !ownerPubkey || !repoId) {
     return {
       success: false,
@@ -2484,6 +2520,9 @@ async function mergePullRequest(options) {
     relays: relaysOpt,
     skipNostrStatus = false,
   } = options || {};
+
+  const forgeRefuse = refuseForgeImportedTicket(prId, 'mergePullRequest');
+  if (forgeRefuse) return forgeRefuse;
 
   if (process.env.GITTR_DISABLE_GIT_MERGE === '1') {
     return {
