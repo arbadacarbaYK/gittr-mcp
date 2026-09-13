@@ -92,7 +92,7 @@ These are the **processes** people actually run; each maps to MCP tools the agen
 ### Issues (bug reports, tasks)
 - **`listIssues`**, **`createIssue`**, **`getIssueById`**  
 - **`listIssueComments`**, **`createIssueComment`** — NIP-22 kind **1111** (same tags as gittr issue threads). Does **not** touch bounties.
-- **`closeIssue`**, **`reopenIssue`** — publish NIP-34 status events (1632 / 1630).
+- **`closeIssue`**, **`reopenIssue`** — publish NIP-34 status events (1632 / 1630) for a **64-char Nostr event id**. GitHub/Gitea imported `issue-12` / `pr-12` (and a bare `12`) are refused — close those on the origin.
 
 ### Pull requests (code review flow)
 | Step | Tool | Notes |
@@ -101,7 +101,7 @@ These are the **processes** people actually run; each maps to MCP tools the agen
 | Comment on PR | **`listPRComments`**, **`createPRComment`** | NIP-22 kind **1111**. |
 | Full PR with git branches | **`createPRViaGittrCLI`** | Recommended when the agent has **`git`** on PATH. |
 | Update PR tip | **`updatePullRequest`** | New commit + clone URLs on the PR event. |
-| Merge into `main` | **`mergePullRequest`** | **Real git merge**: clone/fetch, merge, push bridge, publish **30618** + merged status **1631**. Repo owner or listed maintainer; **`git` required**. |
+| Merge into `main` | **`mergePullRequest`** | **Real git merge** of a **Nostr** PR (kind **1618** event id): clone/fetch, merge, push bridge, publish **30618** + merged status **1631**. Forge `pr-N` is refused. Repo owner or listed maintainer; **`git` required**. |
 | Mark merged (Nostr only) | **`markPullRequestMerged`** | Status only — no git merge. |
 
 **Honest limits on PRs:** Creating and listing PRs via MCP is supported. **Merging** needs **`git`** installed and permission on the repo. Some relays are strict about **clone URL + relay** matching in repo announcements — if PR publish fails, fix metadata (see [Limitations](#limitations-prs--clone-urls)) or use **`createPRViaGittrCLI`**. Details: [docs/DEVELOPER.md#limitations](docs/DEVELOPER.md#limitations).
