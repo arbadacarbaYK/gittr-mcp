@@ -2,7 +2,7 @@
 
 <!-- mcp-name: io.github.arbadacarbaYK/gittr-mcp -->
 
-**Let your AI agent (or app) use [gittr.space](https://gittr.space) like a developer would** — create repos, push code, open and merge pull requests, manage issues, and work with Lightning bounties — using your **Nostr identity**, not a GitHub login.
+**Let your AI agent (or app) use [gittr](https://gittr.space) — Nostr git hosting — like a developer would** — create repos, push code, open and merge pull requests, manage issues, and work with Lightning bounties — using your **Nostr identity**, not a GitHub login.
 
 Works with **Cursor**, **Claude Desktop**, **VS Code / Copilot MCP**, **Windsurf**, **OpenClaw**, or any host that speaks the [Model Context Protocol](https://modelcontextprotocol.io/) over stdio.
 
