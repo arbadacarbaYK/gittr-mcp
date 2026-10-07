@@ -1,6 +1,7 @@
 /**
- * Reachability guard for inbound MCP SDK advisories (CVE-2026-25536, CVE-2026-0621).
- * gittr-mcp is stdio + tools only — fail CI if that assumption drifts.
+ * Reachability guard for inbound MCP SDK advisories
+ * (CVE-2026-104850, CVE-2026-25536, CVE-2026-0621).
+ * gittr-mcp is a stdio tools server — fail CI if that assumption drifts.
  */
 const assert = require('assert');
 const fs = require('fs');
@@ -38,15 +39,15 @@ function gte(a, b) {
 }
 
 assert.ok(
-  gte(sdkVersion, '1.26.0'),
-  `@modelcontextprotocol/sdk ${sdkVersion} is below 1.26.0 (CVE-2026-25536 floor)`
+  gte(sdkVersion, '1.31.0'),
+  `@modelcontextprotocol/sdk ${sdkVersion} is below 1.31.0 (CVE-2026-104850 floor)`
 );
 
 const dep = pkg.dependencies && pkg.dependencies['@modelcontextprotocol/sdk'];
 assert.ok(dep, 'package.json must depend on @modelcontextprotocol/sdk');
 assert.ok(
-  /^(?:\^|~|>=)?1\.(?:2[6-9]|[3-9]\d)\./.test(dep) || gte(sdkVersion, '1.26.0'),
-  `dependency range ${dep} must keep SDK >= 1.26.0`
+  /^(?:\^|~|>=)?1\.(?:3[1-9]|[4-9]\d)\./.test(dep) || gte(sdkVersion, '1.31.0'),
+  `dependency range ${dep} must keep SDK >= 1.31.0`
 );
 
 const serverJson = JSON.parse(fs.readFileSync(path.join(root, 'server.json'), 'utf8'));
@@ -86,8 +87,13 @@ assert.match(
 );
 assert.doesNotMatch(
   serverSrc,
-  /StreamableHTTPServerTransport|SSEServerTransport/,
+  /StreamableHTTPServerTransport|SSEServerTransport|StreamableHTTPClientTransport|SSEClientTransport/,
   'server.js must not wire Streamable HTTP / SSE MCP transports without re-triage'
+);
+assert.doesNotMatch(
+  serverSrc,
+  /authProvider|OAuthClientProvider|ClientCredentialsProvider|fetchToken\s*\(/,
+  'server.js must not use the MCP OAuth client (CVE-2026-104850) without re-triage'
 );
 assert.doesNotMatch(
   serverSrc,
@@ -132,13 +138,19 @@ function assertOverrideFloor(packageName, floor) {
 }
 
 const overrides = pkg.overrides || {};
-assert.strictEqual(overrides['fast-uri'], '3.1.7');
+assert.strictEqual(overrides['fast-uri'], '3.1.8');
 assert.strictEqual(overrides.hono, '4.13.7');
 assert.strictEqual(overrides.qs, '6.16.0');
-assertOverrideFloor('fast-uri', '3.1.6');
+assert.strictEqual(overrides['proxy-addr'], '2.0.8');
+assert.strictEqual(overrides['brace-expansion'], '5.0.12');
+assert.strictEqual(overrides['ip-address'], '10.7.3');
+assertOverrideFloor('fast-uri', '3.1.8');
 assertOverrideFloor('hono', '4.13.5');
 assertOverrideFloor('qs', '6.16.0');
+assertOverrideFloor('proxy-addr', '2.0.8');
+assertOverrideFloor('brace-expansion', '5.0.12');
+assertOverrideFloor('ip-address', '10.7.3');
 
 console.log(
-  `✓ mcp-sdk-reachability: sdk=${sdkVersion} pkg=${pkg.version} stdio-only tools server (CVE-2026-25536 / CVE-2026-0621 not reachable; fast-uri/hono/qs overrides)`
+  `✓ mcp-sdk-reachability: sdk=${sdkVersion} pkg=${pkg.version} stdio-only tools server (CVE-2026-104850 / CVE-2026-25536 / CVE-2026-0621 not reachable; fast-uri/hono/qs overrides)`
 );

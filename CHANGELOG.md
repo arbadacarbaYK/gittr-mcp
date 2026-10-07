@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Security
+- Upgrade `@modelcontextprotocol/sdk` from 1.30.0 to **^1.32.1** so the lockfile is outside CVE-2026-104850 (GHSA-6qxp-vccf-f47h). That bug lets an MCP **client** send OAuth credentials to an authorization server named by a malicious MCP server. gittr-mcp is a stdio **server** and does not use that client. See `docs/SECURITY-ADVISORIES.md`.
+- Raise override floors that the SDK upgrade still left inside published ranges: `fast-uri@3.1.8`, `proxy-addr@2.0.8`, `brace-expansion@5.0.12`, `ip-address@10.7.3`.
+
 ### Features
 - **NIP-82 announce matches gittr’s zapstore.yaml screenshots:** `announceSoftwareFromForgeRelease` reads `GET /api/repo/zapstore-yaml` and copies `images:` (plus optional extra HTTPS URLs) onto kind **32267**. Official gittr uses `space.gittr.app`, the dark-plate bird icon, gittr.space screenshots, and may pin the APK to `blossom.gittr.space`. Other apps still cannot pin Apps to Pages Blossom.
 - **Pages d-tag length:** `publishNostrPages` clips the site name to **1–13** characters (same DNS-label rule as gittr Pages).

@@ -292,7 +292,7 @@ GITTR_TEST_NSEC=nsec1... npm run test:live:matrix
 - Do **not** commit `.nostr-keys.json`, `.env`, or real `nsec` values.  
 - Bridge auth uses **NIP-98**; treat agent transcripts as sensitive.  
 - Only **`.nostr-keys.json.example`** belongs in git.
-- The gittr **Dependencies** tab can list HIGH/MODERATE matches inside the MCP SDK’s unused HTTP stack. gittr-mcp talks stdio only; we still pin patched `fast-uri` / `hono` / `qs` in `package.json` `overrides` so that list stays clean. Details: [docs/SECURITY-ADVISORIES.md](docs/SECURITY-ADVISORIES.md).
+- The gittr **Dependencies** tab can list matches inside the MCP SDK. gittr-mcp talks stdio only (it is a server, not an OAuth client). `@modelcontextprotocol/sdk` stays on **^1.32.1** or newer so CVE-2026-104850 is not in the lockfile, and patched `fast-uri` / `hono` / `qs` stay pinned in `overrides`. Details: [docs/SECURITY-ADVISORIES.md](docs/SECURITY-ADVISORIES.md).
 
 ---
 
