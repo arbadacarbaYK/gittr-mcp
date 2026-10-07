@@ -9,13 +9,13 @@
     "source": "github"
   },
   "websiteUrl": "https://gittr.space",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "gittr-mcp",
-      "version": "1.0.8",
+      "version": "1.0.9",
       "transport": {
         "type": "stdio"
       },
