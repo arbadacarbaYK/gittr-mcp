@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.9 (2026-10-07)
 
 ### Security
 - Upgrade `@modelcontextprotocol/sdk` from 1.30.0 to **^1.32.1** so the lockfile is outside CVE-2026-104850 (GHSA-6qxp-vccf-f47h). That bug lets an MCP **client** send OAuth credentials to an authorization server named by a malicious MCP server. gittr-mcp is a stdio **server** and does not use that client. See `docs/SECURITY-ADVISORIES.md`.
