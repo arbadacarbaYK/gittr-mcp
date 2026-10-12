@@ -6,20 +6,28 @@ module.exports = {
   // Prefer passing per-request; never log these in agent transcripts.
   // gittrNostr.createBountyInvoice reads GITTR_LNBITS_URL / GITTR_LNBITS_ADMIN_KEY if unset in args.
   
-  // NIP-34 aware relays (git-specific, prioritize these)
-  // Note: relay.noderunners.network has better NIP support than damus/nos.lol
-  nip34Relays: (process.env.NIP34_RELAYS || 
-    'wss://relay.noderunners.network,wss://relay.ngit.dev,wss://git.shakespeare.diy,wss://ngit-relay.nostrver.se,wss://git-01.uid.ovh,wss://git-02.uid.ovh,wss://ngit.danconwaydev.com,wss://nostr.wine'
-  ).split(','),
-  
-  // General Nostr relays (removed damus.io and nos.lol - not git-focused, rate limit issues)
-  generalRelays: (process.env.GENERAL_RELAYS || 
+  // Relays that store a kind 30617 even when clone[] is only a GitHub URL.
+  // Git servers (ngit, shakespeare, …) reject that announcement unless their
+  // own git URL is in clone[]. relay.gittr.space and damus keep it.
+  discoveryRelays: (process.env.GITTR_DISCOVERY_RELAYS ||
+    'wss://relay.gittr.space,wss://relay.damus.io,wss://nos.lol'
+  ).split(',').map((r) => r.trim()).filter((r) => r.length > 0),
+
+  // Git relays. Dead hosts (git-01/02.uid.ovh, ngit-relay.nostrver.se) are
+  // omitted: a failed socket used to count as a successful publish.
+  nip34Relays: (process.env.NIP34_RELAYS ||
+    'wss://relay.ngit.dev,wss://git.shakespeare.diy,wss://ngit.danconwaydev.com,wss://nostr.wine,wss://relay.noderunners.network'
+  ).split(',').map((r) => r.trim()).filter((r) => r.length > 0),
+
+  // Extra relays from the environment (comma-separated wss:// URLs).
+  generalRelays: (process.env.GENERAL_RELAYS ||
     ''
-  ).split(',').filter(r => r.length > 0),
-  
-  // All relays combined (for backwards compatibility)
+  ).split(',').map((r) => r.trim()).filter((r) => r.length > 0),
+
+  // Discovery first, then git relays. Callers that pass an explicit GRASP-only
+  // list still need mergeRepoRelays() so a GitHub-only announcement is stored.
   get relays() {
-    return [...this.nip34Relays, ...this.generalRelays];
+    return [...new Set([...this.discoveryRelays, ...this.nip34Relays, ...this.generalRelays])];
   },
   
   // Known GRASP servers (git servers that are also relays)

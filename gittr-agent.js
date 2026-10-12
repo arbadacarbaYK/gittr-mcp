@@ -190,10 +190,9 @@ function relayToHttpsDomain(relayUrl) {
 
 function buildRelayPublishSet(requestedRelays = []) {
   const safeFallbacks = [
-    'wss://nos.lol',
+    'wss://relay.gittr.space',
     'wss://relay.damus.io',
-    'wss://purplepag.es',
-    'wss://ngit-relay.nostrver.se',
+    'wss://nos.lol',
     'wss://relay.ngit.dev',
     'wss://git.shakespeare.diy',
   ];
@@ -515,7 +514,8 @@ async function createRepo(options) {
  * Get a single repository by ID or owner+name
  */
 async function getRepo(options) {
-  const { repoId, ownerPubkey, relays = gittrNostr.config.relays } = options;
+  const { repoId, ownerPubkey } = options;
+  const relays = gittrNostr.mergeRepoRelays(options.relays || gittrNostr.config.relays);
   
   let repos;
   if (ownerPubkey) {

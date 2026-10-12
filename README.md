@@ -254,6 +254,7 @@ Short version — full detail in [docs/DEVELOPER.md](docs/DEVELOPER.md):
 2. **`git clone`** only “works” for others if your published **`clone`** URL serves git HTTP. This MCP defaults toward **`https://git.gittr.space/<hex-pubkey>/<repo>.git`**. A failed clone means fix the URL in **30617**, not “ignore and continue.” Host-only values like `https://git.gittr.space` are rejected/expanded on publish.  
 3. **`mergePullRequest`** needs **`git`** on the machine running MCP and maintainer/owner rights.  
 4. Relays can rate-limit or lag; failed verification is a **failed** publish, not “maybe OK.”
+5. **GitHub-only announce** (clone/web point at GitHub, no git mirror): git servers such as `relay.ngit.dev` reject kind **30617** unless their own git URL is in `clone`. `publishRepoAnnouncement` also sends the event to **`wss://relay.gittr.space`** (and Damus). The gittr bridge can show the repo from its own copy while those git servers still have nothing — that is not a successful Nostr publish. A socket that never opens is not counted as a relay that accepted the event.
 
 ### Do MCP users get gittr’s filter / CORS server fixes?
 

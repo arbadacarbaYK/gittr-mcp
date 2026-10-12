@@ -4,6 +4,8 @@ This document explains what requires signing in gittr-mcp and what doesn't.
 
 **MCP is not the gittr website.** gittr-mcp signs with a local **nsec / hex privkey** (NIP-98 to the bridge, NIP-34 to relays). It does **not** use NIP-07, Amber, or NIP-46. Console lines like `RemoteSigner` / `No OPEN bunker sockets` are from **gittr.space in the browser**, not from this package. Website Push uses NIP-07 or a remote signer; this guide is the agent path only.
 
+A GitHub-only `publishRepoAnnouncement` is still a local signature. Git servers reject that kind **30617** when `clone` does not point at them. The event is published to `wss://relay.gittr.space` so `getRepo` / `findReposBySource` can read it back. The bridge HTTP copy (`bridgeRepoExists`) is separate and does not mean the relays stored it.
+
 ---
 
 ## Authentication Required for Bridge Pushes (UPDATED 2026-02-13)

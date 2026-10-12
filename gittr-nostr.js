@@ -197,11 +197,10 @@ function getPool() {
 
 function buildReliabilityRelaySet(relays = []) {
   const preferred = [
+    'wss://relay.gittr.space',
     'wss://nos.lol',
     'wss://relay.damus.io',
-    'wss://purplepag.es',
     'wss://relay.ngit.dev',
-    'wss://ngit-relay.nostrver.se',
     'wss://git.shakespeare.diy',
   ];
   const all = [...(Array.isArray(relays) ? relays : []), ...(Array.isArray(config.relays) ? config.relays : []), ...preferred];
@@ -291,16 +290,76 @@ async function verifyEventOnRelays(relays, eventId, kind, timeoutMs = RELAY_VERI
   };
 }
 
+function normalizeRelayList(relays) {
+  const out = [];
+  for (const raw of relays || []) {
+    if (typeof raw !== 'string') continue;
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const url = trimmed.startsWith('ws://') || trimmed.startsWith('wss://')
+      ? trimmed
+      : `wss://${trimmed}`;
+    if (!out.includes(url)) out.push(url);
+  }
+  return out;
+}
+
+/**
+ * Git servers refuse a kind 30617 whose clone[] does not point at them.
+ * Always keep the relays that store a GitHub-only announcement.
+ */
+function mergeRepoRelays(relays) {
+  const discovery = normalizeRelayList(
+    config.discoveryRelays && config.discoveryRelays.length
+      ? config.discoveryRelays
+      : ['wss://relay.gittr.space', 'wss://relay.damus.io', 'wss://nos.lol']
+  );
+  return [...new Set([...discovery, ...normalizeRelayList(relays)])];
+}
+
+/**
+ * nostr-tools resolves (does not reject) when the socket never opens, with the
+ * string "connection failure: …". That is not a stored event.
+ */
+function publishSettledCountsAsStored(settled) {
+  if (!settled || settled.status !== 'fulfilled') return false;
+  const value = settled.value;
+  if (typeof value === 'string' && value.startsWith('connection failure:')) return false;
+  return true;
+}
+
 async function publishEventChecked(relays, event) {
+  const unique = normalizeRelayList(relays);
   const pool = getPool();
-  const pubs = pool.publish(relays, event);
+  const pubs = pool.publish(unique, event);
   const settled = await Promise.allSettled(pubs);
-  const okCount = settled.filter((s) => s.status === 'fulfilled').length;
-  if (okCount > 0) return { okCount, settled };
-  const reasons = settled
-    .filter((s) => s.status === 'rejected')
-    .map((s) => s.reason?.message || String(s.reason));
-  throw new Error(`Publish rejected by all relays: ${reasons.join(' | ')}`);
+  const okRelays = [];
+  const failures = [];
+  settled.forEach((result, index) => {
+    const url = unique[index];
+    if (publishSettledCountsAsStored(result)) {
+      okRelays.push(url);
+      return;
+    }
+    const reason = result.status === 'rejected'
+      ? (result.reason?.message || String(result.reason))
+      : String(result.value);
+    failures.push(`${url}: ${reason}`);
+  });
+  if (okRelays.length === 0) {
+    const graspRejected = failures.some((line) =>
+      /clone' and 'relays'|Announcement must list service/i.test(line)
+    );
+    const hint = graspRejected
+      ? ' Git servers only keep an announcement when their own git URL is in clone[]. A GitHub-only repo is stored on wss://relay.gittr.space.'
+      : '';
+    const err = new Error(
+      `Publish rejected by all relays: ${failures.join(' | ')}.${hint}`
+    );
+    err.publishFailures = failures;
+    throw err;
+  }
+  return { okCount: okRelays.length, okRelays, failures, settled };
 }
 
 async function waitForEventVisibility(relays, eventId, kind, timeoutMs = RELAY_VERIFY_TIMEOUT_MS) {
@@ -413,9 +472,9 @@ async function findReposBySource(options = {}) {
     );
   }
 
-  const relayList = Array.isArray(relays) && relays.length > 0
-    ? relays
-    : [...new Set(['wss://relay.gittr.space', ...config.relays])];
+  const relayList = mergeRepoRelays(
+    Array.isArray(relays) && relays.length > 0 ? relays : config.relays
+  );
 
   /** @type {{ input: string, key: string|null, error?: string }[]} */
   const wants = rawInputs.map((input) => {
@@ -1276,6 +1335,7 @@ async function publishRepoAnnouncement({
   publicRead,
   publicWrite,
 }) {
+  const targetRelays = mergeRepoRelays(relays);
   const sk = privkeyToUint8Array(privkey);
   const webUrls = Array.isArray(web) ? web : [];
   
@@ -1331,15 +1391,10 @@ async function publishRepoAnnouncement({
     if (cloneValues.length > 0) tags.push(['clone', ...cloneValues]);
   }
   
-  // Relay tags: single tag with all relay URLs
-  if (relays && relays.length > 0) {
-    const relayValues = [];
-    relays.forEach((r) => {
-      if (!r) return;
-      const rr = (r.startsWith('wss://') || r.startsWith('ws://')) ? r : `wss://${r}`;
-      relayValues.push(rr);
-    });
-    if (relayValues.length > 0) tags.push(['relays', ...relayValues]);
+  // Relay tags: discovery relays first, then whatever the caller asked for.
+  // A GitHub-only clone is rejected by git servers; relay.gittr.space still stores it.
+  if (targetRelays.length > 0) {
+    tags.push(['relays', ...targetRelays]);
   }
   
   const unsignedEvent = {
@@ -1350,14 +1405,19 @@ async function publishRepoAnnouncement({
   };
   
   const event = finalizeEvent(unsignedEvent, sk);
-  
-  await publishEventChecked(relays, event);
+
+  const published = await publishEventChecked(targetRelays, event);
   try {
     await bridgeApi.sendEventToBridge(event, config.bridgeUrl);
   } catch (_) {
     // best-effort bridge ingest
   }
-  const visibility = await verifyEventOnRelays(relays, event.id, KIND_REPOSITORY, RELAY_VERIFY_TIMEOUT_MS);
+  const visibility = await verifyEventOnRelays(
+    published.okRelays,
+    event.id,
+    KIND_REPOSITORY,
+    RELAY_VERIFY_TIMEOUT_MS
+  );
   if (!visibility.confirmed) {
     const err = new Error(
       `VERIFICATION_FAILED: kind ${KIND_REPOSITORY} event ${event.id} not readable on relays after ${visibility.elapsedMs}ms (${visibility.attempts} poll rounds).`
@@ -1372,6 +1432,7 @@ async function publishRepoAnnouncement({
 
 // Publish repository state (kind 30618)
 async function publishRepoState({ repoId, refs, privkey, relays = config.relays }) {
+  const targetRelays = mergeRepoRelays(relays);
   const sk = privkeyToUint8Array(privkey);
   const normalizedRefs = (Array.isArray(refs) ? refs : [])
     .map((r) => ({
@@ -1397,9 +1458,9 @@ async function publishRepoState({ repoId, refs, privkey, relays = config.relays 
   };
   
   const event = finalizeEvent(unsignedEvent, sk);
-  
-  await publishEventChecked(relays, event);
-  
+
+  await publishEventChecked(targetRelays, event);
+
   return { event, success: true };
 }
 
@@ -2297,6 +2358,8 @@ module.exports = {
   resolveRepoOwnerHex,
   verifyEventOnRelays,
   waitForEventVisibility,
+  mergeRepoRelays,
+  publishSettledCountsAsStored,
   buildGitHttpsAuthGitConfigArgs,
   repoSlugFromHttpsGitUrl,
   requireRepoActingAuthority,

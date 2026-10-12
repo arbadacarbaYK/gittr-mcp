@@ -199,7 +199,7 @@ const tools = [
   },
   {
     name: 'publishRepoAnnouncement',
-    description: 'Publish repository to Nostr (kind 30617) - REQUIRES signing',
+    description: 'Publish repository to Nostr (kind 30617). A GitHub-only clone is stored on wss://relay.gittr.space (git servers reject it unless their own git URL is in clone). Bridge ingest alone does not make the repo findable on Nostr. REQUIRES signing',
     inputSchema: {
       type: 'object',
       properties: {
