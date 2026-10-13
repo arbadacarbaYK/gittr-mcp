@@ -2,7 +2,7 @@
 
 **Doc index:** [docs/README.md](README.md) · **Same result as the website:** [MCP-GITTR-PARITY.md](MCP-GITTR-PARITY.md)
 
-This is the map of which tool to call. **gittr-mcp 1.0.10** or newer. It is not an npm package. Cursor: `git pull` in the folder whose path ends with `gittr-mcp/server.js`, then reload the MCP. Or install `gittr-mcp-x.y.z.mcpb` from [GitHub Releases](https://github.com/arbadacarbaYK/gittr-mcp/releases).
+This is the map of which tool to call. **gittr-mcp 1.0.11** or newer for issue lists that include GitHub. It is not an npm package. Cursor: `git pull` in the folder whose path ends with `gittr-mcp/server.js`, then reload the MCP. Or install `gittr-mcp-x.y.z.mcpb` from [GitHub Releases](https://github.com/arbadacarbaYK/gittr-mcp/releases).
 
 The owner key is the same Nostr key as on gittr.space (`.nostr-keys.json` or `privkey` on the call). See [SIGNING-GUIDE.md](SIGNING-GUIDE.md).
 
@@ -48,8 +48,9 @@ A later file edit is `pushToBridge` on that branch, then `publishRepoState` with
 
 ## Issues and pull requests
 
-- **Issue:** `createIssue`. The page also posts an “open” status; the issue still shows as open without it. Close a Nostr issue with `closeIssue` (64-character event id). GitHub `issue-12` is closed on GitHub.
-- **Pull request:** `createPR` (kind 1618). The page also tries to pin `refs/nostr/<event-id>` on the git server; that step is optional there too.
+- **Issue:** `listIssues` returns the same rows as the website Issues tab: Nostr issues, and GitHub or Codeberg/Gitea issues when the repo has that source. They stay separate. `createIssue` posts a Nostr issue. Close a Nostr issue with `closeIssue` (64-character event id). A GitHub `issue-12` is closed on GitHub, same as the website.
+- **Comments:** `listIssueComments` on a Nostr id returns Nostr comments. On `issue-N`, pass `ownerPubkey` and `repoId` to read the forge comments. `createIssueComment` posts on Nostr only. The website does not write comments back to GitHub.
+- **Pull request:** `listPRs` works the same way as the issue list. `createPR` posts kind 1618.
 - **Merge:** `mergePullRequest` applies the files and saves a snapshot, the same as the website Merge button. It does not keep a git merge commit. On a repo copied from GitHub, merge with git and `git push` instead, or the GitHub history is replaced.
 
 ## Read the repo

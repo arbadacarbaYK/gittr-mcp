@@ -1,8 +1,7 @@
 'use strict';
 
 /**
- * HTTP helpers for gittr/ngit "bridge" Next.js API routes.
- * See ngit: ui/src/pages/api/nostr/repo/* and ui/src/pages/api/bounty/*
+ * HTTP helpers for gittr.space Next.js API routes.
  */
 
 const config = require('./config');

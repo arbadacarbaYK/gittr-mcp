@@ -91,15 +91,16 @@ These are the **processes** people actually run; each maps to MCP tools the agen
 - **`resolveRepoByNostrId`** — find clone URLs and relays from npub + repo name.
 
 ### Issues (bug reports, tasks)
-- **`listIssues`**, **`createIssue`**, **`getIssueById`**  
-- **`listIssueComments`**, **`createIssueComment`** — NIP-22 kind **1111** (same tags as gittr issue threads). Does **not** touch bounties.
+- **`listIssues`**, **`getIssueById`** — same rows as the website Issues tab. Nostr issues, plus GitHub or Codeberg/Gitea issues when the repo source says so. They stay separate rows. `getIssueById` with `issue-N` or a number needs **`ownerPubkey`** and **`repoId`**. GitLab sources stay Nostr-only.
+- **`createIssue`**
+- **`listIssueComments`**, **`createIssueComment`** — Nostr comments on a 64-character id. Forge comments when the id is `issue-N` or a number (read-only; the website does not post them back to GitHub).
 - **`closeIssue`**, **`reopenIssue`** — publish NIP-34 status events (1632 / 1630) for a **64-char Nostr event id**. GitHub/Gitea imported `issue-12` / `pr-12` (and a bare `12`) are refused — close those on the origin.
 
 ### Pull requests (code review flow)
 | Step | Tool | Notes |
 |------|------|--------|
-| List / open PR | **`listPRs`**, **`createPR`** | Signed Nostr events (kind **1618**). |
-| Comment on PR | **`listPRComments`**, **`createPRComment`** | NIP-22 kind **1111**. |
+| List / open PR | **`listPRs`**, **`createPR`** | List matches the website: Nostr kind **1618** plus GitHub or Codeberg/Gitea `pr-N` when the repo has that source. `createPR` publishes the Nostr event. |
+| Comment on PR | **`listPRComments`**, **`createPRComment`** | Nostr comments on a 64-character id. `pr-N` reads the forge conversation (needs `ownerPubkey` and `repoId`). Not written back to GitHub. |
 | Full PR with git branches | **`createPRViaGittrCLI`** | Recommended when the agent has **`git`** on PATH. |
 | Update PR tip | **`updatePullRequest`** | New commit + clone URLs on the PR event. |
 | Merge into `main` | **`mergePullRequest`** | **Real git merge** of a **Nostr** PR (kind **1618** event id): clone/fetch, merge, push bridge, publish **30618** + merged status **1631**. Forge `pr-N` is refused. Repo owner or listed maintainer; **`git` required**. |

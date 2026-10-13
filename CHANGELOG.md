@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 1.0.11 (2026-10-13)
+
+### Fixes
+- **Issues and pull requests match the website tabs.** `listIssues` / `listPRs` include GitHub or Codeberg/Gitea tickets when the repo source says so, as separate rows from Nostr. `listIssueComments` reads forge comments for `issue-N` and does not post them back.
 
 ### Docs
 - Agent map is [docs/AGENT-WORKFLOW.md](docs/AGENT-WORKFLOW.md): `mirrorRepo` for a forge repo, `pushToBridge` only for file edits.

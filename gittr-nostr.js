@@ -633,6 +633,18 @@ async function listIssues({ ownerPubkey, repoId, labels = [], relays = config.re
   });
 }
 
+/** Latest NIP-34 status events (1630–1633) for a repo, used to mark open/closed like the website. */
+async function listRepoStatusEvents({ ownerPubkey, repoId, relays = config.relays }) {
+  const pool = getPool();
+  const ownerHex = await resolveRepoOwnerHex(ownerPubkey);
+  const events = await pool.querySync(relays, {
+    kinds: [KIND_STATUS_OPEN, KIND_STATUS_APPLIED, KIND_STATUS_CLOSED, KIND_STATUS_DRAFT],
+    '#a': [`${KIND_REPOSITORY}:${ownerHex}:${repoId}`],
+    limit: 200,
+  });
+  return Array.isArray(events) ? events : [];
+}
+
 // Create and publish an issue
 async function createIssue(privkeyOrOptions, repoIdArg, ownerPubkeyArg, subjectArg, contentArg) {
   // Support both object and positional parameters
@@ -2343,6 +2355,7 @@ module.exports = {
   
   // Issue operations
   listIssues,
+  listRepoStatusEvents,
   createIssue,
   listComments,
   listIssueComments,

@@ -359,7 +359,8 @@ const tools = [
   // Issue operations
   {
     name: 'listIssues',
-    description: 'List issues for a repository',
+    description:
+      'List issues the way the website Issues tab does. Nostr issues, plus GitHub or Codeberg/Gitea issues when the repo source says so. A forge issue and a Nostr issue stay separate rows. GitLab sources stay Nostr-only, same as the website.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -391,11 +392,13 @@ const tools = [
   {
     name: 'listIssueComments',
     description:
-      'List NIP-22 comments (kind 1111) on a Nostr issue (root E tag = issue id). Does not list or change bounties.',
+      'Comments on an issue, same as the website. A 64-character Nostr id returns Nostr comments. issue-N or a number needs ownerPubkey and repoId and returns the forge comments. Nothing is posted back to GitHub.',
     inputSchema: {
       type: 'object',
       properties: {
-        issueId: { type: 'string', description: 'Issue event id (kind 1621)' },
+        issueId: { type: 'string', description: 'Nostr issue id, issue-N, or the forge number' },
+        ownerPubkey: { type: 'string', description: 'Required with issue-N or a number' },
+        repoId: { type: 'string', description: 'Required with issue-N or a number' },
         limit: { type: 'number' },
         relays: { type: 'array', items: { type: 'string' } },
       },
@@ -426,11 +429,13 @@ const tools = [
   {
     name: 'listPRComments',
     description:
-      'List NIP-22 comments (kind 1111) on a Nostr pull request (root E tag = PR id).',
+      'Comments on a pull request, same as the website. A 64-character Nostr id returns Nostr comments. pr-N or a number needs ownerPubkey and repoId and returns the forge conversation. Nothing is posted back to GitHub.',
     inputSchema: {
       type: 'object',
       properties: {
-        prId: { type: 'string', description: 'PR event id (kind 1618)' },
+        prId: { type: 'string', description: 'Nostr pull request id, pr-N, or the forge number' },
+        ownerPubkey: { type: 'string', description: 'Required with pr-N or a number' },
+        repoId: { type: 'string', description: 'Required with pr-N or a number' },
         limit: { type: 'number' },
         relays: { type: 'array', items: { type: 'string' } },
       },
@@ -461,7 +466,8 @@ const tools = [
   // PR operations
   {
     name: 'listPRs',
-    description: 'List pull requests for a repository',
+    description:
+      'List pull requests the way the website does. Nostr pull requests, plus GitHub or Codeberg/Gitea pull requests when the repo source says so. They stay separate rows.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1069,11 +1075,13 @@ const tools = [
   },
   {
     name: 'getIssueById',
-    description: 'Fetch single issue event (1621) by id from relays',
+    description: 'One issue, the way the website opens it. A 64-character id is the Nostr issue. issue-N or a number needs ownerPubkey and repoId and reads the forge issue.',
     inputSchema: {
       type: 'object',
       properties: {
-        issueId: { type: 'string' },
+        issueId: { type: 'string', description: 'Nostr issue id, issue-N, or the forge number' },
+        ownerPubkey: { type: 'string', description: 'Required with issue-N or a number' },
+        repoId: { type: 'string', description: 'Required with issue-N or a number' },
         relays: { type: 'array', items: { type: 'string' } },
       },
       required: ['issueId'],
@@ -1081,11 +1089,13 @@ const tools = [
   },
   {
     name: 'getPullRequestById',
-    description: 'Fetch single PR event (1618) by id from relays',
+    description: 'One pull request, the way the website opens it. A 64-character id is the Nostr pull request. pr-N or a number needs ownerPubkey and repoId and reads the forge pull request.',
     inputSchema: {
       type: 'object',
       properties: {
-        prId: { type: 'string' },
+        prId: { type: 'string', description: 'Nostr pull request id, pr-N, or the forge number' },
+        ownerPubkey: { type: 'string', description: 'Required with pr-N or a number' },
+        repoId: { type: 'string', description: 'Required with pr-N or a number' },
         relays: { type: 'array', items: { type: 'string' } },
       },
       required: ['prId'],

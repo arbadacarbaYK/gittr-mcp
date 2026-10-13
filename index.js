@@ -13,19 +13,19 @@ module.exports = {
   publishRepoState: gittrNostr.publishRepoState,
   pushToBridge: gittrNostr.pushToBridge,
 
-  // Issue operations
-  listIssues: gittrNostr.listIssues,
+  // Issue operations — list/detail/comments match the website (Nostr + GitHub/Codeberg)
+  listIssues: gittrAgent.listIssues,
   createIssue: gittrNostr.createIssue,
   listComments: gittrNostr.listComments,
-  listIssueComments: gittrNostr.listIssueComments,
-  listPRComments: gittrNostr.listPRComments,
+  listIssueComments: gittrAgent.listIssueComments,
+  listPRComments: gittrAgent.listPRComments,
   createComment: gittrNostr.createComment,
   createIssueComment: gittrNostr.createIssueComment,
   createPRComment: gittrNostr.createPRComment,
   buildCommentTags: gittrNostr.buildCommentTags,
 
   // Pull Request operations
-  listPRs: gittrNostr.listPRs,
+  listPRs: gittrAgent.listPRs,
   createPR: gittrNostr.createPR,
   updatePullRequest: gittrNostr.updatePullRequest,
   createPRViaGittrCLI: gittrShell.createPRViaGittrCLI,

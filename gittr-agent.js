@@ -7,6 +7,7 @@ const { probeGitSmartHttp } = require('./gittr-verify.js');
 const { withAgentHints, suggestNextStepsForTool } = require('./gittr-agent-outcomes.js');
 const { privkeyToUint8Array } = require('./gittr-keys.js');
 const { buildFullGraspCloneUrls } = require('./grasp-detection.js');
+const forgeTickets = require('./forge-tickets.js');
 const { nip19 } = require('nostr-tools');
 const fs = require('fs');
 const fsPromises = require('fs/promises');
@@ -2229,8 +2230,133 @@ async function importRemoteToBridge(options) {
 }
 
 /** Fetch a single issue event by hex id from relays. */
+async function repoUpstreamSource(options) {
+  try {
+    const event = await gittrNostr.fetchLatestRepo30617({
+      ownerPubkey: options.ownerPubkey,
+      repoId: options.repoId,
+      relays: options.relays,
+    });
+    const parsed = gittrNostr.parse30617Announcement(event);
+    return forgeTickets.pickUpstreamSource(parsed);
+  } catch {
+    return '';
+  }
+}
+
+async function listIssues(options = {}) {
+  const nostrRows = await gittrNostr.listIssues(options);
+  let statusEvents = [];
+  try {
+    statusEvents = await gittrNostr.listRepoStatusEvents(options);
+  } catch {
+    statusEvents = [];
+  }
+  const withStatus = forgeTickets.applyNostrStatus(nostrRows, statusEvents, 'issue');
+  let forgeRows = [];
+  const sourceUrl = await repoUpstreamSource(options);
+  if (sourceUrl) {
+    try {
+      forgeRows = await forgeTickets.fetchForgeIssues(sourceUrl, {
+        bridgeUrl: gittrNostr.config.bridgeUrl,
+      });
+    } catch {
+      forgeRows = [];
+    }
+  }
+  let rows = forgeTickets.combineTicketRows(withStatus, forgeRows);
+  if (Array.isArray(options.labels) && options.labels.length > 0) {
+    const want = new Set(options.labels.map((l) => String(l).toLowerCase()));
+    rows = rows.filter((row) => (row.labels || []).some((l) => want.has(String(l).toLowerCase())));
+  }
+  return rows;
+}
+
+async function listPRs(options = {}) {
+  const nostrRows = await gittrNostr.listPRs(options);
+  let statusEvents = [];
+  try {
+    statusEvents = await gittrNostr.listRepoStatusEvents(options);
+  } catch {
+    statusEvents = [];
+  }
+  const withStatus = forgeTickets.applyNostrStatus(nostrRows, statusEvents, 'pr');
+  let forgeRows = [];
+  const sourceUrl = await repoUpstreamSource(options);
+  if (sourceUrl) {
+    try {
+      forgeRows = await forgeTickets.fetchForgePulls(sourceUrl, {
+        bridgeUrl: gittrNostr.config.bridgeUrl,
+      });
+    } catch {
+      forgeRows = [];
+    }
+  }
+  return forgeTickets.combineTicketRows(withStatus, forgeRows);
+}
+
+async function listIssueComments(options = {}) {
+  const issueId = String(options.issueId || '').trim();
+  if (/^[0-9a-f]{64}$/i.test(issueId)) {
+    const rows = await gittrNostr.listIssueComments(options);
+    return rows.map((row) => ({ ...row, source: row.source || 'nostr' }));
+  }
+  const number = forgeTickets.ticketNumber(issueId);
+  if (!number) {
+    throw new Error('listIssueComments needs a Nostr issue id, issue-N, or a number.');
+  }
+  if (!options.ownerPubkey || !options.repoId) {
+    throw new Error('A GitHub or Codeberg issue needs ownerPubkey and repoId so the comments match the website.');
+  }
+  const sourceUrl = await repoUpstreamSource(options);
+  if (!sourceUrl) return [];
+  return forgeTickets.fetchForgeComments(sourceUrl, number, {
+    bridgeUrl: gittrNostr.config.bridgeUrl,
+  });
+}
+
+async function listPRComments(options = {}) {
+  const prId = String(options.prId || options.issueId || '').trim();
+  if (/^[0-9a-f]{64}$/i.test(prId)) {
+    const rows = await gittrNostr.listPRComments({ ...options, prId });
+    return rows.map((row) => ({ ...row, source: row.source || 'nostr' }));
+  }
+  const number = forgeTickets.ticketNumber(prId);
+  if (!number) {
+    throw new Error('listPRComments needs a Nostr pull request id, pr-N, or a number.');
+  }
+  if (!options.ownerPubkey || !options.repoId) {
+    throw new Error('A GitHub or Codeberg pull request needs ownerPubkey and repoId so the comments match the website.');
+  }
+  const sourceUrl = await repoUpstreamSource(options);
+  if (!sourceUrl) return [];
+  return forgeTickets.fetchForgeComments(sourceUrl, number, {
+    bridgeUrl: gittrNostr.config.bridgeUrl,
+  });
+}
+
 async function getIssueById(options) {
-  const { issueId, relays = gittrNostr.config.relays } = options;
+  const issueId = String(options.issueId || '').trim();
+  if (forgeTickets.isForgeIssueId(issueId) || /^\d+$/.test(issueId)) {
+    if (!options.ownerPubkey || !options.repoId) {
+      return {
+        error: 'Pass ownerPubkey and repoId with issue-N or a number. That is how the website knows which repo the issue belongs to.',
+        issueId,
+      };
+    }
+    const sourceUrl = await repoUpstreamSource(options);
+    const row = sourceUrl
+      ? await forgeTickets.fetchForgeIssueByNumber(sourceUrl, forgeTickets.ticketNumber(issueId), {
+          bridgeUrl: gittrNostr.config.bridgeUrl,
+          kind: 'issue',
+        })
+      : null;
+    if (!row) {
+      return { error: 'Issue not found on the forge source for this repo', issueId };
+    }
+    return row;
+  }
+  const { relays = gittrNostr.config.relays } = options;
   const pool = new (require('nostr-tools')).SimplePool();
   try {
     const evs = await pool.querySync(relays, { kinds: [1621], ids: [issueId], limit: 1 });
@@ -2277,9 +2403,29 @@ function tagValuesAll(event, tagName) {
   return out;
 }
 
-/** Fetch a single PR event by id (kind 1618). */
+/** Fetch a single PR: Nostr event id, or pr-N / number on the forge source. */
 async function getPullRequestById(options) {
-  const { prId, relays = gittrNostr.config.relays } = options;
+  const prId = String(options.prId || '').trim();
+  if (forgeTickets.isForgePrId(prId) || /^\d+$/.test(prId)) {
+    if (!options.ownerPubkey || !options.repoId) {
+      return {
+        error: 'Pass ownerPubkey and repoId with pr-N or a number. That is how the website knows which repo the pull request belongs to.',
+        prId,
+      };
+    }
+    const sourceUrl = await repoUpstreamSource(options);
+    const row = sourceUrl
+      ? await forgeTickets.fetchForgeIssueByNumber(sourceUrl, forgeTickets.ticketNumber(prId), {
+          bridgeUrl: gittrNostr.config.bridgeUrl,
+          kind: 'pr',
+        })
+      : null;
+    if (!row) {
+      return { error: 'Pull request not found on the forge source for this repo', prId };
+    }
+    return row;
+  }
+  const { relays = gittrNostr.config.relays } = options;
   const pool = new (require('nostr-tools')).SimplePool();
   try {
     const evs = await pool.querySync(relays, { kinds: [1618], ids: [prId], limit: 1 });
@@ -3042,6 +3188,10 @@ module.exports = {
   getFile,
   mirrorRepo,
   importRemoteToBridge,
+  listIssues,
+  listPRs,
+  listIssueComments,
+  listPRComments,
   getIssueById,
   getPullRequestById,
   closeIssue,
