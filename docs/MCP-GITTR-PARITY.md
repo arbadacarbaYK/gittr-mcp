@@ -7,7 +7,7 @@ This document tracks how MCP tools map to the **current** gittr web app (`ngit` 
 | Workflow | MCP tools | gittr today |
 |----------|-----------|-------------|
 | Push files / folder delete | `pushToBridge` (`files`, optional `deletedPaths`, `allowTreeShrink`) | NIP-98 challenge + `POST /api/nostr/repo/push` (UI sends `deletedPaths` + `allowTreeShrink` on final chunk) |
-| Publish repo | `createRepo`, `publishRepoAnnouncement`, `publishRepoState` | kinds **30617** + **30618**; **`clone[]` = full GRASP push set** (`buildFullGraspCloneUrls` — not capped relay hosts); forge URL in `source` only (`forkedFrom` only for a real parent). A GitHub-only announce (no mirror) is stored on **`wss://relay.gittr.space`**; git servers reject it until their own clone URL is in `clone[]`. |
+| Publish repo | `createRepo`, `publishRepoAnnouncement`, `publishRepoState` | kinds **30617** + **30618**; **`clone[]` is always the website push set** (`buildFullGraspCloneUrls`: gittr, ngit, gitnostr, shakespeare, danconway — npub paths). A forge URL stays in `source` only. `mirrorRepo` clones onto the bridge before that announcement. |
 | Soft-delete repo | `softDeleteRepo` / `deleteRepo` | Soft-deleted **30617** + NIP-09 kind **5**, **and** `POST /api/nostr/repo/event` so the bridge wipes the bare tree (Settings → Delete parity) |
 | Issues | `createIssue`, `listIssues`, `getIssueById` | kind **1621**. gittr URLs use the **event id** (`/issues/<64-hex>`), not a local `#2`. MCP already passes that id. |
 | Issue/PR comments | `listIssueComments`, `createIssueComment`, `listPRComments`, `createPRComment` | NIP-22 kind **1111**. Issue **and** PR detail pages subscribe to `#E`/`#e` on the root event. `repo` owner may be npub or hex. |

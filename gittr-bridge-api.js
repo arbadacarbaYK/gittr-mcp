@@ -326,6 +326,7 @@ async function bridgeImportRepo(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ cloneUrl, ownerPubkey, repo }),
+    timeoutMs: 120000,
   });
   return { ok: res.ok, status: res.status, ...(await readJson(res)) };
 }

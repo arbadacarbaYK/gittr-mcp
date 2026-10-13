@@ -199,7 +199,7 @@ const tools = [
   },
   {
     name: 'publishRepoAnnouncement',
-    description: 'Publish repository to Nostr (kind 30617). A GitHub-only clone is stored on wss://relay.gittr.space (git servers reject it unless their own git URL is in clone). Bridge ingest alone does not make the repo findable on Nostr. REQUIRES signing',
+    description: 'Publish repository to Nostr (kind 30617). Always writes the same clone addresses as the website Push (gittr, ngit, gitnostr, shakespeare, danconway). A GitHub URL is kept as the source, not as a clone. REQUIRES signing',
     inputSchema: {
       type: 'object',
       properties: {
@@ -298,7 +298,7 @@ const tools = [
   },
   {
     name: 'mirrorRepo',
-    description: 'Mirror a GitHub/GitLab repo to gittr.space',
+    description: 'Copy a GitHub/GitLab repo onto gittr\'s git server, then announce it with the same clone addresses the website Push uses.',
     inputSchema: {
       type: 'object',
       properties: {

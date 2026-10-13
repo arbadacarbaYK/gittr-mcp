@@ -894,7 +894,25 @@ async function mirrorRepo(options) {
   }
   
   const pubkey = gittrNostr.getPublicKey(privkey);
-  
+  const ownerNpub = nip19.npubEncode(pubkey);
+
+  const importUrl = /\.git$/i.test(String(sourceUrl || ''))
+    ? String(sourceUrl)
+    : `${String(sourceUrl || '').replace(/\/+$/, '')}.git`;
+  const copied = await bridgeApi.bridgeImportRepo({
+    cloneUrl: importUrl,
+    ownerPubkey: pubkey,
+    repo: repoName,
+  });
+  if (!copied || copied.ok === false) {
+    const detail = copied && (copied.error || copied.message)
+      ? (copied.error || copied.message)
+      : `HTTP ${copied && copied.status}`;
+    throw new Error(
+      `Could not copy the repository onto gittr's git server before announcing: ${detail}`
+    );
+  }
+
   // Forge web URL for `source` (GitHub, GitLab, Codeberg, Forgejo, any https owner/repo).
   let webUrl = '';
   let cloneUrl = sourceUrl;
@@ -911,7 +929,6 @@ async function mirrorRepo(options) {
   }
   
   // Create clone URLs: full GRASP push set (npub). Forge URL stays in source only.
-  const ownerNpub = nip19.npubEncode(pubkey);
   const graspCloneUrl = `https://git.gittr.space/${ownerNpub}/${repoName}.git`;
   const cloneUrls = buildFullGraspCloneUrls(ownerNpub, repoName);
   

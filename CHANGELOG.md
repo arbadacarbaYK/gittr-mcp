@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Fixes
-- **GitHub-only kind 30617:** git servers reject an announcement whose `clone` URL is not their own git repo. `publishRepoAnnouncement` now also publishes to `wss://relay.gittr.space` and Damus, and checks only relays that actually accepted the event. A socket that fails to open is no longer treated as a successful publish (that made verification report 0/8 after the bridge had already stored its own copy). Dead relays `git-01.uid.ovh`, `git-02.uid.ovh`, and `ngit-relay.nostrver.se` are no longer in the default list.
+- **Same clone list as the website:** `publishRepoAnnouncement` always adds gittr, ngit, gitnostr, shakespeare, and danconway. A forge URL in `clone` is moved to `source`. `mirrorRepo` copies the repo onto gittr’s git server before announcing. `publishRepoState` is sent to those same git relays.
 
 ## 1.0.9 (2026-10-07)
 

@@ -7,6 +7,8 @@
 const {
   buildFullGraspCloneUrls,
   GRASP_CLONE_HOSTS_FOR_PUSH,
+  canonicalAnnouncementCloneUrls,
+  graspRelaysForCloneUrls,
 } = require('../grasp-detection.js');
 
 function assert(cond, msg) {
@@ -46,5 +48,21 @@ assert(JSON.stringify(again) === JSON.stringify(urls), 'clone set must be stable
 // Empty inputs
 assert(buildFullGraspCloneUrls('', repo).length === 0, 'empty owner');
 assert(buildFullGraspCloneUrls(npub, '').length === 0, 'empty repo');
+
+const short = canonicalAnnouncementCloneUrls(npub, repo, [
+  `https://git.gittr.space/${npub}/${repo}.git`,
+  'https://github.com/L3and3r/bitcoin-junioren.git',
+]);
+assert(short.clone.length === GRASP_CLONE_HOSTS_FOR_PUSH.length, 'short caller list still expands');
+for (const host of GRASP_CLONE_HOSTS_FOR_PUSH) {
+  assert(short.clone.some((u) => u.includes(`https://${host}/`)), `expanded set missing ${host}`);
+}
+assert(!short.clone.some((u) => u.includes('github.com')), 'forge URL must leave clone[]');
+assert(short.forgeUrls[0].includes('github.com'), 'forge URL kept for the source tag');
+const wss = graspRelaysForCloneUrls(short.clone);
+assert(wss.includes('wss://relay.ngit.dev'), 'ngit relay');
+assert(wss.includes('wss://gitnostr.com'), 'gitnostr relay');
+assert(wss.includes('wss://git.shakespeare.diy'), 'shakespeare relay');
+assert(!wss.includes('wss://git.gittr.space'), 'git.gittr.space is not a relay');
 
 console.log('✓ grasp-clone-urls: full push set (independent of relay cap)');

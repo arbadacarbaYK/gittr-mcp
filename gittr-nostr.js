@@ -13,7 +13,12 @@ if (typeof globalThis.WebSocket === 'undefined') {
 }
 
 const config = require('./config');
-const { detectGraspFromRepoEvent } = require('./grasp-detection');
+const {
+  detectGraspFromRepoEvent,
+  buildFullGraspCloneUrls,
+  canonicalAnnouncementCloneUrls,
+  graspRelaysForCloneUrls,
+} = require('./grasp-detection');
 const { normalizeOwnerPubkeyHexSync, privkeyToUint8Array } = require('./gittr-keys');
 const bridgeApi = require('./gittr-bridge-api');
 const nip82 = require('./gittr-nip82-software');
@@ -1335,8 +1340,8 @@ async function publishRepoAnnouncement({
   publicRead,
   publicWrite,
 }) {
-  const targetRelays = mergeRepoRelays(relays);
   const sk = privkeyToUint8Array(privkey);
+  const ownerNpub = nip19.npubEncode(getPublicKey(privkey));
   const webUrls = Array.isArray(web) ? web : [];
   
   // Build tags with single clone/relays entries carrying multiple values.
@@ -1353,7 +1358,31 @@ async function publishRepoAnnouncement({
   }
 
   if (forkedFrom) tags.push(['forkedFrom', String(forkedFrom)]);
-  if (source) tags.push(['source', String(source)]);
+
+  // Same clone set as the website Push. A caller who only passed gittr + GitHub
+  // still gets ngit, shakespeare, gitnostr, and danconway. The forge URL moves
+  // to source so other git clients are not sent to GitHub for bridge commits.
+  const expandedCaller = [];
+  for (const u of Array.isArray(clone) ? clone : []) {
+    if (!u || typeof u !== 'string') continue;
+    let next = u.trim();
+    if (!next) continue;
+    try {
+      const parsedUrl = new URL(next.startsWith('http') ? next : `https://${next}`);
+      const path = parsedUrl.pathname.replace(/\/+$/, '');
+      if (!path) {
+        next = `${parsedUrl.protocol}//${parsedUrl.host}/${ownerNpub}/${repoId}.git`;
+      }
+    } catch {
+      // keep as-is
+    }
+    if (!expandedCaller.includes(next)) expandedCaller.push(next);
+  }
+  const canon = canonicalAnnouncementCloneUrls(ownerNpub, repoId, expandedCaller);
+  const sourceTag = source || (canon.forgeUrls[0]
+    ? String(canon.forgeUrls[0]).replace(/\.git$/i, '')
+    : '');
+  if (sourceTag) tags.push(['source', String(sourceTag)]);
 
   // Visibility tags (gittr extension to NIP-34, same normalization as the web UI):
   // anything except an explicit false stays public-read, write stays owner-only
@@ -1367,32 +1396,12 @@ async function publishRepoAnnouncement({
   const mergeMaint = [...new Set((mergeMaintainers || []).map((h) => normalizeOwnerPubkeyHexSync(h)).filter(Boolean))];
   if (mergeMaint.length > 0) tags.push(['merge_maintainers', ...mergeMaint]);
   
-  // Clone tags: single tag with all clone URLs.
-  // Never publish host-only values (https://git.gittr.space) — expand to
-  // https://host/<hex>/<repo>.git so browser clients (gitworkshop) can fetch.
-  if (clone && clone.length > 0) {
-    const ownerHex = getPublicKey(privkey);
-    const cloneValues = [];
-    for (const u of clone) {
-      if (!u || typeof u !== 'string') continue;
-      let next = u.trim();
-      if (!next) continue;
-      try {
-        const parsed = new URL(next.startsWith('http') ? next : `https://${next}`);
-        const path = parsed.pathname.replace(/\/+$/, '');
-        if (!path || path === '') {
-          next = `${parsed.protocol}//${parsed.host}/${ownerHex}/${repoId}.git`;
-        }
-      } catch {
-        // keep as-is
-      }
-      if (!cloneValues.includes(next)) cloneValues.push(next);
-    }
-    if (cloneValues.length > 0) tags.push(['clone', ...cloneValues]);
-  }
-  
-  // Relay tags: discovery relays first, then whatever the caller asked for.
-  // A GitHub-only clone is rejected by git servers; relay.gittr.space still stores it.
+  if (canon.clone.length > 0) tags.push(['clone', ...canon.clone]);
+
+  const targetRelays = mergeRepoRelays([
+    ...(Array.isArray(relays) ? relays : []),
+    ...graspRelaysForCloneUrls(canon.clone),
+  ]);
   if (targetRelays.length > 0) {
     tags.push(['relays', ...targetRelays]);
   }
@@ -1432,7 +1441,11 @@ async function publishRepoAnnouncement({
 
 // Publish repository state (kind 30618)
 async function publishRepoState({ repoId, refs, privkey, relays = config.relays }) {
-  const targetRelays = mergeRepoRelays(relays);
+  const ownerNpub = nip19.npubEncode(getPublicKey(privkey));
+  const targetRelays = mergeRepoRelays([
+    ...(Array.isArray(relays) ? relays : []),
+    ...graspRelaysForCloneUrls(buildFullGraspCloneUrls(ownerNpub, repoId)),
+  ]);
   const sk = privkeyToUint8Array(privkey);
   const normalizedRefs = (Array.isArray(refs) ? refs : [])
     .map((r) => ({

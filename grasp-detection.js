@@ -36,6 +36,68 @@ function buildFullGraspCloneUrls(ownerNpubOrHex, repoName) {
   );
 }
 
+const FORGE_CLONE_HOSTS = ['github.com', 'gitlab.com', 'codeberg.org'];
+
+function gitHostname(url) {
+  const raw = String(url || '').trim();
+  if (!raw) return '';
+  if (/^git@/i.test(raw)) {
+    return (raw.slice(4).split(':')[0] || '').toLowerCase();
+  }
+  try {
+    const withProto = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    return new URL(withProto).hostname.toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+function isForgeGitUrl(url) {
+  const host = gitHostname(url);
+  return FORGE_CLONE_HOSTS.some((d) => host === d || host.endsWith(`.${d}`));
+}
+
+/**
+ * Same clone list the gittr website writes on Push: every pushable GRASP host
+ * (npub path), plus any non-forge extra the caller already had. GitHub /
+ * GitLab / Codeberg stay out of clone[] once a GRASP copy exists — they belong
+ * in `source`. A second URL for a host we already list (hex vs npub) is dropped.
+ */
+function canonicalAnnouncementCloneUrls(ownerNpubOrHex, repoName, callerClone) {
+  const grasp = buildFullGraspCloneUrls(ownerNpubOrHex, repoName);
+  const graspHosts = new Set(grasp.map(gitHostname));
+  const extras = [];
+  const forgeUrls = [];
+  for (const raw of callerClone || []) {
+    if (!raw || typeof raw !== 'string') continue;
+    const url = raw.trim();
+    if (!url) continue;
+    if (isForgeGitUrl(url)) {
+      forgeUrls.push(url);
+      continue;
+    }
+    const host = gitHostname(url);
+    if (host && graspHosts.has(host)) continue;
+    if (!extras.includes(url)) extras.push(url);
+  }
+  return { clone: [...grasp, ...extras], forgeUrls };
+}
+
+/** wss relays that must see the announcement or they reject it (clone host missing). git.gittr.space is git bytes, not a relay. */
+function graspRelaysForCloneUrls(cloneUrls) {
+  const out = [];
+  for (const url of cloneUrls || []) {
+    const host = gitHostname(url);
+    if (!host || host === 'git.gittr.space' || host === 'gittr.space') continue;
+    if (!GRASP_CLONE_HOSTS_FOR_PUSH.includes(host) && !KNOWN_GRASP_DOMAINS.includes(host)) {
+      continue;
+    }
+    const wss = `wss://${host}`;
+    if (!out.includes(wss)) out.push(wss);
+  }
+  return out;
+}
+
 /**
  * Check if a URL is a GRASP server
  * @param {string} url - URL to check (can be wss://, https://, or git@)
@@ -139,6 +201,9 @@ module.exports = {
   KNOWN_GRASP_DOMAINS,
   GRASP_CLONE_HOSTS_FOR_PUSH,
   buildFullGraspCloneUrls,
+  canonicalAnnouncementCloneUrls,
+  graspRelaysForCloneUrls,
+  isForgeGitUrl,
   isGraspServer,
   getGraspServers,
   getRegularRelays,
