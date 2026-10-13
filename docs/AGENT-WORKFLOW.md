@@ -38,7 +38,7 @@ Stop there. Do not call `pushToBridge` or `importRemoteToBridge` after this.
 
 GitHub’s own reply looks like `403` and `Sorry. Your account was suspended`. That means GitHub will not serve that account. It does not delete commits already stored on gittr, and it does not delete a copy another Nostr git host already accepted.
 
-The website has no control that changes this. Settings → SSH Base is only the hostname in a displayed `git@host:<nostr-key>/repo.git` line. The next Push does not send the git data there, and saving settings keeps the existing `source` tag (the GitHub URL). “Link source URL” appears only when no forge is linked.
+The swap is on the website, not in MCP and not over SSH. Settings → SSH Base is only the hostname in a displayed `git@host:<nostr-key>/repo.git` line. The next Push does not send the git data there, and saving settings keeps the existing `source` tag (the GitHub URL). “Link source URL” appears only when no forge is linked.
 
 ### Check where the files actually are
 
@@ -50,7 +50,7 @@ Use the npub and repo name from the latest kind 30617. If that prints commit ids
 
 ### What to tell the user to do
 
-Leave `source` pointing at GitHub. The next Push does **not** turn the repo into a Nostr-only repo, and there is no button that drops `source`. Dropping it and then pressing Push is unsafe when this browser only has file names: that Push refuses to publish, because it will not invent an empty branch. Keep the source link. Work on the gittr copy.
+The owner stops gittr asking GitHub from the repo page: **If this git host is gone** → **Keep the Nostr git copy**. That publishes a new card and does not fetch. MCP cannot do that. Do not drop `source` by editing settings and pressing Push. A browser that only has file names will refuse, and it must not invent an empty branch. Until the owner uses that button, the source link stays and the Code tab still asks GitHub first. Work on the gittr copy in the meantime.
 
 On the website (same page they are staring at):
 
@@ -75,9 +75,9 @@ A website Push with no local edits, while `source` is still GitHub, tries once t
 
 ### When a new forge is safe
 
-Only after the same commits are already on that forge: the owner pushed the gittr clone **to** the forge, and `git ls-remote` on the forge URL shows those commits. Then `mirrorRepo` with that URL is the normal website Push. Until that `ls-remote` succeeds, do not change `source`.
+Only on the website, and only after the same commits are already on that forge. The owner pushes the gittr clone **to** the forge with ordinary `git push` (SSH or HTTPS), then `git ls-remote` on the forge URL shows those commits. They then press **Check this server** or **Use** that host. The server refuses unless every gittr branch tip is still there, and it does not delete the repo or move a branch that is already on gittr.
 
-The website sidebar does this for the owner. Under the source line, **If this git host is gone** has two choices and no third. **Keep the Nostr git copy** publishes a new card (`source-cleared`, same clone addresses) and does not fetch. **Use** a backup, or **Check this server**, fetches only when every gittr branch tip is already on that public forge. Point the owner at that. Do not invent a `mirrorRepo` call to drop GitHub. MCP has no tool that drops `source` without copying.
+Do not call `mirrorRepo` for this job. It copies the URL you pass onto gittr and replaces branches, and it does not use that refusal. MCP has no tool that drops `source` without copying. Point the owner at the sidebar.
 
 ## New repo or file edits
 

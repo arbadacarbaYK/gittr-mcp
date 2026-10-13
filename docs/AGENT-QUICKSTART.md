@@ -96,7 +96,7 @@ await gittr.mirrorRepo({
 
 That keeps the forge commits, announces the same git servers as the website, and publishes those commit ids with `HEAD` on the forge default branch. A second call updates the commits and keeps the name, description, and web links. The full map is [AGENT-WORKFLOW.md](AGENT-WORKFLOW.md).
 
-### 1d. GitHub returns 403 (account suspended) — do not change the source
+### 1d. GitHub returns 403 (account suspended) — read gittr; the owner changes source on the website
 
 The copy that already landed on gittr stays there. GitHub refusing the account does not delete it.
 
@@ -104,7 +104,9 @@ The copy that already landed on gittr stays there. GitHub refusing the account d
 git ls-remote https://git.gittr.space/<npub>/<repo>.git
 ```
 
-If that prints commits, read with `bridgeListFiles` / `bridgeGetFileContent`. New issues and pull requests are `createIssue` and `createPR` (Nostr). Old GitHub `issue-N` / `pr-N` will 403. On the website, **New issue** and **New pull request** are the same Nostr path. The next Push does **not** drop `source` or make the repo Nostr-only. Continue with `git push` to that gittr URL, then `publishRepoState`.
+If that prints commits, read with `bridgeListFiles` / `bridgeGetFileContent`. New issues and pull requests are `createIssue` and `createPR` (Nostr). Old GitHub `issue-N` / `pr-N` will 403. On the website, **New issue** and **New pull request** are the same Nostr path. The next Push does **not** drop `source` by itself. New commits that must keep history are `git push` to that gittr URL, then `publishRepoState`.
+
+The owner stops gittr asking GitHub on the repo page: **If this git host is gone**. **Keep the Nostr git copy** does not fetch. **Check this server** runs only when that public forge already has the same commits. MCP has no tool for either choice.
 
 Do **not** call `mirrorRepo` or `importRemoteToBridge` on the dead GitHub URL, and do **not** point either tool at a new Forgejo to “overwrite the source”. Those tools copy **from** the URL you pass **onto** gittr and replace the branches. An empty forge deletes the only remaining history. `pushToBridge` also replaces the branch with one snapshot. Settings → SSH Base does not change the source. Full rules: [AGENT-WORKFLOW.md](AGENT-WORKFLOW.md).
 

@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Docs
-- When a forge returns 403 (account suspended), keep reading the gittr copy and open new Nostr issues and pull requests. The next Push does not drop `source`. `mirrorRepo` / `importRemoteToBridge` copy the URL you pass onto gittr and replace branches, so they are not a way to change source. The website sidebar (**If this git host is gone**) is the owner action: keep the Nostr copy without fetching, or follow another public forge only when it already has the same commits. Guide: [docs/AGENT-WORKFLOW.md](docs/AGENT-WORKFLOW.md).
+- When a forge returns 403 (account suspended), keep reading the gittr copy and open new Nostr issues and pull requests. The next Push does not drop `source`. `mirrorRepo` / `importRemoteToBridge` copy the URL you pass onto gittr and replace branches, so they are not a way to change source. The website sidebar (**If this git host is gone**) is the only owner action: keep the Nostr copy without fetching, or follow another public forge only when it already has the same commits. Do not follow a matching `ls-remote` with `mirrorRepo`. Guide: [docs/AGENT-WORKFLOW.md](docs/AGENT-WORKFLOW.md).
 
 ## 1.0.12 (2026-10-13)
 
