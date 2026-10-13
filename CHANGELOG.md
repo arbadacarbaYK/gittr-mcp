@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Docs
+- When a forge returns 403 (account suspended), keep reading the gittr copy. `mirrorRepo` / `importRemoteToBridge` copy the URL you pass onto gittr and replace branches, so they are not a way to change source. Guide: [docs/AGENT-WORKFLOW.md](docs/AGENT-WORKFLOW.md).
+
 ## 1.0.12 (2026-10-13)
 
 ### Fixes

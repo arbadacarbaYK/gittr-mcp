@@ -41,7 +41,24 @@ function suggestNextStepsForTool(toolName, message) {
     push('Bridge auth uses X-Nostr-Auth-Event; ensure the key matches the repo owner for push.', steps);
   }
 
-  if (lower.includes('access denied') || lower.includes('403')) {
+  const forgeCopyTool = toolName === 'mirrorRepo' || toolName === 'importRemoteToBridge';
+  const forgeCopyRefused =
+    forgeCopyTool &&
+    !lower.includes('access denied') &&
+    (lower.includes('suspended') ||
+      lower.includes('could not copy the forge') ||
+      lower.includes('failed to sync from source') ||
+      lower.includes('requested url returned error: 403') ||
+      (lower.includes('403') &&
+        (lower.includes('github') || lower.includes('forge') || lower.includes('sync'))));
+
+  if (forgeCopyRefused) {
+    push('The forge refused the copy. If this repo was already on gittr, a failed fetch does not delete a bare repo that already has branches. Confirm with git ls-remote https://git.gittr.space/<npub>/<repo>.git and read with bridgeListFiles.', steps);
+    push('Do not call mirrorRepo or importRemoteToBridge with a different URL unless git ls-remote on that URL already shows the commits to keep. Those tools replace the gittr branches with that URL.', steps);
+    push('Do not call pushToBridge to keep the imported history. It replaces the branch with one snapshot.', steps);
+  }
+
+  if ((lower.includes('access denied') || lower.includes('403')) && !forgeCopyRefused) {
     push('Confirm the authenticated pubkey is allowed to push to this owner/repo (same owner as bridge repo).', steps);
   }
 

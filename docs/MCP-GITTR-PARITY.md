@@ -50,7 +50,7 @@ This document tracks how MCP tools map to the **current** gittr website. Updated
 
 Step-by-step which-tool map: [AGENT-WORKFLOW.md](AGENT-WORKFLOW.md).
 
-1. **GitHub / GitLab / Codeberg onto gittr:** `mirrorRepo` once (1.0.10+). Do not call `pushToBridge` after it.
+1. **GitHub / GitLab / Codeberg onto gittr:** `mirrorRepo` once (1.0.10+). Do not call `pushToBridge` after it. If that forge later returns **403** (account suspended or blocked), do not call `mirrorRepo` again and do not point it at a different URL. The commits already on `git.gittr.space/<npub>/<repo>.git` stay; read them with `bridgeListFiles`. A new forge URL is safe only after `git ls-remote` on that URL shows the commits you mean to keep — `mirrorRepo` copies that URL onto gittr and replaces branches. See [AGENT-WORKFLOW.md](AGENT-WORKFLOW.md).
 2. **New repo from files:** `createRepo` (or push + publish + state).
 3. **Bug fix on files already on gittr:** `createIssue` → `pushToBridge` on a branch → `createPR` → `mergePullRequest` (snapshot, same as the website Merge button). On a forge mirror, merge with git and `git push` so the forge history stays.
 4. **Star vs watch:** `starRepo` for appreciation; `watchRepo` for follow list (**10018**).

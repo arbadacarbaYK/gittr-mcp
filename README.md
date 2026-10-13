@@ -112,6 +112,7 @@ These are the **processes** people actually run; each maps to MCP tools the agen
 - **`forkRepo`** — fork an existing gittr repo under your key.  
 - **`mirrorRepo`** — same result as the website Push of a GitHub/GitLab repo: forge commits on gittr (history kept, and a later call updates them), the same git-server list, and a state event whose `HEAD` is the forge default branch. A later call keeps the name, description, and web links already announced.  
 - **`importRemoteToBridge`** — copy onto the git server only. With the owner key, a later call updates the forge commits. It does not publish the Nostr card. Use **`mirrorRepo`** for the full website result.
+- **Forge 403 / suspended account:** if the repo was already copied, keep using `https://git.gittr.space/<npub>/<repo>.git`. Do not point `mirrorRepo` at a new forge to change the source — that copies the new URL onto gittr and replaces the branches. Guide: [docs/AGENT-WORKFLOW.md](docs/AGENT-WORKFLOW.md).
 
 ### Discover & social
 - **`listRepos`**, **`searchRepos`**, **`myRepos`**, **`exploreRepos`**, **`getTrendingRepos`** (trending = recent repos, not engagement rank)  

@@ -96,6 +96,18 @@ await gittr.mirrorRepo({
 
 That keeps the forge commits, announces the same git servers as the website, and publishes those commit ids with `HEAD` on the forge default branch. A second call updates the commits and keeps the name, description, and web links. The full map is [AGENT-WORKFLOW.md](AGENT-WORKFLOW.md).
 
+### 1d. GitHub returns 403 (account suspended) — do not change the source
+
+The copy that already landed on gittr stays there. GitHub refusing the account does not delete it.
+
+```bash
+git ls-remote https://git.gittr.space/<npub>/<repo>.git
+```
+
+If that prints commits, read with `bridgeListFiles` / `bridgeGetFileContent`. Continue with `git push` to that gittr URL, then `publishRepoState`. Open new work with `createIssue`.
+
+Do **not** call `mirrorRepo` or `importRemoteToBridge` on the dead GitHub URL, and do **not** point either tool at a new Forgejo to “overwrite the source”. Those tools copy **from** the URL you pass **onto** gittr and replace the branches. An empty forge deletes the only remaining history. `pushToBridge` also replaces the branch with one snapshot. Settings → SSH Base does not change the source. Full rules: [AGENT-WORKFLOW.md](AGENT-WORKFLOW.md).
+
 ---
 
 ### 2. Create an Issue

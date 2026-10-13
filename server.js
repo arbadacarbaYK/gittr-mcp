@@ -299,7 +299,7 @@ const tools = [
   },
   {
     name: 'mirrorRepo',
-    description: 'Same result as the website Push of a GitHub/GitLab repo. Copies the forge commits onto gittr (keeps history, updates an existing repo), announces the same git servers as the website, and publishes the branch tips with HEAD on the forge default branch. A second call keeps the existing name, description, and web links unless you pass new ones. Do not follow this with pushToBridge.',
+    description: 'Same result as the website Push of a GitHub/GitLab repo. Copies the forge commits onto gittr (keeps history, updates an existing repo), announces the same git servers as the website, and publishes the branch tips with HEAD on the forge default branch. A second call keeps the existing name, description, and web links unless you pass new ones. Do not follow this with pushToBridge. If the forge returns 403 (account suspended or blocked), do not call this again and do not pass a different URL to change the source: this copies that URL onto the gittr bare repo and replaces every branch. Read the existing copy with bridgeListFiles after git ls-remote on https://git.gittr.space/<npub>/<repo>.git. A new forge URL is safe only when ls-remote on that URL already shows the commits to keep. See docs/AGENT-WORKFLOW.md.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1174,7 +1174,7 @@ const tools = [
   },
   {
     name: 'importRemoteToBridge',
-    description: 'Copy a Git URL onto the bridge. With the owner key, an existing forge repo is updated to the forge commits (history kept). Does not publish the Nostr card — use mirrorRepo for the same result as the website Push. Do not use pushToBridge to sync a forge.',
+    description: 'Copy a Git URL onto the bridge. With the owner key, an existing forge repo is updated to the forge commits (history kept). Does not publish the Nostr card — use mirrorRepo for the same result as the website Push. Do not use pushToBridge to sync a forge. If the URL returns 403, do not retry it and do not pass a different URL to change source: this force-updates the gittr branches to match the URL. Read the existing bare repo with bridgeListFiles instead.',
     inputSchema: {
       type: 'object',
       properties: {
