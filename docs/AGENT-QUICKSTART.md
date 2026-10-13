@@ -104,7 +104,7 @@ The copy that already landed on gittr stays there. GitHub refusing the account d
 git ls-remote https://git.gittr.space/<npub>/<repo>.git
 ```
 
-If that prints commits, read with `bridgeListFiles` / `bridgeGetFileContent`. Continue with `git push` to that gittr URL, then `publishRepoState`. Open new work with `createIssue`.
+If that prints commits, read with `bridgeListFiles` / `bridgeGetFileContent`. New issues and pull requests are `createIssue` and `createPR` (Nostr). Old GitHub `issue-N` / `pr-N` will 403. On the website, **New issue** and **New pull request** are the same Nostr path. The next Push does **not** drop `source` or make the repo Nostr-only. Continue with `git push` to that gittr URL, then `publishRepoState`.
 
 Do **not** call `mirrorRepo` or `importRemoteToBridge` on the dead GitHub URL, and do **not** point either tool at a new Forgejo to “overwrite the source”. Those tools copy **from** the URL you pass **onto** gittr and replace the branches. An empty forge deletes the only remaining history. `pushToBridge` also replaces the branch with one snapshot. Settings → SSH Base does not change the source. Full rules: [AGENT-WORKFLOW.md](AGENT-WORKFLOW.md).
 

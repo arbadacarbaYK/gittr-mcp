@@ -50,11 +50,20 @@ Use the npub and repo name from the latest kind 30617. If that prints commit ids
 
 ### What to tell the user to do
 
-Leave `source` pointing at GitHub. Read and continue from the gittr URL.
+Leave `source` pointing at GitHub. The next Push does **not** turn the repo into a Nostr-only repo, and there is no button that drops `source`. Dropping it and then pressing Push is unsafe when this browser only has file names: that Push refuses to publish, because it will not invent an empty branch. Keep the source link. Work on the gittr copy.
 
-- **Read:** `bridgeListFiles` and `bridgeGetFileContent`. Those read the gittr bridge, not GitHub. `getFile` is also bridge-first. The website Code tab is not: while `source` is still the GitHub URL, the file list asks GitHub first. A 403 there is GitHub refusing. It is not proof the bridge is empty. After that refusal, opening one file on the website tries the bridge.
+On the website (same page they are staring at):
+
+- **Files.** The Code tab also asks every `clone[]` address, including `https://git.gittr.space/<npub>/<repo>.git`. If that copy answers, the file list is the gittr copy. Clone that address. The copy-clone button can still put the GitHub URL on the clipboard, because it prefers `source`. Ignore that URL.
+- **Issues and pull requests.** Old GitHub tickets will not load. **New issue** and **New pull request** on that repo are Nostr (kinds 1621 and 1618). They do not need GitHub. Do not try to close `issue-N` / a GitHub number.
+- **To do and Discussions.** While `source` is still the forge, those two tabs stay the forge’s read-only copy. New conversation goes in Issues.
+- **Push to Nostr** with no file edits tries GitHub once, fails, and keeps the commits already on the bridge. The `source` tag stays. Editing files in the browser and then Push saves one new snapshot. It is not a commit on top of the imported history.
+
+With MCP, do the same jobs:
+
+- **Read:** `bridgeListFiles` and `bridgeGetFileContent`. Those read the gittr bridge, not GitHub. `getFile` is also bridge-first.
+- **New issue:** `createIssue`. **New pull request:** `createPR`. `listIssues` / `listPRs` still try the forge when `source` says so; a 403 there means the forge rows are missing, not that Nostr rows are gone.
 - **New commits that must keep the imported history:** clone the gittr URL above and `git push` to it with the owner key. Then `publishRepoState` with the refs from that push. Do not use `pushToBridge` for this.
-- **New issues:** `createIssue` (a Nostr issue). GitHub issue numbers and `issue-N` will 403. Do not try to close them on GitHub.
 
 A website Push with no local edits, while `source` is still GitHub, tries once to copy from GitHub. On 403 that copy fails. The Push then keeps the commit ids already on the bridge when those refs exist. It does not remove the GitHub `source` tag, so the Code tab keeps asking GitHub first.
 
