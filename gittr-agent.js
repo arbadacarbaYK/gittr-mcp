@@ -874,14 +874,17 @@ async function getFile(options) {
  * Mirror a GitHub/GitLab repo to gittr
  */
 async function mirrorRepo(options) {
+  const repoName = options.repoName || options.repo;
+  if (!repoName) {
+    throw new Error('mirrorRepo requires repoName (the gittr repo name).');
+  }
   const {
     sourceUrl,        // GitHub or GitLab clone URL
-    repoName,        // Name for the new repo
     description = '',
-    privkey,
     relays = gittrNostr.config.relays,
     graspServer = 'git.gittr.space'  // Use the server that actually works!
   } = options;
+  let privkey = options.privkey;
   
   // Auto-load credentials
   if (!privkey) {

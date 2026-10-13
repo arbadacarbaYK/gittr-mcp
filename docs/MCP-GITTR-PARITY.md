@@ -7,7 +7,7 @@ This document tracks how MCP tools map to the **current** gittr web app (`ngit` 
 | Workflow | MCP tools | gittr today |
 |----------|-----------|-------------|
 | Push files / folder delete | `pushToBridge` (`files`, optional `deletedPaths`, `allowTreeShrink`) | NIP-98 challenge + `POST /api/nostr/repo/push` (UI sends `deletedPaths` + `allowTreeShrink` on final chunk) |
-| Publish repo | `createRepo`, `publishRepoAnnouncement`, `publishRepoState` | kinds **30617** + **30618**; **`clone[]` is always the website push set** (`buildFullGraspCloneUrls`: gittr, ngit, gitnostr, shakespeare, danconway — npub paths). A forge URL stays in `source` only. `mirrorRepo` clones onto the bridge before that announcement. |
+| Publish repo | `createRepo`, `publishRepoAnnouncement`, `publishRepoState` | kinds **30617** + **30618**; **`clone[]` is always the website push set** (`buildFullGraspCloneUrls`: gittr, ngit, gitnostr, shakespeare, danconway — npub paths). A forge URL stays in `source` only. `mirrorRepo` syncs the forge commits onto the bridge before that announcement. |
 | Soft-delete repo | `softDeleteRepo` / `deleteRepo` | Soft-deleted **30617** + NIP-09 kind **5**, **and** `POST /api/nostr/repo/event` so the bridge wipes the bare tree (Settings → Delete parity) |
 | Issues | `createIssue`, `listIssues`, `getIssueById` | kind **1621**. gittr URLs use the **event id** (`/issues/<64-hex>`), not a local `#2`. MCP already passes that id. |
 | Issue/PR comments | `listIssueComments`, `createIssueComment`, `listPRComments`, `createPRComment` | NIP-22 kind **1111**. Issue **and** PR detail pages subscribe to `#E`/`#e` on the root event. `repo` owner may be npub or hex. |
@@ -48,12 +48,15 @@ This document tracks how MCP tools map to the **current** gittr web app (`ngit` 
 
 ## Recommended agent flows
 
-1. **New repo:** `createRepo` (or push + publish + state).
-2. **Bug fix:** `createIssue` → branch push → `createPR` or `createPRViaGittrCLI` → `mergePullRequest`.
-3. **Star vs watch:** `starRepo` for appreciation; `watchRepo` for follow list (**10018**).
-4. **Read code:** Prefer `bridgeGetFileContent` / `bridgeListFiles` after the repo is on the bridge. `getFile` is bridge-then-GRASP-raw — not the Code tab (live 30617, forge `source` tip, then first clone listing). See gittr [FILE_FETCHING_INSIGHTS.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/FILE_FETCHING_INSIGHTS.md).
-5. **Announce software:** linked forge with a tagged Release + hashed binary → `announceSoftwareFromForgeRelease({ sourceUrl })` (latest) or `{ sourceUrl, tag }` (chosen tag). Screenshots: commit `images:` in that repo’s `zapstore.yaml`. Optional `pinToBlossom: true`. Preview with `fetchForgeReleases({ sourceUrl, hash:true, tag })` or `listForgeReleases({ sourceUrl })`.
-6. **Publish Pages:** `publishNostrPages({ files:[{path:'index.html', content:'…'}], dTag })` or `{ fromBridge:true, ownerPubkey, repoId }`. `dTag` is clipped to 1–13 characters.
-7. **Audit dependencies:** `auditRepoDependencies({ ownerPubkey, repoId })`.
+Step-by-step which-tool map: [AGENT-WORKFLOW.md](AGENT-WORKFLOW.md).
+
+1. **GitHub / GitLab / Codeberg onto gittr:** `mirrorRepo` once (1.0.10+). Do not call `pushToBridge` after it.
+2. **New repo from files:** `createRepo` (or push + publish + state).
+3. **Bug fix on files already on gittr:** `createIssue` → `pushToBridge` on a branch → `createPR` → `mergePullRequest` (snapshot, same as the website Merge button). On a forge mirror, merge with git and `git push` so the forge history stays.
+4. **Star vs watch:** `starRepo` for appreciation; `watchRepo` for follow list (**10018**).
+5. **Read code:** Prefer `bridgeGetFileContent` / `bridgeListFiles` after the repo is on the bridge. `getFile` is bridge-then-GRASP-raw — not the Code tab (live 30617, forge `source` tip, then first clone listing). See gittr [FILE_FETCHING_INSIGHTS.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/FILE_FETCHING_INSIGHTS.md).
+6. **Announce software:** linked forge with a tagged Release + hashed binary → `announceSoftwareFromForgeRelease({ sourceUrl })` (latest) or `{ sourceUrl, tag }` (chosen tag). Screenshots: commit `images:` in that repo’s `zapstore.yaml`. Optional `pinToBlossom: true`. Preview with `fetchForgeReleases({ sourceUrl, hash:true, tag })` or `listForgeReleases({ sourceUrl })`.
+7. **Publish Pages:** `publishNostrPages({ files:[{path:'index.html', content:'…'}], dTag })` or `{ fromBridge:true, ownerPubkey, repoId }`. `dTag` is clipped to 1–13 characters.
+8. **Audit dependencies:** `auditRepoDependencies({ ownerPubkey, repoId })`.
 
 See also: [NIP25_STARS_NIP51_FOLLOWING.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/NIP25_STARS_NIP51_FOLLOWING.md) in the gittr repo (ngit).

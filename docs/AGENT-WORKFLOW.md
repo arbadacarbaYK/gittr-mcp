@@ -1,158 +1,59 @@
-# Agent Workflow Guide
+# Agent workflow
 
-**Doc index:** [docs/README.md](README.md)
+**Doc index:** [docs/README.md](README.md) · **Same result as the website:** [MCP-GITTR-PARITY.md](MCP-GITTR-PARITY.md)
 
-This guide shows AI agents how to push code to gittr.space using gittr-mcp.
+This is the map of which tool to call. **gittr-mcp 1.0.10** or newer. It is not an npm package. Cursor: `git pull` in the folder whose path ends with `gittr-mcp/server.js`, then reload the MCP. Or install `gittr-mcp-x.y.z.mcpb` from [GitHub Releases](https://github.com/arbadacarbaYK/gittr-mcp/releases).
 
-## Prerequisites
+The owner key is the same Nostr key as on gittr.space (`.nostr-keys.json` or `privkey` on the call). See [SIGNING-GUIDE.md](SIGNING-GUIDE.md).
 
-- Nostr identity (private key required for signing)
-- Node.js environment
+## Pick the tool by the job
 
-## Full Workflow
+| Job | Call this | Do not |
+| --- | --- | --- |
+| Put a **GitHub / GitLab / Codeberg** repo on gittr the way the website Push does | **`mirrorRepo` once** | `pushToBridge`. `importRemoteToBridge` for the Nostr card. |
+| **New repo made of files**, or **edit files** already on gittr | **`createRepo`** or **`pushToBridge`** | `mirrorRepo` (that one needs a forge URL) |
+| Copy the git commits only, no Nostr card | **`importRemoteToBridge`** | Follow it with `pushToBridge` |
+| Later commits you already made with git | **`git push`** (SSH or HTTPS) | `pushToBridge` if those commits must stay |
 
-### 1. Install gittr-mcp
+`pushToBridge` saves one new snapshot (author `gittr push`) and replaces the branch. That is the same as editing files in the browser and pressing Push. It drops imported GitHub history.
 
-```bash
-git clone https://github.com/arbadacarbaYK/gittr-mcp.git
-cd gittr-mcp
-npm install   # or: npm ci
-# or reference locally:
-const gittr = require('./gittr-nostr.js');
-```
+## Copy a forge repo (website Push)
 
-### 2. Push Files to Git Server
+One call. It updates the git server to the forge commits (history stays, and a second call refreshes them), announces the same git servers as the website, and publishes the branch tips.
 
 ```javascript
-const pushResult = await gittr.pushToBridge({
-  ownerPubkey: '<your-pubkey-hex>',  // 64-char hex pubkey
-  repo: 'my-repo',
-  branch: 'main',
-  privkey: '<your-private-key-hex>', // required — NIP-98 auth to the bridge
-  files: [
-    {
-      path: 'README.md',
-      content: '# My Repo\n\nHello from gittr!'
-    },
-    {
-      path: 'src/index.js',
-      content: 'console.log("Hello world!");'
-    }
-  ]
+await mirrorRepo({
+  sourceUrl: 'https://github.com/org/repo',
+  repoName: 'repo',
 });
-
-console.log('Pushed files:', pushResult.pushedFiles);
-console.log('Commit:', pushResult.refs[0].commit);
 ```
 
-### 3. Publish to Nostr (Requires Private Key)
+If the tool says the repo already exists, that is fine on 1.0.10: the commits are still updated.
 
-**Important:** Steps 2 and 3 require your Nostr private key. `pushToBridge` signs a bridge challenge (NIP-98). Publish signs kinds 30617 / 30618. MCP has no Amber / NIP-46 path.
+Stop there. Do not call `pushToBridge` or `importRemoteToBridge` after this.
+
+## New repo or file edits
+
+`createRepo` pushes the files and publishes the Nostr card (kinds 30617 and 30618) in one call.
 
 ```javascript
-const { nip19 } = require('nostr-tools');
-
-// Announce repository (kind 30617)
-const npub = nip19.npubEncode('<your-pubkey-hex>');
-const repoUrl = `https://gittr.space/${npub}/my-repo`;
-
-// CRITICAL: Use a GRASP server that's also in your relays list
-const graspDomain = 'relay.ngit.dev'; // Known public GRASP server
-
-const announceResult = await gittr.publishRepoAnnouncement({
-  repoId: 'my-repo',
+await createRepo({
   name: 'my-repo',
-  description: 'My awesome repository',
-  web: [repoUrl],
-  clone: [
-    `https://${graspDomain}/<your-pubkey-hex>/my-repo.git`,
-    `https://git.gittr.space/<your-pubkey-hex>/my-repo.git`
-  ],
-  privkey: '<your-private-key-hex>', // 64-char hex private key
-  relays: [`wss://${graspDomain}`] // MUST include GRASP server as relay
+  description: 'What this is',
+  files: [{ path: 'README.md', content: '# My repo\n' }],
 });
-
-console.log('Announced to Nostr, event:', announceResult.event.id);
-
-// Publish repository state (kind 30618)
-const refs = pushResult.refs.map(r => ({
-  name: r.ref,
-  commit: r.commit
-}));
-
-const stateResult = await gittr.publishRepoState({
-  repoId: 'my-repo',
-  refs,
-  privkey: '<your-private-key-hex>',
-  relays: [`wss://${graspDomain}`]
-});
-
-console.log('State published, event:', stateResult.event.id);
 ```
 
-### 4. Wait for Nostr Propagation
+A later file edit is `pushToBridge` on that branch, then `publishRepoState` with the refs it returns. Pass `deletedPaths` to remove a file or folder.
 
-```javascript
-console.log('✅ Complete! View your repo at:', repoUrl);
-console.log('Wait ~30s for Nostr relays to propagate.');
-```
+## Issues and pull requests
 
-## GRASP Server Requirements
+- **Issue:** `createIssue`. The page also posts an “open” status; the issue still shows as open without it. Close a Nostr issue with `closeIssue` (64-character event id). GitHub `issue-12` is closed on GitHub.
+- **Pull request:** `createPR` (kind 1618). The page also tries to pin `refs/nostr/<event-id>` on the git server; that step is optional there too.
+- **Merge:** `mergePullRequest` applies the files and saves a snapshot, the same as the website Merge button. It does not keep a git merge commit. On a repo copied from GitHub, merge with git and `git push` instead, or the GitHub history is replaced.
 
-**Critical:** The clone URL domain MUST be listed in the relays array as a WebSocket URL.
+## Read the repo
 
-### Known Public GRASP Servers
+Prefer `bridgeListFiles` and `bridgeGetFileContent` after the repo is on gittr. `getFile` is not the website Code tab.
 
-These servers accept repositories from any user:
-
-- `relay.ngit.dev` (recommended)
-- `git.shakespeare.diy`
-- `ngit-relay.nostrver.se`
-- `git-01.uid.ovh`
-- `git-02.uid.ovh`
-- `ngit.danconwaydev.com`
-- `git.gittr.space` (gittr's own server) — **include this in `clone[]`** when you want the bridge to keep a bare repo. Foreign GRASP-only announces are not mirrored onto gittr disk.
-
-### Example
-
-```javascript
-// ✅ CORRECT - domain matches
-clone: ['https://relay.ngit.dev/<pubkey>/repo.git']
-relays: ['wss://relay.ngit.dev']
-
-// ❌ WRONG - domains don't match
-clone: ['https://git.gittr.space/<pubkey>/repo.git']
-relays: ['wss://relay.noderunners.network'] // Different domain!
-```
-
-## Common Issues
-
-### "Announcement must list service in both clone and relays tags"
-
-**Cause:** The clone URL domain doesn't match any relay in your relays list.
-
-**Solution:** Extract the domain from your clone URL and add it as `wss://<domain>` to your relays array.
-
-### Repo shows "0 files" on gittr.space
-
-**Cause:** You pushed files (step 1) but didn't publish to Nostr (steps 2-3).
-
-**Solution:** Run all 3 steps. Files won't appear on gittr.space without Nostr events.
-
-### "duplicate url" error
-
-**Cause:** You're trying to publish to the same relay multiple times.
-
-**Solution:** This is non-fatal. The events were published successfully, just de-duplicate your relays array.
-
-## Security Notes
-
-- **Never commit your private key to git**
-- Store it in environment variables or a keys file (see [SIGNING-GUIDE.md](SIGNING-GUIDE.md))
-- MCP uses a local **nsec**, not a NIP-07 extension and not Amber (NIP-46)
-- `pushToBridge` (step 2) **does** require your private key (bridge NIP-98)
-- Nostr publishing (step 3) also requires signing
-
-## Complete Example
-
-See `test-full-workflow.js` in the repo for a working end-to-end example.
+Full tool-by-tool comparison: [MCP-GITTR-PARITY.md](MCP-GITTR-PARITY.md).

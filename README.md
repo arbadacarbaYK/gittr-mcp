@@ -71,7 +71,7 @@ flowchart TB
 
 ## What you can do (workflows)
 
-These are the **processes** people actually run; each maps to MCP tools the agent can call.
+These are the **processes** people actually run; each maps to MCP tools the agent can call. Agents: follow [docs/AGENT-WORKFLOW.md](docs/AGENT-WORKFLOW.md) (which tool, and what not to call after it).
 
 ### Ship a new project
 1. **`createRepo`** — push initial files to the bridge **and** publish Nostr kinds **30617** + **30618** in one step (best default for agents).  
@@ -280,7 +280,7 @@ GITTR_TEST_NSEC=nsec1... npm run test:live:matrix
 | Doc | Contents |
 |-----|----------|
 | [docs/MCP-HOSTS.md](docs/MCP-HOSTS.md) | Per-host MCP config |
-| [docs/AGENT-WORKFLOW.md](docs/AGENT-WORKFLOW.md) | Step-by-step push + publish |
+| [docs/AGENT-WORKFLOW.md](docs/AGENT-WORKFLOW.md) | Which tool for which job |
 | [docs/AGENT-QUICKSTART.md](docs/AGENT-QUICKSTART.md) | Copy-paste agent prompts |
 | [docs/DEVELOPER.md](docs/DEVELOPER.md) | API, verification contract, GRASP |
 | [docs/SIGNING-GUIDE.md](docs/SIGNING-GUIDE.md) | Keys and NIP-98 |

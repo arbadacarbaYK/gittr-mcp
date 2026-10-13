@@ -82,6 +82,22 @@ HTTP: `GET https://gittr.space/api/nostr/repos-by-github?source=https://gitlab.c
 
 ---
 
+### 1c. Copy a GitHub / GitLab / Codeberg repo (same as the website Push)
+
+**gittr-mcp 1.0.10+.** One call. Do not follow it with `pushToBridge`.
+
+```javascript
+const gittr = require('./index.js');
+await gittr.mirrorRepo({
+  sourceUrl: 'https://github.com/org/repo',
+  repoName: 'repo',
+});
+```
+
+That keeps the forge commits, announces the same git servers as the website, and publishes those commit ids. “Already exists” still updates the commits. The full map is [AGENT-WORKFLOW.md](AGENT-WORKFLOW.md).
+
+---
+
 ### 2. Create an Issue
 
 ```javascript
@@ -100,11 +116,11 @@ const issue = await gittr.createIssue(
 console.log('Issue created:', issue.event.id);
 ```
 
-### 3. Push Code (No Private Key Needed!)
+### 3. Push file edits (needs the owner key)
+
+This replaces the branch with one snapshot. Use it for edited files, not to copy a GitHub repo (`mirrorRepo` does that).
 
 ```javascript
-// Push code changes via bridge API
-// NOTE: You only need the repo owner's PUBLIC key!
 const result = await gittr.pushToBridge({
   ownerPubkey: 'owner-pubkey-hex',
   repo: 'repo-name',

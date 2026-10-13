@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Docs
+- Agent map is [docs/AGENT-WORKFLOW.md](docs/AGENT-WORKFLOW.md): `mirrorRepo` for a forge repo, `pushToBridge` only for file edits.
+
+## 1.0.10 (2026-10-13)
+
 ### Fixes
 - **`mirrorRepo` matches a website Push of a GitHub repo.** It updates the git server to the forge commits (history stays, a second call refreshes), announces the same git servers, and publishes the branch tips. `importRemoteToBridge` does that git update when the owner key is available. `pushToBridge` is still a snapshot and drops that history.
 - **Same clone list as the website:** `publishRepoAnnouncement` always adds gittr, ngit, gitnostr, shakespeare, and danconway. A forge URL in `clone` is moved to `source`. `publishRepoState` is sent to those same git relays.
