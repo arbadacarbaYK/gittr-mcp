@@ -2,7 +2,7 @@
 
 **Doc index:** [docs/README.md](README.md) · **Same result as the website:** [MCP-GITTR-PARITY.md](MCP-GITTR-PARITY.md)
 
-This is the map of which tool to call. **gittr-mcp 1.0.11** or newer for issue lists that include GitHub. It is not an npm package. Cursor: `git pull` in the folder whose path ends with `gittr-mcp/server.js`, then reload the MCP. Or install `gittr-mcp-x.y.z.mcpb` from [GitHub Releases](https://github.com/arbadacarbaYK/gittr-mcp/releases).
+This is the map of which tool to call. **gittr-mcp 1.0.12** or newer so a second `mirrorRepo` keeps the title and links and points `HEAD` at the forge default branch. It is not an npm package. Cursor: `git pull` in the folder whose path ends with `gittr-mcp/server.js`, then reload the MCP. Or install `gittr-mcp-x.y.z.mcpb` from [GitHub Releases](https://github.com/arbadacarbaYK/gittr-mcp/releases).
 
 The owner key is the same Nostr key as on gittr.space (`.nostr-keys.json` or `privkey` on the call). See [SIGNING-GUIDE.md](SIGNING-GUIDE.md).
 
@@ -28,7 +28,9 @@ await mirrorRepo({
 });
 ```
 
-If the tool says the repo already exists, that is fine on 1.0.10: the commits are still updated.
+A second call is fine on 1.0.12. It refreshes the commits and points `HEAD` at the forge default branch (`main`, not whichever branch sorts first). It keeps the name, description, and web links already announced. Pass `name`, `description`, or `web` only when those should change.
+
+If an older `mirrorRepo` already replaced them with the repo name and the GitHub link, pass the old title, description, and the two `https://gittr.space/...` links once. Later calls keep them.
 
 Stop there. Do not call `pushToBridge` or `importRemoteToBridge` after this.
 

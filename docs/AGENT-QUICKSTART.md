@@ -84,7 +84,7 @@ HTTP: `GET https://gittr.space/api/nostr/repos-by-github?source=https://gitlab.c
 
 ### 1c. Copy a GitHub / GitLab / Codeberg repo (same as the website Push)
 
-**gittr-mcp 1.0.10+.** One call. Do not follow it with `pushToBridge`.
+**gittr-mcp 1.0.12+.** One call. Do not follow it with `pushToBridge`.
 
 ```javascript
 const gittr = require('./index.js');
@@ -94,7 +94,7 @@ await gittr.mirrorRepo({
 });
 ```
 
-That keeps the forge commits, announces the same git servers as the website, and publishes those commit ids. “Already exists” still updates the commits. The full map is [AGENT-WORKFLOW.md](AGENT-WORKFLOW.md).
+That keeps the forge commits, announces the same git servers as the website, and publishes those commit ids with `HEAD` on the forge default branch. A second call updates the commits and keeps the name, description, and web links. The full map is [AGENT-WORKFLOW.md](AGENT-WORKFLOW.md).
 
 ---
 

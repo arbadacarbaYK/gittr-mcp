@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.12 (2026-10-13)
+
+### Fixes
+- **`mirrorRepo` keeps an existing repo card.** A second call no longer replaces the name, description, and web links with the repo name and the GitHub URL. Pass `name`, `description`, or `web` to change them. Maintainers, pay-to-push, and private/public flags stay too.
+- **`HEAD` follows the forge default branch.** `gh-pages` no longer wins just because it sorts before `main`. `publishRepoState` takes an optional `branch`.
+- **`publishRepoAnnouncement` and `publishRepoState` load `.nostr-keys.json`** the same way the other tools do. The private key is no longer required on the tool call.
+
 ## 1.0.11 (2026-10-13)
 
 ### Fixes

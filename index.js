@@ -8,9 +8,9 @@ const gittrShell = require('./gittr-shell.js');
 module.exports = {
   // Core repository operations
   listRepos: gittrNostr.listRepos,
-  publishRepoAnnouncement: gittrNostr.publishRepoAnnouncement,
-  publishRepo: gittrNostr.publishRepoAnnouncement, // Alias
-  publishRepoState: gittrNostr.publishRepoState,
+  publishRepoAnnouncement: gittrAgent.publishRepoAnnouncement,
+  publishRepo: gittrAgent.publishRepoAnnouncement, // Alias
+  publishRepoState: gittrAgent.publishRepoState,
   pushToBridge: gittrNostr.pushToBridge,
 
   // Issue operations — list/detail/comments match the website (Nostr + GitHub/Codeberg)

@@ -110,7 +110,7 @@ These are the **processes** people actually run; each maps to MCP tools the agen
 
 ### Fork, mirror, import
 - **`forkRepo`** — fork an existing gittr repo under your key.  
-- **`mirrorRepo`** — same result as the website Push of a GitHub/GitLab repo: forge commits on gittr (history kept, and a later call updates them), the same git-server list, and a state event that names those commits.  
+- **`mirrorRepo`** — same result as the website Push of a GitHub/GitLab repo: forge commits on gittr (history kept, and a later call updates them), the same git-server list, and a state event whose `HEAD` is the forge default branch. A later call keeps the name, description, and web links already announced.  
 - **`importRemoteToBridge`** — copy onto the git server only. With the owner key, a later call updates the forge commits. It does not publish the Nostr card. Use **`mirrorRepo`** for the full website result.
 
 ### Discover & social
@@ -255,7 +255,7 @@ Short version — full detail in [docs/DEVELOPER.md](docs/DEVELOPER.md):
 2. **`git clone`** only “works” for others if your published **`clone`** URL serves git HTTP. This MCP defaults toward **`https://git.gittr.space/<hex-pubkey>/<repo>.git`**. A failed clone means fix the URL in **30617**, not “ignore and continue.” Host-only values like `https://git.gittr.space` are rejected/expanded on publish.  
 3. **`mergePullRequest`** needs **`git`** on the machine running MCP and maintainer/owner rights.  
 4. Relays can rate-limit or lag; failed verification is a **failed** publish, not “maybe OK.”
-5. **Same result as the website Push.** `mirrorRepo` copies the forge commits (and updates them if the repo is already there), then writes `clone` for gittr, ngit, gitnostr, shakespeare, and danconway, keeps the forge URL in `source`, and publishes the branch tips. Dead hosts (`git-01.uid.ovh`, `ngit-relay.nostrver.se`) are not added.
+5. **Same result as the website Push.** `mirrorRepo` copies the forge commits (and updates them if the repo is already there), then writes `clone` for gittr, ngit, gitnostr, shakespeare, and danconway, keeps the forge URL in `source`, and publishes the branch tips with `HEAD` on the forge default branch. A second call keeps the existing name, description, and web links. Dead hosts (`git-01.uid.ovh`, `ngit-relay.nostrver.se`) are not added.
 6. **`pushToBridge` replaces the branch with one new snapshot** (author `gittr push`) and drops imported GitHub history. That matches editing files on the website, not syncing GitHub. Do not use it after `mirrorRepo`.
 
 ### Do MCP users get gittr’s filter / CORS server fixes?

@@ -1451,26 +1451,112 @@ async function publishRepoAnnouncement({
   return { event, success: true };
 }
 
+function resolveNip34HeadBranchName(refs, preferredBranch) {
+  const heads = (Array.isArray(refs) ? refs : [])
+    .filter((r) => r && typeof r.ref === 'string' && r.ref.startsWith('refs/heads/'))
+    .map((r) => ({
+      ref: r.ref,
+      branch: r.ref.replace(/^refs\/heads\//i, ''),
+      commit: String(r.commit || '').trim(),
+    }));
+  const isBotBranch = (name) => /^(dependabot|renovate)\//i.test(String(name || '').trim());
+  const pref = String(preferredBranch || '').trim().toLowerCase();
+  if (pref) {
+    const exact = heads.find((h) => h.branch.toLowerCase() === pref);
+    if (exact) return exact.branch;
+  }
+  for (const canonical of ['main', 'master']) {
+    const match = heads.find((h) => h.branch.toLowerCase() === canonical && h.commit.length > 0);
+    if (match) return match.branch;
+  }
+  const withCommit = heads.find((h) => h.commit.length > 0 && !isBotBranch(h.branch));
+  if (withCommit) return withCommit.branch;
+  if (heads[0]) return heads[0].branch;
+  const trimmed = String(preferredBranch || '').trim();
+  if (trimmed) return trimmed;
+  return 'main';
+}
+
+/** Branch tips for kind 30618, with HEAD on the forge default branch. */
+function nip34StateRefs(refs, branch) {
+  const incomingRefs = (Array.isArray(refs) ? refs : [])
+    .map((r) => ({
+      ref: r?.ref || r?.name || '',
+      commit: r?.commit || '',
+    }))
+    .filter((r) => r.ref && typeof r.ref === 'string');
+  const explicitHead = incomingRefs.find((r) => r.ref === 'HEAD');
+  const normalizedRefs = incomingRefs.filter((r) => r.ref !== 'HEAD');
+  const preferred = String(branch || '').trim();
+  let headCommit;
+  if (preferred || !explicitHead || !explicitHead.commit) {
+    const headBranch = resolveNip34HeadBranchName(normalizedRefs, preferred);
+    headCommit = `ref: refs/heads/${headBranch}`;
+  } else {
+    headCommit = explicitHead.commit;
+  }
+  normalizedRefs.push({ ref: 'HEAD', commit: headCommit });
+  return normalizedRefs;
+}
+
+/**
+ * Fields for a forge mirror announcement. A second call keeps the name,
+ * description, and web links already on the repo unless the caller passes new ones.
+ */
+function mirrorAnnouncementFields({
+  existing,
+  repoName,
+  sourceUrl,
+  name,
+  description,
+  web,
+  ownerNpub,
+  pubkey,
+  publicRead,
+  publicWrite,
+  pushCostSats,
+  maintainers,
+  mergeMaintainers,
+  forkedFrom,
+}) {
+  const explicitName = typeof name === 'string' && name.trim() ? name.trim() : '';
+  const explicitDescription = typeof description === 'string' && description.trim() ? description.trim() : '';
+  const explicitWeb = Array.isArray(web) ? web.map((u) => String(u || '').trim()).filter(Boolean) : [];
+  const keptWeb = existing && Array.isArray(existing.web) ? existing.web.filter(Boolean) : [];
+  return {
+    name: explicitName || (existing && existing.name) || repoName,
+    description:
+      explicitDescription ||
+      (existing && existing.description) ||
+      (sourceUrl ? `Mirrored from ${sourceUrl}` : ''),
+    web: explicitWeb.length
+      ? explicitWeb
+      : keptWeb.length
+        ? keptWeb
+        : [
+            `https://gittr.space/${ownerNpub}/${repoName}`,
+            `https://gittr.space/${pubkey}/${repoName}`,
+          ],
+    publicRead: publicRead !== undefined ? publicRead : existing ? existing.publicRead : undefined,
+    publicWrite: publicWrite !== undefined ? publicWrite : existing ? existing.publicWrite : undefined,
+    pushCostSats: pushCostSats != null ? pushCostSats : existing ? existing.pushCostSats : undefined,
+    maintainers: maintainers || (existing && existing.maintainers && existing.maintainers.length ? existing.maintainers : undefined),
+    mergeMaintainers:
+      mergeMaintainers ||
+      (existing && existing.mergeMaintainers && existing.mergeMaintainers.length ? existing.mergeMaintainers : undefined),
+    forkedFrom: forkedFrom || (existing && existing.forkedFrom) || undefined,
+  };
+}
+
 // Publish repository state (kind 30618)
-async function publishRepoState({ repoId, refs, privkey, relays = config.relays }) {
+async function publishRepoState({ repoId, refs, privkey, relays = config.relays, branch }) {
   const ownerNpub = nip19.npubEncode(getPublicKey(privkey));
   const targetRelays = mergeRepoRelays([
     ...(Array.isArray(relays) ? relays : []),
     ...graspRelaysForCloneUrls(buildFullGraspCloneUrls(ownerNpub, repoId)),
   ]);
   const sk = privkeyToUint8Array(privkey);
-  const normalizedRefs = (Array.isArray(refs) ? refs : [])
-    .map((r) => ({
-      ref: r?.ref || r?.name || '',
-      commit: r?.commit || ''
-    }))
-    .filter((r) => r.ref && typeof r.ref === 'string');
-  const hasHead = normalizedRefs.some((r) => r.ref === 'HEAD');
-  const firstHeadRef = normalizedRefs.find((r) => r.ref.startsWith('refs/heads/'));
-  if (!hasHead) {
-    const branch = firstHeadRef ? firstHeadRef.ref.replace('refs/heads/', '') : 'main';
-    normalizedRefs.push({ ref: 'HEAD', commit: `ref: refs/heads/${branch}` });
-  }
+  const normalizedRefs = nip34StateRefs(refs, branch);
   
   const unsignedEvent = {
     kind: KIND_REPOSITORY_STATE,
@@ -2344,6 +2430,9 @@ module.exports = {
   findReposByGithub,
   publishRepoAnnouncement,
   publishRepo: publishRepoAnnouncement, // Alias
+  resolveNip34HeadBranchName,
+  nip34StateRefs,
+  mirrorAnnouncementFields,
   publishRepoState,
   pushToBridge,
   publishSoftwareAnnounce,

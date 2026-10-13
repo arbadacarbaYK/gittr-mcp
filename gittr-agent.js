@@ -881,9 +881,7 @@ async function mirrorRepo(options) {
   }
   const {
     sourceUrl,        // GitHub or GitLab clone URL
-    description = '',
     relays = gittrNostr.config.relays,
-    graspServer = 'git.gittr.space'  // Use the server that actually works!
   } = options;
   let privkey = options.privkey;
   
@@ -942,18 +940,50 @@ async function mirrorRepo(options) {
   const cloneUrls = buildFullGraspCloneUrls(ownerNpub, repoName);
   
   // Publish announcement with source reference (needed for reverse GitHub lookup).
-  // forkedFrom is only a real parent (GitHub fork / gittr Fork), not this repo's own URL.
+  // A second call keeps the name, description, and web links already announced
+  // unless the caller passes new ones. forkedFrom stays a real parent, not this URL.
+  let existingAnnouncement = null;
+  try {
+    const existingEvent = await gittrNostr.fetchLatestRepo30617({
+      ownerPubkey: pubkey,
+      repoId: repoName,
+      relays,
+    });
+    existingAnnouncement = gittrNostr.parse30617Announcement(existingEvent);
+  } catch (e) {
+    throw new Error(
+      `Forge commits were updated, but the existing repo card could not be read, so it was not republished: ${e.message || e}. Retry mirrorRepo when the relays answer.`
+    );
+  }
+  const fields = gittrNostr.mirrorAnnouncementFields({
+    existing: existingAnnouncement,
+    repoName,
+    sourceUrl: webUrl || sourceUrl,
+    name: options.name,
+    description: options.description,
+    web: options.web,
+    ownerNpub,
+    pubkey,
+    publicRead: options.publicRead,
+    publicWrite: options.publicWrite,
+    pushCostSats: options.pushCostSats,
+    forkedFrom: options.forkedFrom,
+  });
   const result = await gittrNostr.publishRepoAnnouncement({
     repoId: repoName,
-    name: repoName,
-    description: description || `Mirrored from ${sourceUrl}`,
-    web: webUrl ? [webUrl] : [],
+    name: fields.name,
+    description: fields.description,
+    web: fields.web,
     clone: cloneUrls.length > 0 ? cloneUrls : [graspCloneUrl],
     source: webUrl || undefined,
     privkey,
     relays,
-    publicRead: options.publicRead,
-    publicWrite: options.publicWrite,
+    publicRead: fields.publicRead,
+    publicWrite: fields.publicWrite,
+    pushCostSats: fields.pushCostSats,
+    maintainers: fields.maintainers,
+    mergeMaintainers: fields.mergeMaintainers,
+    forkedFrom: fields.forkedFrom,
   });
   
   let stateEvent = null;
@@ -962,6 +992,7 @@ async function mirrorRepo(options) {
     const state = await gittrNostr.publishRepoState({
       repoId: repoName,
       refs: Array.isArray(synced.refs) ? synced.refs : [],
+      branch: synced.branch || 'main',
       privkey,
       relays,
     });
@@ -981,12 +1012,15 @@ async function mirrorRepo(options) {
     branch: synced.branch,
     headCommit: head,
     refs: synced.refs,
+    name: fields.name,
+    description: fields.description,
+    web: fields.web,
     announcementEvent: result.event,
     stateEvent,
     stateError,
     agentSummary: stateError
       ? `Forge commits are on gittr (${head}) and the announcement was published, but the state event failed: ${stateError}. Call publishRepoState with these refs. Do not call pushToBridge.`
-      : `Same result as the website Push. Forge history is on gittr (${synced.branch || 'main'} ${head}). The announcement lists the same git servers as the website, with the forge URL as the source. The state event names those commits. Do not call pushToBridge.`,
+      : `Same result as the website Push. Forge history is on gittr (${synced.branch || 'main'} ${head}). HEAD is that branch. The announcement lists the same git servers as the website, with the forge URL as the source. ${existingAnnouncement ? 'The existing name, description, and web links were kept.' : 'This is the first announcement for this name.'} Do not call pushToBridge.`,
   };
 }
 
@@ -3171,6 +3205,29 @@ async function mergePullRequest(options) {
   }
 }
 
+function resolveToolPrivkey(explicit) {
+  if (explicit) return explicit;
+  const creds = loadCredentials();
+  if (creds) return creds.nsec || creds.secretKey || creds.private_key || '';
+  return '';
+}
+
+async function publishRepoAnnouncement(options = {}) {
+  const privkey = resolveToolPrivkey(options.privkey);
+  if (!privkey) {
+    throw new Error(`Private key required. ${MISSING_KEY_GUIDANCE}`);
+  }
+  return gittrNostr.publishRepoAnnouncement({ ...options, privkey });
+}
+
+async function publishRepoState(options = {}) {
+  const privkey = resolveToolPrivkey(options.privkey);
+  if (!privkey) {
+    throw new Error(`Private key required. ${MISSING_KEY_GUIDANCE}`);
+  }
+  return gittrNostr.publishRepoState({ ...options, privkey });
+}
+
 module.exports = {
   loadCredentials,
   describeAgentAuth,
@@ -3188,6 +3245,8 @@ module.exports = {
   getFile,
   mirrorRepo,
   importRemoteToBridge,
+  publishRepoAnnouncement,
+  publishRepoState,
   listIssues,
   listPRs,
   listIssueComments,

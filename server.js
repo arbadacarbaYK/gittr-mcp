@@ -199,7 +199,7 @@ const tools = [
   },
   {
     name: 'publishRepoAnnouncement',
-    description: 'Publish repository to Nostr (kind 30617). Always writes the same clone addresses as the website Push (gittr, ngit, gitnostr, shakespeare, danconway). A GitHub URL is kept as the source, not as a clone. REQUIRES signing',
+    description: 'Publish repository to Nostr (kind 30617). Always writes the same clone addresses as the website Push (gittr, ngit, gitnostr, shakespeare, danconway). A GitHub URL is kept as the source, not as a clone. The private key is loaded from .nostr-keys.json when omitted.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -210,24 +210,25 @@ const tools = [
         clone: { type: 'array', items: { type: 'string' } },
         pushCostSats: { type: 'number', description: 'Optional pay-to-push; then call syncRepoPushPolicy with returned event' },
         publicRead: { type: 'boolean', description: 'false = private repo. Default true. Announcement name/description remain public on relays.' },
-        privkey: { type: 'string', description: '64-char hex or nsec' },
+        privkey: { type: 'string', description: 'Private key (auto-loaded from .nostr-keys.json)' },
         relays: { type: 'array', items: { type: 'string' } },
       },
-      required: ['repoId', 'name', 'privkey', 'relays'],
+      required: ['repoId', 'name'],
     },
   },
   {
     name: 'publishRepoState',
-    description: 'Publish repository state to Nostr (kind 30618) - REQUIRES signing',
+    description: 'Publish repository state to Nostr (kind 30618). HEAD follows branch when passed, otherwise main or master, not the alphabetically first branch. The private key is loaded from .nostr-keys.json when omitted.',
     inputSchema: {
       type: 'object',
       properties: {
         repoId: { type: 'string' },
         refs: { type: 'array', items: { type: 'object' } },
-        privkey: { type: 'string' },
+        branch: { type: 'string', description: 'Default branch for the HEAD tag, for example main' },
+        privkey: { type: 'string', description: 'Private key (auto-loaded from .nostr-keys.json)' },
         relays: { type: 'array', items: { type: 'string' } },
       },
-      required: ['repoId', 'refs', 'privkey', 'relays'],
+      required: ['repoId', 'refs'],
     },
   },
   // Agent convenience functions
@@ -298,13 +299,15 @@ const tools = [
   },
   {
     name: 'mirrorRepo',
-    description: 'Same result as the website Push of a GitHub/GitLab repo. Copies the forge commits onto gittr (keeps history, updates an existing repo), announces the same git servers as the website, and publishes the branch tips. Do not follow this with pushToBridge.',
+    description: 'Same result as the website Push of a GitHub/GitLab repo. Copies the forge commits onto gittr (keeps history, updates an existing repo), announces the same git servers as the website, and publishes the branch tips with HEAD on the forge default branch. A second call keeps the existing name, description, and web links unless you pass new ones. Do not follow this with pushToBridge.',
     inputSchema: {
       type: 'object',
       properties: {
         sourceUrl: { type: 'string', description: 'GitHub or GitLab clone URL' },
-        repoName: { type: 'string', description: 'Name for the new repo' },
-        description: { type: 'string', description: 'Description' },
+        repoName: { type: 'string', description: 'gittr repo name (the d tag), not the display title' },
+        name: { type: 'string', description: 'Display title. Omit to keep the title already announced.' },
+        description: { type: 'string', description: 'Omit to keep the description already announced.' },
+        web: { type: 'array', items: { type: 'string' }, description: 'Website links. Omit to keep the links already announced.' },
         privkey: { type: 'string', description: 'Private key (auto-loaded)' },
         relays: { type: 'array', items: { type: 'string' } },
         graspServer: { type: 'string' },
