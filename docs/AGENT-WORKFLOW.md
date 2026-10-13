@@ -77,6 +77,8 @@ A website Push with no local edits, while `source` is still GitHub, tries once t
 
 Only after the same commits are already on that forge: the owner pushed the gittr clone **to** the forge, and `git ls-remote` on the forge URL shows those commits. Then `mirrorRepo` with that URL is the normal website Push. Until that `ls-remote` succeeds, do not change `source`.
 
+The website sidebar does this for the owner. Under the source line, **If this git host is gone** has two choices and no third. **Keep the Nostr git copy** publishes a new card (`source-cleared`, same clone addresses) and does not fetch. **Use** a backup, or **Check this server**, fetches only when every gittr branch tip is already on that public forge. Point the owner at that. Do not invent a `mirrorRepo` call to drop GitHub. MCP has no tool that drops `source` without copying.
+
 ## New repo or file edits
 
 `createRepo` pushes the files and publishes the Nostr card (kinds 30617 and 30618) in one call.
