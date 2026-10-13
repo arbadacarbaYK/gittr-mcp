@@ -4,6 +4,7 @@
 
 ### Docs
 - Agent map is [docs/AGENT-WORKFLOW.md](docs/AGENT-WORKFLOW.md): `mirrorRepo` for a forge repo, `pushToBridge` only for file edits.
+- The parity doc no longer calls the gittr website “ngit”. ngit is Dan Conway’s client and GRASP relays (`relay.ngit.dev`, `ngit.danconwaydev.com`).
 
 ## 1.0.10 (2026-10-13)
 

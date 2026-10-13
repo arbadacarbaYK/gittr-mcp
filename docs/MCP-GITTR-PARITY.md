@@ -1,6 +1,6 @@
 # gittr-mcp vs gittr.space (parity audit)
 
-This document tracks how MCP tools map to the **current** gittr web app (`ngit` UI). Updated after the NIP-25 star / NIP-51 watch changes.
+This document tracks how MCP tools map to the **current** gittr website. Updated after the NIP-25 star / NIP-51 watch changes.
 
 ## Aligned (safe for agents)
 
@@ -59,4 +59,4 @@ Step-by-step which-tool map: [AGENT-WORKFLOW.md](AGENT-WORKFLOW.md).
 7. **Publish Pages:** `publishNostrPages({ files:[{path:'index.html', content:'…'}], dTag })` or `{ fromBridge:true, ownerPubkey, repoId }`. `dTag` is clipped to 1–13 characters.
 8. **Audit dependencies:** `auditRepoDependencies({ ownerPubkey, repoId })`.
 
-See also: [NIP25_STARS_NIP51_FOLLOWING.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/NIP25_STARS_NIP51_FOLLOWING.md) in the gittr repo (ngit).
+See also: [NIP25_STARS_NIP51_FOLLOWING.md](https://github.com/arbadacarbaYK/gittr/blob/main/docs/NIP25_STARS_NIP51_FOLLOWING.md) in the gittr repo.

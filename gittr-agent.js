@@ -317,7 +317,7 @@ async function createRepo(options) {
     pushPolicySync = { ok: false, error: e.message };
   }
 
-  // Send announcement directly to bridge API (same strategy as ngit UI) for faster indexing.
+  // Send announcement directly to bridge API (same strategy as the gittr website) for faster indexing.
   let bridgeEventForward = null;
   try {
     if (announceResult?.event) {
