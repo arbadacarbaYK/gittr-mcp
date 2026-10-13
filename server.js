@@ -161,7 +161,7 @@ const tools = [
   {
     name: 'pushToBridge',
     description:
-      'Push files to git server (REQUIRES signing with privkey). Optional deletedPaths removes files or whole folders on the bare tip (same as gittr UI folder delete); allowTreeShrink defaults true when deletes are present.',
+      'Push files to the git server (REQUIRES signing with privkey). This replaces the branch with one new snapshot commit. It does not keep imported GitHub history. Optional deletedPaths removes files or whole folders on that snapshot (same as gittr UI folder delete); allowTreeShrink defaults true when deletes are present.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1161,7 +1161,7 @@ const tools = [
   },
   {
     name: 'importRemoteToBridge',
-    description: 'Server-side git clone into bridge: import GitHub/Git URL into owner/repo on gittr (refetch)',
+    description: 'First copy of a Git URL onto the bridge. If the repo already exists, commits are left unchanged (not a refetch).',
     inputSchema: {
       type: 'object',
       properties: {

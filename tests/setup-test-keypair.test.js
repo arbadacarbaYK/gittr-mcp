@@ -59,5 +59,12 @@ assert(again.created === false && again.alreadyConfigured === true, 're-run: ref
 const forced = gittr.setupTestKeypair({ confirm: true, force: true });
 assert(forced.created === true && forced.pubkeyHex !== created.pubkeyHex, 'force: fresh identity written');
 
+// 7. PowerShell writes a UTF-8 BOM. The keys file must still load.
+const bomFile = path.join(tmp, '.nostr-keys.json');
+fs.writeFileSync(bomFile, '\uFEFF' + fs.readFileSync(bomFile, 'utf8'));
+const authBom = gittr.describeAgentAuth();
+assert(authBom.configured === true, 'BOM: keys file still loads');
+assert(authBom.pubkeyHex === forced.pubkeyHex, 'BOM: same pubkey');
+
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log('\n✓ setupTestKeypair flow test passed');

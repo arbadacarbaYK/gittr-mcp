@@ -4,6 +4,8 @@
 
 ### Fixes
 - **Same clone list as the website:** `publishRepoAnnouncement` always adds gittr, ngit, gitnostr, shakespeare, and danconway. A forge URL in `clone` is moved to `source`. `mirrorRepo` copies the repo onto gittr’s git server before announcing. `publishRepoState` is sent to those same git relays.
+- **Windows keys file:** `loadCredentials()` also reads `.nostr-keys.json` next to `server.js`, uses the OS home directory when `HOME` is unset, and strips a UTF-8 BOM before parsing.
+- **Import is not a refetch:** tool text no longer calls `importRemoteToBridge` a refetch. `pushToBridge` is described as a snapshot that replaces the branch.
 
 ## 1.0.9 (2026-10-07)
 

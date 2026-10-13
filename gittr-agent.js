@@ -18,16 +18,18 @@ const execFile = promisify(execFileCb);
 
 // Try to load credentials from various locations
 function loadCredentials() {
+  const home = process.env.HOME || os.homedir() || '';
   const possiblePaths = [
-    '.nostr-keys.json',
-    path.join(process.env.HOME || '', '.nostr-identity.json'),
-    path.join(process.env.HOME || '', '.config', 'gittr', 'keys.json')
+    path.join(process.cwd(), '.nostr-keys.json'),
+    path.join(__dirname, '.nostr-keys.json'),
+    path.join(home, '.nostr-identity.json'),
+    path.join(home, '.config', 'gittr', 'keys.json')
   ];
   
   for (const p of possiblePaths) {
     try {
-      if (fs.existsSync(p)) {
-        const content = fs.readFileSync(p, 'utf8');
+      if (p && fs.existsSync(p)) {
+        const content = fs.readFileSync(p, 'utf8').replace(/^\uFEFF/, '');
         const keys = JSON.parse(content);
         
         // Support various key formats
@@ -2147,13 +2149,22 @@ async function exploreRepos(options = {}) {
   });
 }
 
-/** Import / refresh a remote git URL into the gittr bridge working tree (server-side git clone). */
+/** First copy of a remote git URL onto the bridge. Does not refresh an existing repo. */
 async function importRemoteToBridge(options) {
   const { cloneUrl, ownerPubkey, repo, bridgeUrl } = options;
-  return bridgeApi.bridgeImportRepo(
+  const result = await bridgeApi.bridgeImportRepo(
     { cloneUrl, ownerPubkey, repo },
     bridgeUrl || gittrNostr.config.bridgeUrl
   );
+  if (result && /already exists/i.test(String(result.message || ''))) {
+    return {
+      ...result,
+      refetched: false,
+      agentSummary:
+        'The bridge already had this repo. Commits were not updated. pushToBridge replaces the branch with one new snapshot and drops imported history. To add commits on top, git push over SSH.',
+    };
+  }
+  return result;
 }
 
 /** Fetch a single issue event by hex id from relays. */

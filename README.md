@@ -110,7 +110,7 @@ These are the **processes** people actually run; each maps to MCP tools the agen
 ### Fork, mirror, import
 - **`forkRepo`** — fork an existing gittr repo under your key.  
 - **`mirrorRepo`** — copy from GitHub/GitLab URL to gittr.  
-- **`importRemoteToBridge`** — server-side import/refetch into bridge storage.
+- **`importRemoteToBridge`** — first copy of a Git URL onto the bridge. If that repo is already there, the server says so and does **not** update commits.
 
 ### Discover & social
 - **`listRepos`**, **`searchRepos`**, **`myRepos`**, **`exploreRepos`**, **`getTrendingRepos`** (trending = recent repos, not engagement rank)  
@@ -172,7 +172,7 @@ cp .nostr-keys.json.example .nostr-keys.json
 
 Edit `.nostr-keys.json` and set your **`nsec`** (or hex `secretKey`). The file is gitignored.
 
-Lookup order: `./.nostr-keys.json` → `~/.nostr-identity.json` → `~/.config/gittr/keys.json`.
+Lookup order: `./.nostr-keys.json` (the folder the MCP process was started in) → `.nostr-keys.json` next to `server.js` → `~/.nostr-identity.json` → `~/.config/gittr/keys.json`. On Windows, the home folder is used even when `HOME` is unset. A UTF-8 BOM (PowerShell’s default) is stripped before the file is read.
 
 **No key yet? Test keypair flow.** If no credentials are found, `describeAgentAuth` and all key-missing errors tell the agent to ask you whether a disposable **test keypair** should be created. If you agree, the agent calls **`setupTestKeypair({ confirm: true })`** — it writes a fresh identity into `.nostr-keys.json` (flagged `"generated": true`, file mode 600, never committed) and everything auto-loads it from then on. Replace the `nsec` in that file with your real key whenever you're ready; `describeAgentAuth` keeps reminding the agent that a test key is active. It never runs without `confirm: true` and never overwrites existing credentials unless you explicitly ask for `force: true` — anything published under a keypair stays under that identity forever, so this is always your call, not the agent's.
 
@@ -255,6 +255,7 @@ Short version — full detail in [docs/DEVELOPER.md](docs/DEVELOPER.md):
 3. **`mergePullRequest`** needs **`git`** on the machine running MCP and maintainer/owner rights.  
 4. Relays can rate-limit or lag; failed verification is a **failed** publish, not “maybe OK.”
 5. **Same clone list as the website.** `publishRepoAnnouncement`, `createRepo`, and `mirrorRepo` write `clone` for gittr, ngit, gitnostr, shakespeare, and danconway (npub paths). A GitHub/GitLab/Codeberg URL is the `source`, not a second clone, once those git addresses are present. `mirrorRepo` copies the forge repo onto gittr’s git server before that announcement. Dead hosts (`git-01.uid.ovh`, `ngit-relay.nostrver.se`) are not added.
+6. **`importRemoteToBridge` is not a refetch.** A second call leaves the commits as they are. **`pushToBridge` replaces the branch with one new snapshot** (author `gittr push`) and drops imported GitHub history. To add commits on top of that history, `git push` over SSH. Do not use `pushToBridge` to “sync the latest GitHub commit.”
 
 ### Do MCP users get gittr’s filter / CORS server fixes?
 
