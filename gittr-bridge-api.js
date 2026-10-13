@@ -332,6 +332,37 @@ async function bridgeImportRepo(
 }
 
 /**
+ * POST /api/nostr/repo/sync-from-source
+ * Copies a forge repo onto the bridge, or updates an existing one to the forge
+ * tips, without inventing a new commit. Requires the owner's signed 30617
+ * in X-Nostr-Auth-Event (same header as push).
+ */
+async function bridgeSyncFromSource(
+  { sourceUrl, ownerPubkey, repo, branch, authEventHeader },
+  bridgeUrl = baseUrl()
+) {
+  if (!authEventHeader) {
+    throw new Error('bridgeSyncFromSource requires the owner auth header');
+  }
+  const hex = normalizeOwnerPubkeyHexSync(ownerPubkey) || ownerPubkey;
+  const res = await guardedFetch(`${bridgeUrl}/api/nostr/repo/sync-from-source`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Nostr-Auth-Event': authEventHeader,
+    },
+    body: JSON.stringify({
+      ownerPubkey: hex,
+      repo,
+      sourceUrl,
+      branch: branch || undefined,
+    }),
+    timeoutMs: 180000,
+  });
+  return { ok: res.ok, status: res.status, ...(await readJson(res)) };
+}
+
+/**
  * GET /api/nostr/repo/push-payment?ownerPubkey=&repo=&payerPubkey=
  * Optional headers for owner wallet verification: x-owner-lnbits-url, x-owner-lnbits-read-key, x-owner-blink-api-key
  */
@@ -485,6 +516,7 @@ module.exports = {
   bridgeListRefs,
   bridgeListCommits,
   bridgeImportRepo,
+  bridgeSyncFromSource,
   getPushPaywallStatus,
   createPushPaywallIntent,
   bountyCreateInvoice,

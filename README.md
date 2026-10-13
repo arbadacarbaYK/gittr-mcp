@@ -109,8 +109,8 @@ These are the **processes** people actually run; each maps to MCP tools the agen
 
 ### Fork, mirror, import
 - **`forkRepo`** — fork an existing gittr repo under your key.  
-- **`mirrorRepo`** — copy from GitHub/GitLab URL to gittr.  
-- **`importRemoteToBridge`** — first copy of a Git URL onto the bridge. If that repo is already there, the server says so and does **not** update commits.
+- **`mirrorRepo`** — same result as the website Push of a GitHub/GitLab repo: forge commits on gittr (history kept, and a later call updates them), the same git-server list, and a state event that names those commits.  
+- **`importRemoteToBridge`** — copy onto the git server only. With the owner key, a later call updates the forge commits. It does not publish the Nostr card. Use **`mirrorRepo`** for the full website result.
 
 ### Discover & social
 - **`listRepos`**, **`searchRepos`**, **`myRepos`**, **`exploreRepos`**, **`getTrendingRepos`** (trending = recent repos, not engagement rank)  
@@ -254,17 +254,17 @@ Short version — full detail in [docs/DEVELOPER.md](docs/DEVELOPER.md):
 2. **`git clone`** only “works” for others if your published **`clone`** URL serves git HTTP. This MCP defaults toward **`https://git.gittr.space/<hex-pubkey>/<repo>.git`**. A failed clone means fix the URL in **30617**, not “ignore and continue.” Host-only values like `https://git.gittr.space` are rejected/expanded on publish.  
 3. **`mergePullRequest`** needs **`git`** on the machine running MCP and maintainer/owner rights.  
 4. Relays can rate-limit or lag; failed verification is a **failed** publish, not “maybe OK.”
-5. **Same clone list as the website.** `publishRepoAnnouncement`, `createRepo`, and `mirrorRepo` write `clone` for gittr, ngit, gitnostr, shakespeare, and danconway (npub paths). A GitHub/GitLab/Codeberg URL is the `source`, not a second clone, once those git addresses are present. `mirrorRepo` copies the forge repo onto gittr’s git server before that announcement. Dead hosts (`git-01.uid.ovh`, `ngit-relay.nostrver.se`) are not added.
-6. **`importRemoteToBridge` is not a refetch.** A second call leaves the commits as they are. **`pushToBridge` replaces the branch with one new snapshot** (author `gittr push`) and drops imported GitHub history. To add commits on top of that history, `git push` over SSH. Do not use `pushToBridge` to “sync the latest GitHub commit.”
+5. **Same result as the website Push.** `mirrorRepo` copies the forge commits (and updates them if the repo is already there), then writes `clone` for gittr, ngit, gitnostr, shakespeare, and danconway, keeps the forge URL in `source`, and publishes the branch tips. Dead hosts (`git-01.uid.ovh`, `ngit-relay.nostrver.se`) are not added.
+6. **`pushToBridge` replaces the branch with one new snapshot** (author `gittr push`) and drops imported GitHub history. That matches editing files on the website, not syncing GitHub. Do not use it after `mirrorRepo`.
 
 ### Do MCP users get gittr’s filter / CORS server fixes?
 
 **Mostly yes, without updating MCP.** Browser/`filter`/`uploadpack`/CORS fixes live on **`git.gittr.space`**. Anyone (including agents via MCP) cloning that host benefits as soon as the server is fixed.
 
-**MCP package updates are separate.** Cursor/Claude do **not** auto-pull new MCP code. To get new tools or clone-tag logic:
+**MCP updates are a new version, not an npm package.** This project is not installed from the npm registry. Cursor runs `node` on a local `server.js`. Claude can install the `.mcpb` file from [GitHub Releases](https://github.com/arbadacarbaYK/gittr-mcp/releases).
 
-- **git clone install:** `cd gittr-mcp && git pull && npm install`, then reload MCP / restart the host  
-- **Claude `.mcpb`:** download the latest from [Releases](https://github.com/arbadacarbaYK/gittr-mcp/releases) and reinstall the bundle
+- **Cursor:** in the folder whose path ends with `gittr-mcp/server.js`, run `git pull`, then reload the MCP. `npm install` is only the first-time library download in that folder. A normal update does not need it.
+- **Release file:** install the new `gittr-mcp-x.y.z.mcpb` from Releases. The old 1.0.9 file does not include later fixes. The version shown at startup is the way to tell them apart.
 
 ---
 

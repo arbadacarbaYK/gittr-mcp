@@ -298,7 +298,7 @@ const tools = [
   },
   {
     name: 'mirrorRepo',
-    description: 'Copy a GitHub/GitLab repo onto gittr\'s git server, then announce it with the same clone addresses the website Push uses.',
+    description: 'Same result as the website Push of a GitHub/GitLab repo. Copies the forge commits onto gittr (keeps history, updates an existing repo), announces the same git servers as the website, and publishes the branch tips. Do not follow this with pushToBridge.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1161,7 +1161,7 @@ const tools = [
   },
   {
     name: 'importRemoteToBridge',
-    description: 'First copy of a Git URL onto the bridge. If the repo already exists, commits are left unchanged (not a refetch).',
+    description: 'Copy a Git URL onto the bridge. With the owner key, an existing forge repo is updated to the forge commits (history kept). Does not publish the Nostr card — use mirrorRepo for the same result as the website Push. Do not use pushToBridge to sync a forge.',
     inputSchema: {
       type: 'object',
       properties: {

@@ -2373,6 +2373,7 @@ module.exports = {
   waitForEventVisibility,
   mergeRepoRelays,
   publishSettledCountsAsStored,
+  buildSignedAuthEventHeader,
   buildGitHttpsAuthGitConfigArgs,
   repoSlugFromHttpsGitUrl,
   requireRepoActingAuthority,

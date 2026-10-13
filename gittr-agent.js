@@ -898,26 +898,8 @@ async function mirrorRepo(options) {
   const pubkey = gittrNostr.getPublicKey(privkey);
   const ownerNpub = nip19.npubEncode(pubkey);
 
-  const importUrl = /\.git$/i.test(String(sourceUrl || ''))
-    ? String(sourceUrl)
-    : `${String(sourceUrl || '').replace(/\/+$/, '')}.git`;
-  const copied = await bridgeApi.bridgeImportRepo({
-    cloneUrl: importUrl,
-    ownerPubkey: pubkey,
-    repo: repoName,
-  });
-  if (!copied || copied.ok === false) {
-    const detail = copied && (copied.error || copied.message)
-      ? (copied.error || copied.message)
-      : `HTTP ${copied && copied.status}`;
-    throw new Error(
-      `Could not copy the repository onto gittr's git server before announcing: ${detail}`
-    );
-  }
-
   // Forge web URL for `source` (GitHub, GitLab, Codeberg, Forgejo, any https owner/repo).
   let webUrl = '';
-  let cloneUrl = sourceUrl;
   const httpsMatch = String(sourceUrl || '').match(
     /^https?:\/\/([^/]+)\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/i
   );
@@ -930,6 +912,27 @@ async function mirrorRepo(options) {
     webUrl = `https://${scpMatch[1]}/${scpMatch[2]}/${scpMatch[3]}`;
   }
   
+  // Same as the website Push of a forge repo: fetch the real commits (create or
+  // update). This does not invent a snapshot commit.
+  const authEventHeader = gittrNostr.buildSignedAuthEventHeader({
+    repo: repoName,
+    privkey,
+  });
+  const synced = await bridgeApi.bridgeSyncFromSource({
+    sourceUrl: webUrl || sourceUrl,
+    ownerPubkey: pubkey,
+    repo: repoName,
+    authEventHeader,
+  });
+  if (!synced || synced.ok === false || synced.success === false) {
+    const detail = synced && (synced.error || synced.details || synced.message)
+      ? (synced.error || synced.details || synced.message)
+      : `HTTP ${synced && synced.status}`;
+    throw new Error(
+      `Could not copy the forge commits onto gittr (history kept): ${detail}`
+    );
+  }
+
   // Create clone URLs: full GRASP push set (npub). Forge URL stays in source only.
   const graspCloneUrl = `https://git.gittr.space/${ownerNpub}/${repoName}.git`;
   const cloneUrls = buildFullGraspCloneUrls(ownerNpub, repoName);
@@ -949,14 +952,37 @@ async function mirrorRepo(options) {
     publicWrite: options.publicWrite,
   });
   
+  let stateEvent = null;
+  let stateError = null;
+  try {
+    const state = await gittrNostr.publishRepoState({
+      repoId: repoName,
+      refs: Array.isArray(synced.refs) ? synced.refs : [],
+      privkey,
+      relays,
+    });
+    stateEvent = state && state.event;
+  } catch (e) {
+    stateError = e.message || String(e);
+  }
+
+  const head = synced.headCommit || '';
   return {
-    success: true,
+    success: !stateError,
     repoId: repoName,
     cloneUrl: graspCloneUrl,
     cloneUrls,
     sourceUrl,
     webUrl,
-    announcementEvent: result.event
+    branch: synced.branch,
+    headCommit: head,
+    refs: synced.refs,
+    announcementEvent: result.event,
+    stateEvent,
+    stateError,
+    agentSummary: stateError
+      ? `Forge commits are on gittr (${head}) and the announcement was published, but the state event failed: ${stateError}. Call publishRepoState with these refs. Do not call pushToBridge.`
+      : `Same result as the website Push. Forge history is on gittr (${synced.branch || 'main'} ${head}). The announcement lists the same git servers as the website, with the forge URL as the source. The state event names those commits. Do not call pushToBridge.`,
   };
 }
 
@@ -2149,9 +2175,41 @@ async function exploreRepos(options = {}) {
   });
 }
 
-/** First copy of a remote git URL onto the bridge. Does not refresh an existing repo. */
+/** Copy a forge URL onto the bridge. With the owner's key, updates an existing repo to the forge commits. */
 async function importRemoteToBridge(options) {
   const { cloneUrl, ownerPubkey, repo, bridgeUrl } = options;
+  let privkey = options.privkey;
+  if (!privkey) {
+    const creds = loadCredentials();
+    if (creds) privkey = creds.nsec || creds.secretKey || creds.private_key;
+  }
+  const nostrGit = /git\.gittr\.space/i.test(String(cloneUrl || '')) || /\/npub1/i.test(String(cloneUrl || ''));
+  if (privkey && !nostrGit) {
+    const authEventHeader = gittrNostr.buildSignedAuthEventHeader({ repo, privkey });
+    const synced = await bridgeApi.bridgeSyncFromSource(
+      {
+        sourceUrl: cloneUrl,
+        ownerPubkey,
+        repo,
+        authEventHeader,
+      },
+      bridgeUrl || gittrNostr.config.bridgeUrl
+    );
+    if (synced && synced.ok !== false && synced.success !== false && synced.headCommit) {
+      return {
+        ...synced,
+        refetched: true,
+        agentSummary: `Forge commits are on gittr (${synced.branch || 'main'} ${synced.headCommit}). History was kept. This did not publish the Nostr card. Call mirrorRepo so the announcement and state event match the website.`,
+      };
+    }
+    return {
+      ...(synced || {}),
+      refetched: false,
+      agentSummary:
+        (synced && (synced.error || synced.details || synced.message)) ||
+        'Forge sync did not update commits. Do not use pushToBridge to retry — that replaces history with one snapshot.',
+    };
+  }
   const result = await bridgeApi.bridgeImportRepo(
     { cloneUrl, ownerPubkey, repo },
     bridgeUrl || gittrNostr.config.bridgeUrl
@@ -2161,7 +2219,7 @@ async function importRemoteToBridge(options) {
       ...result,
       refetched: false,
       agentSummary:
-        'The bridge already had this repo. Commits were not updated. pushToBridge replaces the branch with one new snapshot and drops imported history. To add commits on top, git push over SSH.',
+        'The bridge already had this repo and no owner key was available, so commits were not updated. Call mirrorRepo with the owner key. Do not use pushToBridge.',
     };
   }
   return result;

@@ -3,7 +3,8 @@
 ## Unreleased
 
 ### Fixes
-- **Same clone list as the website:** `publishRepoAnnouncement` always adds gittr, ngit, gitnostr, shakespeare, and danconway. A forge URL in `clone` is moved to `source`. `mirrorRepo` copies the repo onto gittr’s git server before announcing. `publishRepoState` is sent to those same git relays.
+- **`mirrorRepo` matches a website Push of a GitHub repo.** It updates the git server to the forge commits (history stays, a second call refreshes), announces the same git servers, and publishes the branch tips. `importRemoteToBridge` does that git update when the owner key is available. `pushToBridge` is still a snapshot and drops that history.
+- **Same clone list as the website:** `publishRepoAnnouncement` always adds gittr, ngit, gitnostr, shakespeare, and danconway. A forge URL in `clone` is moved to `source`. `publishRepoState` is sent to those same git relays.
 - **Windows keys file:** `loadCredentials()` also reads `.nostr-keys.json` next to `server.js`, uses the OS home directory when `HOME` is unset, and strips a UTF-8 BOM before parsing.
 - **Import is not a refetch:** tool text no longer calls `importRemoteToBridge` a refetch. `pushToBridge` is described as a snapshot that replaces the branch.
 
