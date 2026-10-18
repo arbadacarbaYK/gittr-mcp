@@ -15,7 +15,7 @@ if (typeof globalThis.WebSocket === 'undefined') {
 const config = require('./config');
 const {
   detectGraspFromRepoEvent,
-  buildFullGraspCloneUrls,
+  mergeUserGraspCloneUrls,
   canonicalAnnouncementCloneUrls,
   graspRelaysForCloneUrls,
 } = require('./grasp-detection');
@@ -198,6 +198,33 @@ function getPool() {
     pool = new SimplePool();
   }
   return pool;
+}
+
+/** Kind 10317 `g` tags for this key. Empty if relays are quiet. */
+async function fetchUserGraspHosts(pubkeyHex, relays) {
+  const author = String(pubkeyHex || '').trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(author)) return [];
+  const relaySet = buildReliabilityRelaySet(relays).slice(0, 6);
+  if (relaySet.length === 0) return [];
+  let events = [];
+  try {
+    events = await Promise.race([
+      getPool().querySync(relaySet, { kinds: [10317], authors: [author], limit: 8 }),
+      new Promise((resolve) => setTimeout(() => resolve([]), 2500)),
+    ]);
+  } catch (_) {
+    return [];
+  }
+  const latest = (Array.isArray(events) ? events : [])
+    .slice()
+    .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))[0];
+  if (!latest || !Array.isArray(latest.tags)) return [];
+  return latest.tags.filter((tag) => tag && tag[0] === 'g' && tag[1]).map((tag) => tag[1]);
+}
+
+async function announcementCloneUrlsForOwner({ ownerNpub, pubkeyHex, repoName, relays }) {
+  const user = await fetchUserGraspHosts(pubkeyHex, relays);
+  return mergeUserGraspCloneUrls(ownerNpub, repoName, user);
 }
 
 function buildReliabilityRelaySet(relays = []) {
@@ -1553,7 +1580,12 @@ async function publishRepoState({ repoId, refs, privkey, relays = config.relays,
   const ownerNpub = nip19.npubEncode(getPublicKey(privkey));
   const targetRelays = mergeRepoRelays([
     ...(Array.isArray(relays) ? relays : []),
-    ...graspRelaysForCloneUrls(buildFullGraspCloneUrls(ownerNpub, repoId)),
+    ...graspRelaysForCloneUrls(await announcementCloneUrlsForOwner({
+      ownerNpub,
+      pubkeyHex: getPublicKey(privkey),
+      repoName: repoId,
+      relays,
+    })),
   ]);
   const sk = privkeyToUint8Array(privkey);
   const normalizedRefs = nip34StateRefs(refs, branch);
@@ -2429,6 +2461,7 @@ module.exports = {
   findReposBySource,
   findReposByGithub,
   publishRepoAnnouncement,
+  announcementCloneUrlsForOwner,
   publishRepo: publishRepoAnnouncement, // Alias
   resolveNip34HeadBranchName,
   nip34StateRefs,

@@ -22,7 +22,7 @@ Works with **Cursor**, **Claude Desktop**, **VS Code / Copilot MCP**, **Windsurf
 
 **End result:** one MCP server connects your agent to **decentralized git on Nostr** — same account as on gittr.space (`nsec` / keys file), no separate vendor account for the agent.
 
-**Hosting note:** The website Create/Import flow stays **browser-local** until announce/Push. MCP `createRepo` / `mirrorRepo` / `pushToBridge` **do** write the bridge when you want hosted git — put `https://git.gittr.space/…` in `clone[]`. Soft-delete POSTs the tombstone to the bridge so disk is wiped.
+**Hosting note:** The website Create/Import flow stays **browser-local** until announce/Push. MCP `createRepo` / `mirrorRepo` / `pushToBridge` write the git the same way the website does. The clone addresses are the servers saved under **Settings → Relays** (yours first), then the public copies. Soft-delete POSTs the tombstone to the bridge so disk is wiped.
 
 ## Where this sits (platform map)
 

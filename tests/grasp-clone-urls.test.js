@@ -6,6 +6,7 @@
  */
 const {
   buildFullGraspCloneUrls,
+  mergeUserGraspCloneUrls,
   GRASP_CLONE_HOSTS_FOR_PUSH,
   canonicalAnnouncementCloneUrls,
   graspRelaysForCloneUrls,
@@ -64,5 +65,21 @@ assert(wss.includes('wss://relay.ngit.dev'), 'ngit relay');
 assert(wss.includes('wss://gitnostr.com'), 'gitnostr relay');
 assert(wss.includes('wss://git.shakespeare.diy'), 'shakespeare relay');
 assert(!wss.includes('wss://git.gittr.space'), 'git.gittr.space is not a relay');
+
+const named = mergeUserGraspCloneUrls(npub, repo, [
+  'wss://git.example.com',
+  'wss://relay.gittr.space',
+  'wss://relay.ngit.dev',
+]);
+assert(named[0] === `https://git.example.com/${npub}/${repo}.git`, 'your server is first');
+assert(named.some((u) => u.includes('https://git.gittr.space/')), 'public copies stay on the list');
+assert(!named.some((u) => u.includes('relay.gittr.space')), 'relay hostname is not a clone');
+assert(named.filter((u) => u.includes('relay.ngit.dev')).length === 1, 'no duplicate public host');
+
+const withYours = canonicalAnnouncementCloneUrls(npub, repo, named);
+assert(withYours.clone[0].includes('git.example.com'), 'announcement keeps your server first');
+const yoursWss = graspRelaysForCloneUrls(withYours.clone);
+assert(yoursWss.includes('wss://git.example.com'), 'your server is told about the repo');
+assert(!yoursWss.includes('wss://relay.gittr.space'), 'relay hostname stays out');
 
 console.log('✓ grasp-clone-urls: full push set (independent of relay cap)');

@@ -6,7 +6,6 @@ const bridgeApi = require('./gittr-bridge-api.js');
 const { probeGitSmartHttp } = require('./gittr-verify.js');
 const { withAgentHints, suggestNextStepsForTool } = require('./gittr-agent-outcomes.js');
 const { privkeyToUint8Array } = require('./gittr-keys.js');
-const { buildFullGraspCloneUrls } = require('./grasp-detection.js');
 const forgeTickets = require('./forge-tickets.js');
 const { nip19 } = require('nostr-tools');
 const fs = require('fs');
@@ -267,7 +266,12 @@ async function createRepo(options) {
   // Step 2: Build user-facing URLs. Publish **npub** paths (NIP-34); keep hex as
   // a working fallback probe (on-disk layout) when the npub symlink is missing.
   const ownerNpub = nip19.npubEncode(pubkey);
-  const announcementCloneUrls = buildFullGraspCloneUrls(ownerNpub, name);
+  const announcementCloneUrls = await gittrNostr.announcementCloneUrlsForOwner({
+    ownerNpub,
+    pubkeyHex: pubkey,
+    repoName: name,
+    relays,
+  });
   // Keep relay targeting deterministic: publish only to explicitly provided relays.
   // Cross-relay policy differences can reject announcements when clone/relay tags do not align.
   const announceRelays = buildRelayPublishSet(relays);
@@ -937,7 +941,12 @@ async function mirrorRepo(options) {
 
   // Create clone URLs: full GRASP push set (npub). Forge URL stays in source only.
   const graspCloneUrl = `https://git.gittr.space/${ownerNpub}/${repoName}.git`;
-  const cloneUrls = buildFullGraspCloneUrls(ownerNpub, repoName);
+  const cloneUrls = await gittrNostr.announcementCloneUrlsForOwner({
+    ownerNpub,
+    pubkeyHex: pubkey,
+    repoName,
+    relays,
+  });
   
   // Publish announcement with source reference (needed for reverse GitHub lookup).
   // A second call keeps the name, description, and web links already announced

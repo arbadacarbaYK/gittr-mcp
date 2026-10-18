@@ -36,6 +36,45 @@ function buildFullGraspCloneUrls(ownerNpubOrHex, repoName) {
   );
 }
 
+/** Never turn these into a clone URL, even if kind 10317 lists them. */
+const GRASP_PUSH_EXCLUDED = new Set([
+  'relay.gittr.space',
+  'git-01.uid.ovh',
+  'git-02.uid.ovh',
+  'git.jb55.com',
+  'ngit-relay.nostrver.se',
+]);
+
+function userNamedGraspHost(host) {
+  if (!host || GRASP_PUSH_EXCLUDED.has(host)) return false;
+  if (GRASP_CLONE_HOSTS_FOR_PUSH.includes(host)) return true;
+  if (host.includes('git.')) return true;
+  if (/git-\d+\./.test(host)) return true;
+  return false;
+}
+
+/**
+ * Kind 10317 hosts first, then the public copies. Same order the website uses.
+ * relay.gittr.space is dropped: it is the event relay, not a git disk.
+ */
+function mergeUserGraspCloneUrls(ownerNpubOrHex, repoName, userEntries) {
+  const owner = String(ownerNpubOrHex || '').trim();
+  const repo = String(repoName || '').trim().replace(/\.git$/i, '');
+  if (!owner || !repo) return [];
+  const clone = [];
+  const seen = new Set();
+  const add = (host) => {
+    if (!userNamedGraspHost(host) || seen.has(host)) return;
+    seen.add(host);
+    clone.push(`https://${host}/${owner}/${repo}.git`);
+  };
+  for (const entry of userEntries || []) {
+    add(gitHostname(String(entry || '').replace(/^wss:/i, 'https:')));
+  }
+  for (const host of GRASP_CLONE_HOSTS_FOR_PUSH) add(host);
+  return clone;
+}
+
 const FORGE_CLONE_HOSTS = ['github.com', 'gitlab.com', 'codeberg.org'];
 
 function gitHostname(url) {
@@ -66,8 +105,9 @@ function isForgeGitUrl(url) {
 function canonicalAnnouncementCloneUrls(ownerNpubOrHex, repoName, callerClone) {
   const grasp = buildFullGraspCloneUrls(ownerNpubOrHex, repoName);
   const graspHosts = new Set(grasp.map(gitHostname));
-  const extras = [];
+  const leading = [];
   const forgeUrls = [];
+  const seen = new Set();
   for (const raw of callerClone || []) {
     if (!raw || typeof raw !== 'string') continue;
     const url = raw.trim();
@@ -77,10 +117,19 @@ function canonicalAnnouncementCloneUrls(ownerNpubOrHex, repoName, callerClone) {
       continue;
     }
     const host = gitHostname(url);
-    if (host && graspHosts.has(host)) continue;
-    if (!extras.includes(url)) extras.push(url);
+    if (!host || seen.has(host) || graspHosts.has(host)) continue;
+    if (!userNamedGraspHost(host)) continue;
+    seen.add(host);
+    leading.push(`https://${host}/${String(ownerNpubOrHex || '').trim()}/${String(repoName || '').trim().replace(/\.git$/i, '')}.git`);
   }
-  return { clone: [...grasp, ...extras], forgeUrls };
+  const clone = [...leading];
+  for (const url of grasp) {
+    const host = gitHostname(url);
+    if (!host || seen.has(host)) continue;
+    seen.add(host);
+    clone.push(url);
+  }
+  return { clone, forgeUrls };
 }
 
 /** wss relays that must see the announcement or they reject it (clone host missing). git.gittr.space is git bytes, not a relay. */
@@ -89,9 +138,7 @@ function graspRelaysForCloneUrls(cloneUrls) {
   for (const url of cloneUrls || []) {
     const host = gitHostname(url);
     if (!host || host === 'git.gittr.space' || host === 'gittr.space') continue;
-    if (!GRASP_CLONE_HOSTS_FOR_PUSH.includes(host) && !KNOWN_GRASP_DOMAINS.includes(host)) {
-      continue;
-    }
+    if (GRASP_PUSH_EXCLUDED.has(host)) continue;
     const wss = `wss://${host}`;
     if (!out.includes(wss)) out.push(wss);
   }
@@ -201,6 +248,7 @@ module.exports = {
   KNOWN_GRASP_DOMAINS,
   GRASP_CLONE_HOSTS_FOR_PUSH,
   buildFullGraspCloneUrls,
+  mergeUserGraspCloneUrls,
   canonicalAnnouncementCloneUrls,
   graspRelaysForCloneUrls,
   isForgeGitUrl,
