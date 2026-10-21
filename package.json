@@ -17,7 +17,7 @@
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node tests/smoke.js && node tests/mcp-sdk-reachability.test.js && node tests/stdio-introspect.test.js && node tests/setup-test-keypair.test.js && node tests/public-read-tags.test.js && node tests/find-repos-by-github.test.js && node tests/grasp-clone-urls.test.js && node tests/mirror-sync-auth.test.js && node tests/mirror-announcement.test.js && node tests/announce-relays.test.js && node tests/comment-tags.test.js && node tests/forge-tickets.test.js && node tests/nip82-software.test.js && node tests/gittr-pages.test.js && node tests/security-audit-parse.test.js && node tests/forge-403-next-steps.test.js && node scripts/agent-happy-path.js",
+    "test": "node tests/node-runtime-floor.test.js && node tests/smoke.js && node tests/mcp-sdk-reachability.test.js && node tests/stdio-introspect.test.js && node tests/setup-test-keypair.test.js && node tests/public-read-tags.test.js && node tests/find-repos-by-github.test.js && node tests/grasp-clone-urls.test.js && node tests/mirror-sync-auth.test.js && node tests/mirror-announcement.test.js && node tests/announce-relays.test.js && node tests/comment-tags.test.js && node tests/forge-tickets.test.js && node tests/nip82-software.test.js && node tests/gittr-pages.test.js && node tests/security-audit-parse.test.js && node tests/forge-403-next-steps.test.js && node scripts/agent-happy-path.js",
     "test:smoke": "node tests/smoke.js",
     "test:regressions": "node tests/grasp-clone-urls.test.js && node tests/mirror-sync-auth.test.js && node tests/mirror-announcement.test.js && node tests/announce-relays.test.js && node tests/find-repos-by-github.test.js && node tests/mcp-sdk-reachability.test.js && node tests/comment-tags.test.js && node tests/forge-tickets.test.js && node tests/forge-403-next-steps.test.js",
     "test:mcp-stdio": "node scripts/mcp-stdio-live.js",
@@ -64,7 +64,7 @@
     "nodemon": "^3.1.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "^22.23.4 || ^24.22.1 || >=26.12.1"
   },
   "overrides": {
     "express-rate-limit": "8.5.1",

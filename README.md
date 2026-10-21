@@ -6,6 +6,8 @@
 
 Works with **Cursor**, **Claude Desktop**, **VS Code / Copilot MCP**, **Windsurf**, **OpenClaw**, or any host that speaks the [Model Context Protocol](https://modelcontextprotocol.io/) over stdio.
 
+Needs **Node 22.23.4, 24.22.1, or 26.12.1** (or a newer build on those lines). Node 18 and 20 have no fix for the October 2026 certificate and Brotli bugs, and gittr-mcp exits instead of starting on those.
+
 **Docs hub:** [gittr-docu](https://3un05jr4dnwh6njreq6uhzgv67st83jxi5lnpsbf8y3dkdq1qkgittr-docu.pages.gittr.space/) — product map and how this MCP sits next to the website.
 
 **This repo’s Page:** root [`index.html`](./index.html). After **Push Manifest**, save site name `gittr-mcp`.

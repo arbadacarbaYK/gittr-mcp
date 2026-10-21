@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // gittr-mcp-server.js - MCP Server wrapper for gittr-mcp
 
+require("./node-runtime-floor").assertNodeRuntime();
+
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const {
