@@ -144,13 +144,16 @@ assert.strictEqual(overrides.qs, '6.16.0');
 assert.strictEqual(overrides['proxy-addr'], '2.0.8');
 assert.strictEqual(overrides['brace-expansion'], '5.0.12');
 assert.strictEqual(overrides['ip-address'], '10.7.3');
+assert.strictEqual(overrides.zod, '4.6.7');
+assert.strictEqual(pkg.dependencies && pkg.dependencies.zod, '4.6.7');
 assertOverrideFloor('fast-uri', '3.1.8');
 assertOverrideFloor('hono', '4.13.5');
 assertOverrideFloor('qs', '6.16.0');
 assertOverrideFloor('proxy-addr', '2.0.8');
 assertOverrideFloor('brace-expansion', '5.0.12');
 assertOverrideFloor('ip-address', '10.7.3');
+assertOverrideFloor('zod', '4.6.6');
 
 console.log(
-  `✓ mcp-sdk-reachability: sdk=${sdkVersion} pkg=${pkg.version} stdio-only tools server (CVE-2026-104850 / CVE-2026-25536 / CVE-2026-0621 not reachable; fast-uri/hono/qs overrides)`
+  `✓ mcp-sdk-reachability: sdk=${sdkVersion} pkg=${pkg.version} stdio-only tools server (CVE-2026-104850 / CVE-2026-25536 / CVE-2026-0621 not reachable; fast-uri/hono/qs/zod overrides)`
 );

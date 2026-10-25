@@ -60,6 +60,16 @@ OSV.dev matches **transitive** copies that ship with `@modelcontextprotocol/sdk`
 
 A lockfile match is still not proof gittr-mcp is exploitable (especially hono `toSSG` / query-parser paths). Pinning stops the Dependencies tab from flagging known-patched versions inside the `.mcpb`.
 
+## CVE-2023-54404 / GHSA-mrhx-c7xc-m3w5
+
+**Package:** `zod` (unbounded issue lists while validating a huge array, set, or map).  
+**Affected:** every release before **4.6.6**. Zod 3, including 3.25.76, stays affected. There will not be another Zod 3 release.  
+**gittr-mcp:** direct dependency and `overrides.zod` are both **4.6.7** (npm rejects an override specifier that differs from the direct pin). That replaces the nested `zod@3.25.76` from `@anthropic-ai/mcpb`. The Dependencies tab treats every `zod` pin as direct because `package.json` lists the name.
+
+**Reachability:** **Not reachable on the server.** `server.js` does not import Zod. Nothing in this process validates a visitor-supplied array. `mcpb` uses Zod only when a maintainer packs a local manifest.
+
+**Verdict:** lockfile used to match on `zod@3.25.76` (and the direct `4.4.3` pin is also below 4.6.6). Override so the next Dependencies scan has nothing inside the range.
+
 ## Regression guard
 
 `tests/mcp-sdk-reachability.test.js` fails the suite if:

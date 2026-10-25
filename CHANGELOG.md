@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Security
+- Pin `zod` to **4.6.7** in both `dependencies` and `overrides`, so `@anthropic-ai/mcpb` cannot keep `zod@3.25.76`. CVE-2023-54404 / GHSA-mrhx-c7xc-m3w5 covers every Zod release before 4.6.6. The MCP server does not import Zod; the packaging tool does, for local manifest files.
 - Refuse to start on Node older than 22.23.4, 24.22.1, or 26.12.1. Node 18 and 20 have no patch for the October 2026 certificate and Brotli bugs.
 
 ### Docs
